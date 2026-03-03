@@ -1,6 +1,7 @@
 // ── Section types ──
 
 export type RentMode = "AUTONOMY_SCI" | "OPTIMISATION_FISCALE" | "DESENDETTEMENT_SCI" | "MIX";
+export type BoxMode = "MACRO" | "TYPOLOGIE";
 
 export interface ProjetData {
   nom: string;
@@ -43,37 +44,56 @@ export interface Phase {
   occupancyRate: number;
 }
 
-export interface BoxData {
-  surface: number;
-  prixM2: number;
-  tauxRemplissage: number;
+// ── Exploitation types ──
+
+export interface Typologie {
+  id: string;
+  nom: string;
+  surfaceParBox: number;
+  nombreDeBox: number;
+  prixMensuel: number;
+  actif: boolean;
+}
+
+export interface Capacite {
+  surfaceMacro: number | null;
+  prixM2Macro: number | null;
+  typologies: Typologie[];
 }
 
 export interface ServiceItem {
-  code: string;
-  pricingMode: "PER_M2" | "FIXED";
-  amount: number;
-  isActive: boolean;
+  id: string;
+  nom: string;
+  type: "FIXE" | "PAR_BOX" | "PAR_M2";
+  montantUnitaire: number;
+  actif: boolean;
 }
 
-export interface ChargeItem {
-  categoryCode: string;
-  monthlyAmount: number;
-  isActive: boolean;
+export interface GestionnaireParametres {
+  ratioNetVersBrut: number;
+  tauxChargesPatronales: number;
+  moisPayes: number;
 }
 
-export interface GestionnaireData {
-  salaryMonthly: number;
-  isActive: boolean;
+export interface Gestionnaire {
+  id: string;
+  nom: string;
+  actif: boolean;
+  dateDebutMois: number;
+  netMensuelCible: number;
+  tauxActivite: number;
+  parametres: GestionnaireParametres;
 }
 
 export interface ExploitationData {
-  box: BoxData;
+  modeBox: BoxMode;
+  capacite: Capacite;
   services: ServiceItem[];
-  charges: ChargeItem[];
-  gestionnaire: GestionnaireData;
+  gestionnaires: Gestionnaire[];
   phases: Phase[];
 }
+
+// ── Gouvernance ──
 
 export interface GouvernanceData {
   structureJuridique: string;
@@ -88,7 +108,7 @@ export interface GouvernanceData {
   };
 }
 
-// ── Defaults (jamais undefined) ──
+// ── Defaults ──
 
 export const DEFAULT_PROJET: ProjetData = {
   nom: "Mon projet",
@@ -117,12 +137,22 @@ export const DEFAULT_FINANCEMENT: FinancementData = {
   sciAmortization: 0,
 };
 
+export const DEFAULT_GESTIONNAIRE_PARAMS: GestionnaireParametres = {
+  ratioNetVersBrut: 0.78,
+  tauxChargesPatronales: 0.42,
+  moisPayes: 12,
+};
+
 export const DEFAULT_EXPLOITATION: ExploitationData = {
-  surface: 500,
-  prixM2: 15,
-  tauxRemplissage: 0.85,
+  modeBox: "MACRO",
+  capacite: {
+    surfaceMacro: 500,
+    prixM2Macro: 15,
+    typologies: [],
+  },
+  services: [],
+  gestionnaires: [],
   phases: [{ startMonth: 1, endMonth: 12, occupancyRate: 1.0 }],
-  opexPercentOfRevenue: 0.3,
 };
 
 export const DEFAULT_GOUVERNANCE: GouvernanceData = {
@@ -135,7 +165,7 @@ export const DEFAULT_GOUVERNANCE: GouvernanceData = {
   rentConstraints: { mode: "DESENDETTEMENT_SCI", monthlyRent: 0 },
 };
 
-// ── API payload type (aucun champ optionnel) ──
+// ── API payload type ──
 
 export interface ProjectionInputs {
   horizonMonths: number;
@@ -151,7 +181,6 @@ export interface ProjectionInputs {
     tauxRemplissage: number;
   };
   services: never[];
-  opexPercentOfRevenue: number;
   debts: DebtItem[];
   sciDebts: DebtItem[];
   sciChargesCash: number;

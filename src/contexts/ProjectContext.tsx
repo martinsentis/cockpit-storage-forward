@@ -111,13 +111,24 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       bufferMin: p.bufferMin ?? DEFAULT_PROJET.bufferMin,
       dscrMin: p.dscrMin ?? DEFAULT_PROJET.dscrMin,
       phases: e.phases && e.phases.length > 0 ? e.phases : DEFAULT_EXPLOITATION.phases,
-      revenueParams: {
-        surface: e.surface ?? DEFAULT_EXPLOITATION.surface,
-        prixM2: e.prixM2 ?? DEFAULT_EXPLOITATION.prixM2,
-        tauxRemplissage: e.tauxRemplissage ?? DEFAULT_EXPLOITATION.tauxRemplissage,
-      },
+      revenueParams: (() => {
+        if (e.modeBox === "MACRO") {
+          return {
+            surface: e.capacite.surfaceMacro ?? 0,
+            prixM2: e.capacite.prixM2Macro ?? 0,
+            tauxRemplissage: 1.0,
+          };
+        }
+        const activeTypos = (e.capacite.typologies ?? []).filter(t => t.actif);
+        const surface = activeTypos.reduce((s, t) => s + t.surfaceParBox * t.nombreDeBox, 0);
+        const caBox = activeTypos.reduce((s, t) => s + t.nombreDeBox * t.prixMensuel, 0);
+        return {
+          surface,
+          prixM2: surface > 0 ? caBox / surface : 0,
+          tauxRemplissage: 1.0,
+        };
+      })(),
       services: [],
-      opexPercentOfRevenue: e.opexPercentOfRevenue ?? DEFAULT_EXPLOITATION.opexPercentOfRevenue,
       debts: f.debts ?? [],
       sciDebts: f.sciDebts ?? [],
       sciChargesCash: f.sciChargesCash ?? DEFAULT_FINANCEMENT.sciChargesCash,
