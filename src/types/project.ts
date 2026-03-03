@@ -14,6 +14,8 @@ export interface ProjetData {
   dscrMin: number;
   initialCash: number;
   sciInitialCash: number;
+  defaultVatRate: number;
+  displayMode: "HT" | "TTC";
 }
 
 export interface BuildData {
