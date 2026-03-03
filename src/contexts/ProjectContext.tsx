@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import {
   ProjetData,
   BuildData,
@@ -14,6 +14,8 @@ import {
   DEFAULT_EXPLOITATION,
   DEFAULT_GOUVERNANCE,
 } from "@/types/project";
+
+const STORAGE_KEY = "pilotagebox_project_state";
 
 interface ProjectState {
   projet: ProjetData;
@@ -40,22 +42,46 @@ export const useProject = () => {
   return ctx;
 };
 
-export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [state, setState] = useState<ProjectState>({
-    projet: { ...DEFAULT_PROJET },
-    build: { ...DEFAULT_BUILD },
-    financement: { ...DEFAULT_FINANCEMENT },
-    exploitation: { ...DEFAULT_EXPLOITATION },
-    gouvernance: { ...DEFAULT_GOUVERNANCE },
-  });
+const defaultState: ProjectState = {
+  projet: { ...DEFAULT_PROJET },
+  build: { ...DEFAULT_BUILD },
+  financement: { ...DEFAULT_FINANCEMENT },
+  exploitation: { ...DEFAULT_EXPLOITATION },
+  gouvernance: { ...DEFAULT_GOUVERNANCE },
+};
 
-  const [validated, setValidated] = useState<ValidatedFlags>({
-    projet: false,
-    build: false,
-    financement: false,
-    exploitation: false,
-    gouvernance: false,
-  });
+const defaultValidated: ValidatedFlags = {
+  projet: false,
+  build: false,
+  financement: false,
+  exploitation: false,
+  gouvernance: false,
+};
+
+function loadFromStorage(): { state: ProjectState; validated: ValidatedFlags } {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        state: { ...defaultState, ...parsed.state },
+        validated: { ...defaultValidated, ...parsed.validated },
+      };
+    }
+  } catch {
+    // ignore
+  }
+  return { state: { ...defaultState }, validated: { ...defaultValidated } };
+}
+
+export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [initial] = useState(loadFromStorage);
+  const [state, setState] = useState<ProjectState>(initial.state);
+  const [validated, setValidated] = useState<ValidatedFlags>(initial.validated);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ state, validated }));
+  }, [state, validated]);
 
   const updateSection = useCallback(<K extends keyof ProjectState>(section: K, data: Partial<ProjectState[K]>) => {
     setState((prev) => ({ ...prev, [section]: { ...prev[section], ...data } }));
@@ -84,30 +110,23 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       taxRate: p.taxRate ?? DEFAULT_PROJET.taxRate,
       bufferMin: p.bufferMin ?? DEFAULT_PROJET.bufferMin,
       dscrMin: p.dscrMin ?? DEFAULT_PROJET.dscrMin,
-
       phases: e.phases && e.phases.length > 0 ? e.phases : DEFAULT_EXPLOITATION.phases,
-
       revenueParams: {
         surface: e.surface ?? DEFAULT_EXPLOITATION.surface,
         prixM2: e.prixM2 ?? DEFAULT_EXPLOITATION.prixM2,
         tauxRemplissage: e.tauxRemplissage ?? DEFAULT_EXPLOITATION.tauxRemplissage,
       },
-
       services: [],
-
       opexPercentOfRevenue: e.opexPercentOfRevenue ?? DEFAULT_EXPLOITATION.opexPercentOfRevenue,
-
       debts: f.debts ?? [],
       sciDebts: f.sciDebts ?? [],
       sciChargesCash: f.sciChargesCash ?? DEFAULT_FINANCEMENT.sciChargesCash,
       sciAmortization: f.sciAmortization ?? DEFAULT_FINANCEMENT.sciAmortization,
-
       ccaBalance: g.ccaBalance ?? DEFAULT_GOUVERNANCE.ccaBalance,
       distributableCashRate: g.distributableCashRate ?? DEFAULT_GOUVERNANCE.distributableCashRate,
       ccaPriorityRatio: g.ccaPriorityRatio ?? DEFAULT_GOUVERNANCE.ccaPriorityRatio,
       reserveStrategicRatio: g.reserveStrategicRatio ?? DEFAULT_GOUVERNANCE.reserveStrategicRatio,
       reserveAfterCcaFullyRepaid: g.reserveAfterCcaFullyRepaid ?? DEFAULT_GOUVERNANCE.reserveAfterCcaFullyRepaid,
-
       rentConstraints: {
         mode: "DESENDETTEMENT_SCI",
         monthlyRent: g.rentConstraints?.monthlyRent ?? 0,
