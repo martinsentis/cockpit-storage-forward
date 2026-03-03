@@ -1,48 +1,111 @@
 
 
-## Plan : Implémenter le Cockpit V1 complet
+# Refonte complète de l'onglet Exploitation
 
-### Contexte
-Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
+## Résumé
 
-### Fichiers à créer
+Remplacement total de la structure `ExploitationData` et de la page `ExploitationPage`. Suppression de `opexPercentOfRevenue`, `tauxRemplissage`, et de toute logique en % du CA. Nouvelle structure avec 3 blocs (Box/Capacité, Services, Gestionnaires) + synthèse automatique.
 
-**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
+## 1. `src/types/project.ts` — Refonte des types Exploitation
 
-**2. `src/types/project.ts`** — Types et defaults :
-- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
-- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
-  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
-  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
-  - `revenueParams` (surface, prixM2, tauxRemplissage)
-  - `services` ([] par défaut)
-  - `opexPercentOfRevenue`
-  - `debts`, `sciDebts` ([] par défaut)
-  - `sciChargesCash`, `sciAmortization` (0 par défaut)
-  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
-  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
-- Constantes `DEFAULT_*` exportées pour chaque section
+**Supprimer** : `BoxData`, `ServiceItem` (ancien), `ChargeItem`, `GestionnaireData` (ancien), et l'ancien `ExploitationData`.
 
-**3. `src/contexts/ProjectContext.tsx`** :
-- State initialisé avec les defaults
-- `validated` flags (5 booleans, tous false)
-- `updateSection()`, `validateSection()`, `isProjectComplete()`
-- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
+**Créer** les nouveaux types :
 
-**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
+```ts
+type BoxMode = "MACRO" | "TYPOLOGIE";
 
-**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
+interface Typologie {
+  id: string;
+  nom: string;
+  surfaceParBox: number;
+  nombreDeBox: number;
+  prixMensuel: number;
+  actif: boolean;
+}
 
-**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
-- Formulaires pré-remplis depuis le Context
-- Bouton "Enregistrer" → updateSection + validateSection
-- Champs par page alignés sur les inputs API
+interface Capacite {
+  surfaceMacro: number | null;
+  prixM2Macro: number | null;
+  typologies: Typologie[];
+}
 
-**7. `src/pages/DashboardPage.tsx`** :
-- Liste les sections manquantes si projet incomplet
-- Bouton "Lancer la simulation" désactivé si incomplet
-- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
-- Affiche réponse JSON ou erreur dans `<pre>`
+interface ServiceItem {
+  id: string;
+  nom: string;
+  type: "FIXE" | "PAR_BOX" | "PAR_M2";
+  montantUnitaire: number;
+  actif: boolean;
+}
 
-**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
+interface GestionnaireParametres {
+  ratioNetVersBrut: number;    // 0.78
+  tauxChargesPatronales: number; // 0.42
+  moisPayes: number;           // 12
+}
+
+interface Gestionnaire {
+  id: string;
+  nom: string;
+  actif: boolean;
+  dateDebutMois: number;
+  netMensuelCible: number;
+  tauxActivite: number;
+  parametres: GestionnaireParametres;
+}
+
+interface ExploitationData {
+  modeBox: BoxMode;
+  capacite: Capacite;
+  services: ServiceItem[];
+  gestionnaires: Gestionnaire[];
+  phases: Phase[];
+}
+```
+
+**`DEFAULT_EXPLOITATION`** : modeBox="MACRO", surfaceMacro=500, prixM2Macro=15, typologies=[], services=[], gestionnaires=[], phases=[{1,12,1.0}].
+
+**`ProjectionInputs`** : Supprimer `opexPercentOfRevenue`. Le champ `revenueParams` sera recalculé depuis la nouvelle structure (surface effective + prix m² implicite). `tauxRemplissage` fixé à 1.0 (économie stabilisée).
+
+## 2. `src/contexts/ProjectContext.tsx` — Adapter `buildProjectionInputs()`
+
+Lignes 113-120 : remplacer les accès `e.surface`, `e.prixM2`, `e.tauxRemplissage`, `e.opexPercentOfRevenue` par un calcul depuis la nouvelle structure :
+- Si `modeBox === "MACRO"` : surface = `capacite.surfaceMacro`, prixM2 = `capacite.prixM2Macro`
+- Si `modeBox === "TYPOLOGIE"` : surface = somme des (surfaceParBox × nombreDeBox) actifs, prixM2 = CA Box / surface
+- `tauxRemplissage` = 1.0 (stabilisé)
+- Supprimer `opexPercentOfRevenue` du retour
+
+## 3. `src/pages/ExploitationPage.tsx` — Refonte complète UI
+
+Page divisée en 4 blocs dans des Cards séparées :
+
+**Bloc 1 — Box / Capacité** :
+- ToggleGroup MACRO / TYPOLOGIE
+- Mode MACRO : 2 inputs (surface totale, prix m²), CA Box calculé
+- Mode TYPOLOGIE : table dynamique avec bouton "Ajouter une typologie", validation surface ≤ surfaceMacro
+- Affichage permanent en lecture seule : surface effective, nb box, CA Box, prix m² implicite
+
+**Bloc 2 — Services** :
+- Table dynamique (nom, type select FIXE/PAR_BOX/PAR_M2, montant, actif)
+- Bouton "Ajouter un service"
+- CA Services calculé automatiquement
+
+**Bloc 3 — Gestionnaires** :
+- Table dynamique (nom, actif, mois entrée, net cible, taux activité)
+- Paramètres avancés repliables (Collapsible) par gestionnaire
+- Calcul brut, charges, coût mensuel affiché par ligne
+- Total gestionnaires affiché
+
+**Bloc 4 — Synthèse** :
+- Card lecture seule : CA Box, CA Services, CA Total, Coût Gestionnaires, Résultat d'exploitation stabilisé
+
+Bouton "Enregistrer" en bas → `updateSection("exploitation", ...)` + `validateSection("exploitation")`
+
+## Fichiers impactés
+
+| Fichier | Action |
+|---|---|
+| `src/types/project.ts` | Refonte types Exploitation, supprimer anciens types inutilisés |
+| `src/contexts/ProjectContext.tsx` | Adapter buildProjectionInputs() |
+| `src/pages/ExploitationPage.tsx` | Réécriture complète |
 
