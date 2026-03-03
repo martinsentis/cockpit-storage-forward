@@ -106,7 +106,7 @@ export const DEFAULT_GOUVERNANCE: GouvernanceData = {
   ccaPriorityRatio: 0.7,
   reserveStrategicRatio: 0.1,
   reserveAfterCcaFullyRepaid: 0.3,
-  rentConstraints: { mode: "fixed", monthlyRent: 0 },
+  rentConstraints: { mode: "DESENDETTEMENT_SCI", monthlyRent: 0 },
 };
 
 // ── API payload type (aucun champ optionnel) ──
