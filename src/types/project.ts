@@ -89,11 +89,29 @@ export interface Gestionnaire {
   parametres: GestionnaireParametres;
 }
 
+export interface ChargeItem {
+  id: string;
+  entity: "SAS";
+  label: string;
+  category: ChargeCategory;
+  tag?: string;
+  type: "FIXE";
+  frequency: ChargeFrequency;
+  amountInput: number;
+  amountType: "HT" | "TTC";
+  vatRate: number;
+  annualMonth: number | null;
+  startMonth: number;
+  endMonth: number | null;
+  isActive: boolean;
+}
+
 export interface ExploitationData {
   modeBox: BoxMode;
   capacite: Capacite;
   services: ServiceItem[];
   gestionnaires: Gestionnaire[];
+  charges: ChargeItem[];
   phases: Phase[];
 }
 
