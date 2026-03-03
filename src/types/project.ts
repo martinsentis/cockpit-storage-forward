@@ -1,5 +1,11 @@
 // ── Section types ──
 
+export type RentMode =
+  | "AUTONOMY_SCI"
+  | "OPTIMISATION_FISCALE"
+  | "DESENDETTEMENT_SCI"
+  | "MIX";
+
 export interface ProjetData {
   nom: string;
   localisation: string;
@@ -56,9 +62,10 @@ export interface GouvernanceData {
   ccaPriorityRatio: number;
   reserveStrategicRatio: number;
   reserveAfterCcaFullyRepaid: number;
-  rentConstraints: {
-    mode: "fixed" | "variable";
-    monthlyRent: number;
+rentConstraints: {
+  mode: RentMode;
+  monthlyRent: number;
+};
   };
 }
 
@@ -135,10 +142,10 @@ export interface ProjectionInputs {
   ccaPriorityRatio: number;
   reserveStrategicRatio: number;
   reserveAfterCcaFullyRepaid: number;
-  rentConstraints: {
-    mode: "fixed" | "variable";
-    monthlyRent: number;
-  };
+rentConstraints: {
+  mode: RentMode;
+  monthlyRent: number;
+};
 }
 
 // ── Validated flags ──
