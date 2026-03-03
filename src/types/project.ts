@@ -2,6 +2,8 @@
 
 export type RentMode = "AUTONOMY_SCI" | "OPTIMISATION_FISCALE" | "DESENDETTEMENT_SCI" | "MIX";
 export type BoxMode = "MACRO" | "TYPOLOGIE";
+export type ChargeCategory = "IMMOBILIER" | "ENERGIE" | "SECURITE" | "MARKETING" | "EXPLOITATION" | "ADMINISTRATIF" | "AUTRE";
+export type ChargeFrequency = "MENSUELLE" | "ANNUELLE";
 
 export interface ProjetData {
   nom: string;
