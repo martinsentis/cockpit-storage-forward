@@ -141,6 +141,8 @@ export const DEFAULT_PROJET: ProjetData = {
   dscrMin: 1.2,
   initialCash: 100000,
   sciInitialCash: 50000,
+  defaultVatRate: 0.20,
+  displayMode: "HT",
 };
 
 export const DEFAULT_BUILD: BuildData = {
