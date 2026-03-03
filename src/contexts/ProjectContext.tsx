@@ -114,12 +114,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       revenueParams: (() => {
         if (e.modeBox === "MACRO") {
           return {
-            surface: e.capacite.surfaceMacro ?? 0,
-            prixM2: e.capacite.prixM2Macro ?? 0,
+            surface: e.capacite?.surfaceMacro ?? 0,
+            prixM2: e.capacite?.prixM2Macro ?? 0,
             tauxRemplissage: 1.0,
           };
         }
-        const activeTypos = (e.capacite.typologies ?? []).filter(t => t.actif);
+        const activeTypos = (e.capacite?.typologies ?? []).filter(t => t.actif);
         const surface = activeTypos.reduce((s, t) => s + t.surfaceParBox * t.nombreDeBox, 0);
         const caBox = activeTypos.reduce((s, t) => s + t.nombreDeBox * t.prixMensuel, 0);
         return {
