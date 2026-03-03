@@ -1,10 +1,6 @@
 // ── Section types ──
 
-export type RentMode =
-  | "AUTONOMY_SCI"
-  | "OPTIMISATION_FISCALE"
-  | "DESENDETTEMENT_SCI"
-  | "MIX";
+export type RentMode = "AUTONOMY_SCI" | "OPTIMISATION_FISCALE" | "DESENDETTEMENT_SCI" | "MIX";
 
 export interface ProjetData {
   nom: string;
@@ -47,12 +43,36 @@ export interface Phase {
   occupancyRate: number;
 }
 
-export interface ExploitationData {
+export interface BoxData {
   surface: number;
   prixM2: number;
   tauxRemplissage: number;
+}
+
+export interface ServiceItem {
+  code: string;
+  pricingMode: "PER_M2" | "FIXED";
+  amount: number;
+  isActive: boolean;
+}
+
+export interface ChargeItem {
+  categoryCode: string;
+  monthlyAmount: number;
+  isActive: boolean;
+}
+
+export interface GestionnaireData {
+  salaryMonthly: number;
+  isActive: boolean;
+}
+
+export interface ExploitationData {
+  box: BoxData;
+  services: ServiceItem[];
+  charges: ChargeItem[];
+  gestionnaire: GestionnaireData;
   phases: Phase[];
-  opexPercentOfRevenue: number;
 }
 
 export interface GouvernanceData {
@@ -141,10 +161,10 @@ export interface ProjectionInputs {
   ccaPriorityRatio: number;
   reserveStrategicRatio: number;
   reserveAfterCcaFullyRepaid: number;
-rentConstraints: {
-  mode: RentMode;
-  monthlyRent: number;
-};
+  rentConstraints: {
+    mode: RentMode;
+    monthlyRent: number;
+  };
 }
 
 // ── Validated flags ──
