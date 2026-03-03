@@ -176,6 +176,7 @@ export const DEFAULT_EXPLOITATION: ExploitationData = {
   },
   services: [],
   gestionnaires: [],
+  charges: [],
   phases: [{ startMonth: 1, endMonth: 12, occupancyRate: 1.0 }],
 };
 
