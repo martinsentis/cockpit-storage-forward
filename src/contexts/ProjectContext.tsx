@@ -1,8 +1,18 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
 import {
-  ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData,
-  ValidatedFlags, SectionName, ProjectionInputs,
-  DEFAULT_PROJET, DEFAULT_BUILD, DEFAULT_FINANCEMENT, DEFAULT_EXPLOITATION, DEFAULT_GOUVERNANCE,
+  ProjetData,
+  BuildData,
+  FinancementData,
+  ExploitationData,
+  GouvernanceData,
+  ValidatedFlags,
+  SectionName,
+  ProjectionInputs,
+  DEFAULT_PROJET,
+  DEFAULT_BUILD,
+  DEFAULT_FINANCEMENT,
+  DEFAULT_EXPLOITATION,
+  DEFAULT_GOUVERNANCE,
 } from "@/types/project";
 
 interface ProjectState {
@@ -40,19 +50,25 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   });
 
   const [validated, setValidated] = useState<ValidatedFlags>({
-    projet: false, build: false, financement: false, exploitation: false, gouvernance: false,
+    projet: false,
+    build: false,
+    financement: false,
+    exploitation: false,
+    gouvernance: false,
   });
 
   const updateSection = useCallback(<K extends keyof ProjectState>(section: K, data: Partial<ProjectState[K]>) => {
-    setState(prev => ({ ...prev, [section]: { ...prev[section], ...data } }));
+    setState((prev) => ({ ...prev, [section]: { ...prev[section], ...data } }));
   }, []);
 
   const validateSection = useCallback((section: SectionName) => {
-    setValidated(prev => ({ ...prev, [section]: true }));
+    setValidated((prev) => ({ ...prev, [section]: true }));
   }, []);
 
   const isProjectComplete = useCallback(() => {
-    return validated.projet && validated.build && validated.financement && validated.exploitation && validated.gouvernance;
+    return (
+      validated.projet && validated.build && validated.financement && validated.exploitation && validated.gouvernance
+    );
   }, [validated]);
 
   const buildProjectionInputs = useCallback((): ProjectionInputs => {
@@ -69,7 +85,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       bufferMin: p.bufferMin ?? DEFAULT_PROJET.bufferMin,
       dscrMin: p.dscrMin ?? DEFAULT_PROJET.dscrMin,
 
-      phases: (e.phases && e.phases.length > 0) ? e.phases : DEFAULT_EXPLOITATION.phases,
+      phases: e.phases && e.phases.length > 0 ? e.phases : DEFAULT_EXPLOITATION.phases,
 
       revenueParams: {
         surface: e.surface ?? DEFAULT_EXPLOITATION.surface,
@@ -93,14 +109,16 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       reserveAfterCcaFullyRepaid: g.reserveAfterCcaFullyRepaid ?? DEFAULT_GOUVERNANCE.reserveAfterCcaFullyRepaid,
 
       rentConstraints: {
-        mode: g.rentConstraints?.mode ?? DEFAULT_GOUVERNANCE.rentConstraints.mode,
-        monthlyRent: g.rentConstraints?.monthlyRent ?? DEFAULT_GOUVERNANCE.rentConstraints.monthlyRent,
+        mode: "DESENDETTEMENT_SCI",
+        monthlyRent: g.rentConstraints?.monthlyRent ?? 0,
       },
     };
   }, [state]);
 
   return (
-    <ProjectContext.Provider value={{ state, validated, updateSection, validateSection, isProjectComplete, buildProjectionInputs }}>
+    <ProjectContext.Provider
+      value={{ state, validated, updateSection, validateSection, isProjectComplete, buildProjectionInputs }}
+    >
       {children}
     </ProjectContext.Provider>
   );
