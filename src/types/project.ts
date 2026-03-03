@@ -62,10 +62,9 @@ export interface GouvernanceData {
   ccaPriorityRatio: number;
   reserveStrategicRatio: number;
   reserveAfterCcaFullyRepaid: number;
-rentConstraints: {
-  mode: RentMode;
-  monthlyRent: number;
-};
+  rentConstraints: {
+    mode: RentMode;
+    monthlyRent: number;
   };
 }
 
