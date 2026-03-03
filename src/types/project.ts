@@ -2,6 +2,8 @@
 
 export type RentMode = "AUTONOMY_SCI" | "OPTIMISATION_FISCALE" | "DESENDETTEMENT_SCI" | "MIX";
 export type BoxMode = "MACRO" | "TYPOLOGIE";
+export type ChargeCategory = "IMMOBILIER" | "ENERGIE" | "SECURITE" | "MARKETING" | "EXPLOITATION" | "ADMINISTRATIF" | "AUTRE";
+export type ChargeFrequency = "MENSUELLE" | "ANNUELLE";
 
 export interface ProjetData {
   nom: string;
@@ -12,6 +14,8 @@ export interface ProjetData {
   dscrMin: number;
   initialCash: number;
   sciInitialCash: number;
+  defaultVatRate: number;
+  displayMode: "HT" | "TTC";
 }
 
 export interface BuildData {
@@ -85,11 +89,29 @@ export interface Gestionnaire {
   parametres: GestionnaireParametres;
 }
 
+export interface ChargeItem {
+  id: string;
+  entity: "SAS";
+  label: string;
+  category: ChargeCategory;
+  tag?: string;
+  type: "FIXE";
+  frequency: ChargeFrequency;
+  amountInput: number;
+  amountType: "HT" | "TTC";
+  vatRate: number;
+  annualMonth: number | null;
+  startMonth: number;
+  endMonth: number | null;
+  isActive: boolean;
+}
+
 export interface ExploitationData {
   modeBox: BoxMode;
   capacite: Capacite;
   services: ServiceItem[];
   gestionnaires: Gestionnaire[];
+  charges: ChargeItem[];
   phases: Phase[];
 }
 
@@ -119,6 +141,8 @@ export const DEFAULT_PROJET: ProjetData = {
   dscrMin: 1.2,
   initialCash: 100000,
   sciInitialCash: 50000,
+  defaultVatRate: 0.20,
+  displayMode: "HT",
 };
 
 export const DEFAULT_BUILD: BuildData = {
@@ -152,6 +176,7 @@ export const DEFAULT_EXPLOITATION: ExploitationData = {
   },
   services: [],
   gestionnaires: [],
+  charges: [],
   phases: [{ startMonth: 1, endMonth: 12, occupancyRate: 1.0 }],
 };
 

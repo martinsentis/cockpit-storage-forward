@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 
 export default function ProjetPage() {
@@ -54,6 +55,20 @@ export default function ProjetPage() {
           <div className="space-y-2">
             <Label>Trésorerie initiale SCI (€)</Label>
             <Input type="number" value={form.sciInitialCash} onChange={e => set("sciInitialCash", Number(e.target.value))} />
+          </div>
+          <div className="space-y-2">
+            <Label>Taux TVA par défaut (%)</Label>
+            <Input type="number" step="1" value={Math.round((form.defaultVatRate ?? 0.20) * 100)} onChange={e => set("defaultVatRate", Number(e.target.value) / 100)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Affichage montants</Label>
+            <Select value={form.displayMode ?? "HT"} onValueChange={v => set("displayMode", v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="HT">HT</SelectItem>
+                <SelectItem value="TTC">TTC</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <Button onClick={save} className="w-full">Enregistrer</Button>
