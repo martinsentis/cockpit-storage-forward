@@ -190,6 +190,7 @@ function migrateGouvernance(g: any): GouvernanceData {
     ccaPriorityRatio: g?.ccaPriorityRatio ?? DEFAULT_GOUVERNANCE.ccaPriorityRatio,
     reserveStrategicRatio: g?.reserveStrategicRatio ?? DEFAULT_GOUVERNANCE.reserveStrategicRatio,
     reserveAfterCcaFullyRepaid: g?.reserveAfterCcaFullyRepaid ?? DEFAULT_GOUVERNANCE.reserveAfterCcaFullyRepaid,
+    entityRules: g?.entityRules ?? [],
   };
 }
 
