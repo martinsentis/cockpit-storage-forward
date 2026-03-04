@@ -121,7 +121,7 @@ export default function FoncierePage() {
                 <TableBody>
                   {state.build.assets.map(a => (
                     <TableRow key={a.id}>
-                      <TableCell>{BUILD_ASSET_CATEGORY_LABELS[a.category]}</TableCell>
+                      <TableCell>{CAPEX_CATEGORY_LABELS[a.category]}</TableCell>
                       <TableCell>{a.label}</TableCell>
                       <TableCell className="text-right">{fmt(a.amount)} €</TableCell>
                       <TableCell className="text-right">{formatMonthIndex(a.commissioningMonth, projectStartDate)}</TableCell>

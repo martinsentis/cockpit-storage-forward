@@ -229,9 +229,11 @@ function computeFonciere(inputs: EngineInputs, loyerMensuelHT: number): Fonciere
     (t, d) => t + d.amount * (d.annualRate / 100 / 12), 0
   );
 
-  const amortissementAnnuel = inputs.build.assets.reduce(
-    (t, a) => a.depreciationYears > 0 ? t + a.amount / a.depreciationYears : t, 0
-  );
+  const amortissementAnnuel = inputs.build.assets
+    .filter(a => a.amortissable !== false)
+    .reduce(
+      (t, a) => a.depreciationYears > 0 ? t + a.amount / a.depreciationYears : t, 0
+    );
 
   const resultatExploitationSCI = totalRevenusMensuelHT - totalChargesMensuellesHT;
   const resultatCourant = resultatExploitationSCI - interetsMensuels;
