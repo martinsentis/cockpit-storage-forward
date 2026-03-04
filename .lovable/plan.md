@@ -1,42 +1,48 @@
 
 
-# Plan : Synthèse Exploitation en 2 colonnes (100% vs Cible)
+## Plan : Implémenter le Cockpit V1 complet
 
-## Changement
+### Contexte
+Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
 
-Transformer le bloc "Synthèse — Exploitation stabilisée" en un tableau à 2 colonnes de données :
-- **Colonne 1 — "100% remplissage"** : CA Box et CA Services calculés à 100% d'occupation
-- **Colonne 2 — "Occupation cible"** : CA Box et CA Services pondérés par le `targetOccupancy` moyen des phases
+### Fichiers à créer
 
-Les lignes de charges (gestionnaires, charges) restent identiques dans les deux colonnes (charges fixes). Le résultat d'exploitation diffère donc uniquement par le CA.
+**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
 
-## Calculs dans `derived`
+**2. `src/types/project.ts`** — Types et defaults :
+- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
+- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
+  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
+  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
+  - `revenueParams` (surface, prixM2, tauxRemplissage)
+  - `services` ([] par défaut)
+  - `opexPercentOfRevenue`
+  - `debts`, `sciDebts` ([] par défaut)
+  - `sciChargesCash`, `sciAmortization` (0 par défaut)
+  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
+  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
+- Constantes `DEFAULT_*` exportées pour chaque section
 
-Ajouter :
-- `targetOccupancyWeighted` : moyenne pondérée par surface des `targetOccupancy` de chaque phase
-- `totalCAHT_cible = totalCAHT * targetOccupancyWeighted`
-- `totalCATTC_cible = totalCATTC * targetOccupancyWeighted`
-- `caServices_cible` : pour les services PAR_BOX et PAR_M2, pondérer par le taux cible
-- `caTotal_cible`, `resultat_cible`
+**3. `src/contexts/ProjectContext.tsx`** :
+- State initialisé avec les defaults
+- `validated` flags (5 booleans, tous false)
+- `updateSection()`, `validateSection()`, `isProjectComplete()`
+- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
 
-## UI
+**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
 
-Remplacer la grille `grid-cols-2` par un mini-tableau (ou `grid-cols-3`) :
+**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
 
-```
-Ligne                  | 100% rempli  | Cible (XX%)
-CA Box HT              |   xxx €      |   xxx €
-CA Services            |   xxx €      |   xxx €
-CA Total               |   xxx €      |   xxx €
-Coût Gestionnaires     |  −xxx €      |  −xxx €
-Charges HT             |  −xxx €      |  −xxx €
-─────────────────────────────────────────────────
-Résultat exploitation   |   xxx €      |   xxx €
-```
+**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
+- Formulaires pré-remplis depuis le Context
+- Bouton "Enregistrer" → updateSection + validateSection
+- Champs par page alignés sur les inputs API
 
-## Fichier impacté
+**7. `src/pages/DashboardPage.tsx`** :
+- Liste les sections manquantes si projet incomplet
+- Bouton "Lancer la simulation" désactivé si incomplet
+- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
+- Affiche réponse JSON ou erreur dans `<pre>`
 
-| Fichier | Action |
-|---|---|
-| `src/pages/ExploitationPage.tsx` | Enrichir `derived` avec les valeurs cible, refondre le bloc synthèse en 2 colonnes |
+**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
 
