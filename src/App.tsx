@@ -13,6 +13,7 @@ import FoncierePage from "@/pages/FoncierePage";
 import LoyerDynamiquePage from "@/pages/LoyerDynamiquePage";
 import GouvernancePage from "@/pages/GouvernancePage";
 import AssociesPage from "@/pages/AssociesPage";
+import ApportsPage from "@/pages/ApportsPage";
 import DashboardPage from "@/pages/DashboardPage";
 import NotFound from "./pages/NotFound";
 
@@ -36,6 +37,7 @@ const App = () => (
               <Route path="/loyer-dynamique" element={<LoyerDynamiquePage />} />
               <Route path="/gouvernance" element={<GouvernancePage />} />
               <Route path="/associes" element={<AssociesPage />} />
+              <Route path="/apports" element={<ApportsPage />} />
               <Route path="/dashboard" element={<DashboardPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />

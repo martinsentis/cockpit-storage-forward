@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useProject } from "@/contexts/ProjectContext";
+import { useNavigate } from "react-router-dom";
 import type { Associe, PersonType, SocieteType } from "@/types/project";
 import { SOCIETE_TYPE_LABELS } from "@/types/project";
 import { computeEconomicOwnership, validateOwnership } from "@/lib/ownershipGraph";
@@ -12,13 +13,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, CheckCircle, Plus, Pencil, Trash2, Info } from "lucide-react";
+import { AlertTriangle, CheckCircle, Plus, Pencil, Trash2, Info, ExternalLink } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function AssociesPage() {
   const { state, updateSection, validateSection, validated } = useProject();
+  const navigate = useNavigate();
   const associes = state.associes.associes;
+  const apports = state.apports.apports;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
 
@@ -348,14 +351,15 @@ export default function AssociesPage() {
           </div>
         </TabsContent>
 
-        {/* ── SECTION 4: Apports (placeholder) ── */}
         <TabsContent value="apports" className="space-y-4">
-          <h2 className="text-lg font-semibold text-foreground">Synthèse des apports associés</h2>
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-foreground">Synthèse des apports associés</h2>
+            <Button size="sm" variant="outline" onClick={() => navigate("/apports")}>
+              <ExternalLink className="h-4 w-4 mr-1" /> Module Apports associés
+            </Button>
+          </div>
           <Card>
-            <CardContent className="py-8">
-              <p className="text-center text-muted-foreground mb-4">
-                Les apports associés seront disponibles dans un module dédié.
-              </p>
+            <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -366,9 +370,36 @@ export default function AssociesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">Aucune donnée</TableCell>
-                  </TableRow>
+                  {(() => {
+                    const map = new Map<string, { capital: number; cca: number }>();
+                    for (const a of apports) {
+                      if (!map.has(a.apporteurId)) map.set(a.apporteurId, { capital: 0, cca: 0 });
+                      const entry = map.get(a.apporteurId)!;
+                      if (a.type === "CAPITAL") entry.capital += a.montant;
+                      else entry.cca += a.montant;
+                    }
+                    const rows = Array.from(map.entries());
+                    if (rows.length === 0) {
+                      return (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center text-muted-foreground py-6">Aucun apport enregistré</TableCell>
+                        </TableRow>
+                      );
+                    }
+                    const fmt = (n: number) => n.toLocaleString("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+                    return rows.map(([id, v]) => {
+                      const assoc = associes.find(x => x.id === id);
+                      const nom = assoc ? (assoc.type === "PHYSIQUE" ? `${assoc.prenom ? assoc.prenom + " " : ""}${assoc.nom}` : assoc.nom) : "Inconnu";
+                      return (
+                        <TableRow key={id}>
+                          <TableCell className="font-medium">{nom}</TableCell>
+                          <TableCell className="text-right">{fmt(v.capital)}</TableCell>
+                          <TableCell className="text-right">{fmt(v.cca)}</TableCell>
+                          <TableCell className="text-right font-semibold">{fmt(v.capital + v.cca)}</TableCell>
+                        </TableRow>
+                      );
+                    });
+                  })()}
                 </TableBody>
               </Table>
             </CardContent>

@@ -16,6 +16,7 @@ const SECTION_LABELS: Record<SectionName, string> = {
   loyerDynamique: "Loyer Dynamique",
   gouvernance: "Gouvernance",
   associes: "Associés & Sociétés",
+  apports: "Apports associés",
 };
 
 export default function DashboardPage() {
