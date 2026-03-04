@@ -194,11 +194,7 @@ export const DEFAULT_FINANCEMENT: FinancementData = {
   sciAmortization: 0,
 };
 
-export const DEFAULT_GESTIONNAIRE_PARAMS: GestionnaireParametres = {
-  ratioNetVersBrut: 0.78,
-  tauxChargesPatronales: 0.42,
-  moisPayes: 12,
-};
+export const DEFAULT_GESTIONNAIRE_TAUX_CHARGES = 0.42;
 
 export function createDefaultPhase(id?: string, nom?: string, defaultVatRate = 0.20): CapacityPhase {
   return {
