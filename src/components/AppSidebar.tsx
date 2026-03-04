@@ -1,6 +1,6 @@
 import {
   Building2, Hammer, Landmark, TrendingUp, Users, Users2, LayoutDashboard,
-  CheckCircle, AlertTriangle, Home, ArrowLeftRight,
+  CheckCircle, AlertTriangle, Home, ArrowLeftRight, Wallet,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
