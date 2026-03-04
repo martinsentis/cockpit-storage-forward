@@ -2,8 +2,11 @@
  * Convert a monthIndex to a human-readable calendar date.
  * The model stays index-based — this is purely a display layer.
  */
-export function formatMonthIndex(monthIndex: number, projectStartDate: string): string {
-  const [year, month] = projectStartDate.split("-").map(Number);
+export function formatMonthIndex(monthIndex: number, projectStartDate?: string): string {
+  if (!projectStartDate) return `Mois ${monthIndex}`;
+  const parts = projectStartDate.split("-");
+  if (parts.length < 2) return `Mois ${monthIndex}`;
+  const [year, month] = parts.map(Number);
   const date = new Date(year, month - 1 + monthIndex);
   return date.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
 }
