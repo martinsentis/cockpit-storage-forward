@@ -13,6 +13,7 @@ import FoncierePage from "@/pages/FoncierePage";
 import LoyerDynamiquePage from "@/pages/LoyerDynamiquePage";
 import GouvernancePage from "@/pages/GouvernancePage";
 import AssociesPage from "@/pages/AssociesPage";
+import ApportsPage from "@/pages/ApportsPage";
 import DashboardPage from "@/pages/DashboardPage";
 import NotFound from "./pages/NotFound";
 
