@@ -80,12 +80,24 @@ export interface CapacityPhase {
 
 // ── Exploitation types ──
 
+export type ServiceEcoType = "AVEC_MARGE" | "SANS_COUT";
+export type ServiceCostMode = "FIXE" | "VARIABLE";
+
 export interface ServiceItem {
   id: string;
   nom: string;
   type: "FIXE" | "PAR_BOX" | "PAR_M2";
   montantUnitaire: number;
+  prixType: "HT" | "TTC";
+  vatRate: number;
   actif: boolean;
+  typeEco: ServiceEcoType;
+  coutMode: ServiceCostMode;
+  coutMontant: number;
+  activeFromStart: boolean;
+  startMonth: number;
+  hasEndMonth: boolean;
+  endMonth: number | null;
 }
 
 export interface GestionnaireParametres {
