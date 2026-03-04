@@ -8,11 +8,14 @@ import {
   ValidatedFlags,
   SectionName,
   ProjectionInputs,
+  PhaseProjection,
+  CapacityPhase,
   DEFAULT_PROJET,
   DEFAULT_BUILD,
   DEFAULT_FINANCEMENT,
   DEFAULT_EXPLOITATION,
   DEFAULT_GOUVERNANCE,
+  createDefaultPhase,
 } from "@/types/project";
 
 const STORAGE_KEY = "pilotagebox_project_state";
@@ -58,13 +61,45 @@ const defaultValidated: ValidatedFlags = {
   gouvernance: false,
 };
 
+function migrateExploitation(e: any): ExploitationData {
+  // Migrate from old format (modeBox + capacite + phases) to new (capacityPhases)
+  if (e?.capacityPhases) {
+    return {
+      capacityPhases: e.capacityPhases,
+      services: e.services ?? [],
+      gestionnaires: e.gestionnaires ?? [],
+      charges: e.charges ?? [],
+    };
+  }
+  // Old format migration
+  const phase = createDefaultPhase();
+  if (e?.modeBox) phase.modeBox = e.modeBox;
+  if (e?.capacite?.surfaceMacro != null) phase.surface = e.capacite.surfaceMacro;
+  if (e?.capacite?.prixM2Macro != null) phase.prixM2 = e.capacite.prixM2Macro;
+  if (e?.capacite?.typologies) phase.typologies = e.capacite.typologies.map((t: any) => ({
+    ...t,
+    prixType: t.prixType ?? "HT",
+    vatRate: t.vatRate ?? 0.20,
+  }));
+  return {
+    capacityPhases: [phase],
+    services: e?.services ?? [],
+    gestionnaires: e?.gestionnaires ?? [],
+    charges: e?.charges ?? [],
+  };
+}
+
 function loadFromStorage(): { state: ProjectState; validated: ValidatedFlags } {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       return {
-        state: { ...defaultState, ...parsed.state },
+        state: {
+          ...defaultState,
+          ...parsed.state,
+          exploitation: migrateExploitation(parsed.state?.exploitation),
+        },
         validated: { ...defaultValidated, ...parsed.validated },
       };
     }
@@ -72,6 +107,24 @@ function loadFromStorage(): { state: ProjectState; validated: ValidatedFlags } {
     // ignore
   }
   return { state: { ...defaultState }, validated: { ...defaultValidated } };
+}
+
+// Helper: compute phase CA HT for a single CapacityPhase
+function phaseCAHT(p: CapacityPhase): number {
+  if (p.modeBox === "MACRO") {
+    const priceHT = p.prixType === "HT" ? p.prixM2 : p.prixM2 / (1 + p.vatRate);
+    return p.surface * priceHT;
+  }
+  const active = (p.typologies ?? []).filter(t => t.actif);
+  return active.reduce((sum, t) => {
+    const unitHT = t.prixType === "HT" ? t.prixMensuel : t.prixMensuel / (1 + t.vatRate);
+    return sum + t.nombreDeBox * unitHT;
+  }, 0);
+}
+
+function phaseSurface(p: CapacityPhase): number {
+  if (p.modeBox === "MACRO") return p.surface;
+  return (p.typologies ?? []).filter(t => t.actif).reduce((s, t) => s + t.surfaceParBox * t.nombreDeBox, 0);
 }
 
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -103,6 +156,19 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const f = state.financement;
     const g = state.gouvernance;
 
+    const phases = e.capacityPhases ?? [createDefaultPhase()];
+
+    // Aggregate surface and CA
+    const totalSurface = phases.reduce((s, ph) => s + phaseSurface(ph), 0);
+    const totalCA = phases.reduce((s, ph) => s + phaseCAHT(ph), 0);
+
+    // Build projection phases from ramp-up data
+    const projectionPhases: PhaseProjection[] = phases.map(ph => ({
+      startMonth: ph.startMonth,
+      endMonth: ph.startMonth + ph.rampUpMonths - 1,
+      occupancyRate: ph.targetOccupancy,
+    }));
+
     return {
       horizonMonths: p.horizonMonths ?? DEFAULT_PROJET.horizonMonths,
       initialCash: p.initialCash ?? DEFAULT_PROJET.initialCash,
@@ -110,24 +176,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       taxRate: p.taxRate ?? DEFAULT_PROJET.taxRate,
       bufferMin: p.bufferMin ?? DEFAULT_PROJET.bufferMin,
       dscrMin: p.dscrMin ?? DEFAULT_PROJET.dscrMin,
-      phases: e.phases && e.phases.length > 0 ? e.phases : DEFAULT_EXPLOITATION.phases,
-      revenueParams: (() => {
-        if (e.modeBox === "MACRO") {
-          return {
-            surface: e.capacite?.surfaceMacro ?? 0,
-            prixM2: e.capacite?.prixM2Macro ?? 0,
-            tauxRemplissage: 1.0,
-          };
-        }
-        const activeTypos = (e.capacite?.typologies ?? []).filter(t => t.actif);
-        const surface = activeTypos.reduce((s, t) => s + t.surfaceParBox * t.nombreDeBox, 0);
-        const caBox = activeTypos.reduce((s, t) => s + t.nombreDeBox * t.prixMensuel, 0);
-        return {
-          surface,
-          prixM2: surface > 0 ? caBox / surface : 0,
-          tauxRemplissage: 1.0,
-        };
-      })(),
+      phases: projectionPhases,
+      revenueParams: {
+        surface: totalSurface,
+        prixM2: totalSurface > 0 ? totalCA / totalSurface : 0,
+        tauxRemplissage: 1.0,
+      },
       services: [],
       debts: f.debts ?? [],
       sciDebts: f.sciDebts ?? [],
