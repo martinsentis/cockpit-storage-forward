@@ -1,6 +1,6 @@
 // ── Section types ──
 
-export type RentMode = "AUTONOMY_SCI" | "OPTIMISATION_FISCALE" | "DESENDETTEMENT_SCI" | "MIX";
+export type RentMode = "AUTONOMIE_SCI" | "OPTIMISATION_FISCALE" | "DESENDETTEMENT_SCI" | "MIX";
 export type BoxMode = "MACRO" | "TYPOLOGIE";
 export type ChargeCategory = "IMMOBILIER" | "ENERGIE" | "SECURITE" | "MARKETING" | "EXPLOITATION" | "ADMINISTRATIF" | "AUTRE";
 export type ChargeFrequency = "MENSUELLE" | "ANNUELLE";
@@ -20,6 +20,28 @@ export interface ProjetData {
   projectStartDate: string; // "YYYY-MM" format, e.g. "2026-06"
 }
 
+// ── Build / CAPEX ──
+
+export type BuildAssetCategory = "TERRAIN" | "VRD" | "CLOTURE_PORTAIL" | "CONTENEURS" | "EQUIPEMENTS" | "AUTRE";
+
+export interface BuildAsset {
+  id: string;
+  label: string;
+  category: BuildAssetCategory;
+  amount: number;
+  commissioningMonth: number;
+  depreciationYears: number;
+}
+
+export const BUILD_ASSET_CATEGORY_LABELS: Record<BuildAssetCategory, string> = {
+  TERRAIN: "Terrain",
+  VRD: "Aménagement / VRD",
+  CLOTURE_PORTAIL: "Clôture / Portail",
+  CONTENEURS: "Conteneurs / Box",
+  EQUIPEMENTS: "Équipements",
+  AUTRE: "Autre",
+};
+
 export interface BuildData {
   capexTotal: number;
   posteFoncier: number;
@@ -28,6 +50,8 @@ export interface BuildData {
   posteDivers: number;
   startMonth: number;
   durationMonths: number;
+  taxeAmenagement: number;
+  assets: BuildAsset[];
 }
 
 export interface DebtItem {
@@ -145,6 +169,48 @@ export interface ExploitationData {
   charges: ChargeItem[];
 }
 
+// ── Foncière (SCI) ──
+
+export type SCIChargeCategory = "IMMOBILIER" | "ADMINISTRATIF";
+
+export interface SCIChargeItem {
+  id: string;
+  label: string;
+  category: SCIChargeCategory;
+  frequency: ChargeFrequency;
+  amountInput: number;
+  amountType: "HT" | "TTC";
+  vatRate: number;
+  annualMonth: number | null;
+  startMonth: number;
+  endMonth: number | null;
+  isActive: boolean;
+}
+
+export interface SCIRevenueItem {
+  id: string;
+  nom: string;
+  montant: number;
+  prixType: "HT" | "TTC";
+  vatRate: number;
+  frequency: ChargeFrequency;
+  startMonth: number;
+  endMonth: number | null;
+}
+
+export interface FonciereData {
+  charges: SCIChargeItem[];
+  otherRevenues: SCIRevenueItem[];
+}
+
+// ── Loyer Dynamique ──
+
+export interface LoyerDynamiqueData {
+  mode: RentMode;
+  targetExploitationResult: number;
+  manualOverride: number | null;
+}
+
 // ── Gouvernance ──
 
 export interface GouvernanceData {
@@ -154,10 +220,6 @@ export interface GouvernanceData {
   ccaPriorityRatio: number;
   reserveStrategicRatio: number;
   reserveAfterCcaFullyRepaid: number;
-  rentConstraints: {
-    mode: RentMode;
-    monthlyRent: number;
-  };
 }
 
 // ── Defaults ──
@@ -184,6 +246,8 @@ export const DEFAULT_BUILD: BuildData = {
   posteDivers: 50000,
   startMonth: 0,
   durationMonths: 6,
+  taxeAmenagement: 0,
+  assets: [],
 };
 
 export const DEFAULT_FINANCEMENT: FinancementData = {
@@ -220,6 +284,17 @@ export const DEFAULT_EXPLOITATION: ExploitationData = {
   charges: [],
 };
 
+export const DEFAULT_FONCIERE: FonciereData = {
+  charges: [],
+  otherRevenues: [],
+};
+
+export const DEFAULT_LOYER_DYNAMIQUE: LoyerDynamiqueData = {
+  mode: "AUTONOMIE_SCI",
+  targetExploitationResult: 0,
+  manualOverride: null,
+};
+
 export const DEFAULT_GOUVERNANCE: GouvernanceData = {
   structureJuridique: "SCI + SAS",
   ccaBalance: 0,
@@ -227,7 +302,26 @@ export const DEFAULT_GOUVERNANCE: GouvernanceData = {
   ccaPriorityRatio: 0.7,
   reserveStrategicRatio: 0.1,
   reserveAfterCcaFullyRepaid: 0.3,
-  rentConstraints: { mode: "DESENDETTEMENT_SCI", monthlyRent: 0 },
+};
+
+// ── Tax-exempt labels ──
+
+export const TAX_EXEMPT_LABELS = ["Taxe foncière", "CFE", "Taxe d'aménagement"];
+
+export function isTaxExemptLabel(label: string): boolean {
+  return TAX_EXEMPT_LABELS.some(t => label.toLowerCase().includes(t.toLowerCase()));
+}
+
+// ── SCI Charge presets ──
+
+export const SCI_CHARGE_PRESETS: Record<SCIChargeCategory, string[]> = {
+  IMMOBILIER: ["Taxe foncière", "Assurance PNO", "Entretien du site", "Maintenance immobilière"],
+  ADMINISTRATIF: ["Frais comptables SCI", "Frais juridiques", "Frais bancaires SCI"],
+};
+
+export const SCI_CATEGORY_LABELS: Record<SCIChargeCategory, string> = {
+  IMMOBILIER: "Immobilier",
+  ADMINISTRATIF: "Administratif",
 };
 
 // ── API payload type ──
@@ -274,6 +368,8 @@ export interface ValidatedFlags {
   build: boolean;
   financement: boolean;
   exploitation: boolean;
+  fonciere: boolean;
+  loyerDynamique: boolean;
   gouvernance: boolean;
 }
 

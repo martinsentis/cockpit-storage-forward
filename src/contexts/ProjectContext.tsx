@@ -5,6 +5,8 @@ import {
   FinancementData,
   ExploitationData,
   GouvernanceData,
+  FonciereData,
+  LoyerDynamiqueData,
   ValidatedFlags,
   SectionName,
   ProjectionInputs,
@@ -15,6 +17,8 @@ import {
   DEFAULT_FINANCEMENT,
   DEFAULT_EXPLOITATION,
   DEFAULT_GOUVERNANCE,
+  DEFAULT_FONCIERE,
+  DEFAULT_LOYER_DYNAMIQUE,
   createDefaultPhase,
 } from "@/types/project";
 
@@ -25,6 +29,8 @@ interface ProjectState {
   build: BuildData;
   financement: FinancementData;
   exploitation: ExploitationData;
+  fonciere: FonciereData;
+  loyerDynamique: LoyerDynamiqueData;
   gouvernance: GouvernanceData;
 }
 
@@ -35,6 +41,7 @@ interface ProjectContextValue {
   validateSection: (section: SectionName) => void;
   isProjectComplete: () => boolean;
   buildProjectionInputs: () => ProjectionInputs;
+  computeLoyer: () => number;
 }
 
 const ProjectContext = createContext<ProjectContextValue | null>(null);
@@ -50,6 +57,8 @@ const defaultState: ProjectState = {
   build: { ...DEFAULT_BUILD },
   financement: { ...DEFAULT_FINANCEMENT },
   exploitation: { ...DEFAULT_EXPLOITATION },
+  fonciere: { ...DEFAULT_FONCIERE },
+  loyerDynamique: { ...DEFAULT_LOYER_DYNAMIQUE },
   gouvernance: { ...DEFAULT_GOUVERNANCE },
 };
 
@@ -58,11 +67,12 @@ const defaultValidated: ValidatedFlags = {
   build: false,
   financement: false,
   exploitation: false,
+  fonciere: false,
+  loyerDynamique: false,
   gouvernance: false,
 };
 
 function migrateExploitation(e: any): ExploitationData {
-  // Migrate from old format (modeBox + capacite + phases) to new (capacityPhases)
   if (e?.capacityPhases) {
     return {
       capacityPhases: e.capacityPhases,
@@ -71,7 +81,6 @@ function migrateExploitation(e: any): ExploitationData {
       charges: e.charges ?? [],
     };
   }
-  // Old format migration
   const phase = createDefaultPhase();
   if (e?.modeBox) phase.modeBox = e.modeBox;
   if (e?.capacite?.surfaceMacro != null) phase.surface = e.capacite.surfaceMacro;
@@ -89,6 +98,26 @@ function migrateExploitation(e: any): ExploitationData {
   };
 }
 
+function migrateBuild(b: any): BuildData {
+  return {
+    ...DEFAULT_BUILD,
+    ...b,
+    taxeAmenagement: b?.taxeAmenagement ?? 0,
+    assets: b?.assets ?? [],
+  };
+}
+
+function migrateGouvernance(g: any): GouvernanceData {
+  return {
+    structureJuridique: g?.structureJuridique ?? DEFAULT_GOUVERNANCE.structureJuridique,
+    ccaBalance: g?.ccaBalance ?? DEFAULT_GOUVERNANCE.ccaBalance,
+    distributableCashRate: g?.distributableCashRate ?? DEFAULT_GOUVERNANCE.distributableCashRate,
+    ccaPriorityRatio: g?.ccaPriorityRatio ?? DEFAULT_GOUVERNANCE.ccaPriorityRatio,
+    reserveStrategicRatio: g?.reserveStrategicRatio ?? DEFAULT_GOUVERNANCE.reserveStrategicRatio,
+    reserveAfterCcaFullyRepaid: g?.reserveAfterCcaFullyRepaid ?? DEFAULT_GOUVERNANCE.reserveAfterCcaFullyRepaid,
+  };
+}
+
 function loadFromStorage(): { state: ProjectState; validated: ValidatedFlags } {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -98,7 +127,11 @@ function loadFromStorage(): { state: ProjectState; validated: ValidatedFlags } {
         state: {
           ...defaultState,
           ...parsed.state,
+          build: migrateBuild(parsed.state?.build),
           exploitation: migrateExploitation(parsed.state?.exploitation),
+          fonciere: { ...DEFAULT_FONCIERE, ...parsed.state?.fonciere },
+          loyerDynamique: { ...DEFAULT_LOYER_DYNAMIQUE, ...parsed.state?.loyerDynamique },
+          gouvernance: migrateGouvernance(parsed.state?.gouvernance),
         },
         validated: { ...defaultValidated, ...parsed.validated },
       };
@@ -127,6 +160,41 @@ function phaseSurface(p: CapacityPhase): number {
   return (p.typologies ?? []).filter(t => t.actif).reduce((s, t) => s + t.surfaceParBox * t.nombreDeBox, 0);
 }
 
+// Helper: compute SCI charges mensuelles HT
+function sciChargesMonthlyHT(state: ProjectState): number {
+  return state.fonciere.charges
+    .filter(c => c.isActive)
+    .reduce((total, c) => {
+      const ht = c.amountType === "HT" ? c.amountInput : c.amountInput / (1 + c.vatRate);
+      const monthly = c.frequency === "ANNUELLE" ? ht / 12 : ht;
+      return total + monthly;
+    }, 0);
+}
+
+// Helper: compute SCI debt monthly interest
+function sciDebtMonthlyInterest(state: ProjectState): number {
+  return state.financement.sciDebts.reduce((total, d) => {
+    const monthlyRate = d.annualRate / 100 / 12;
+    return total + d.amount * monthlyRate;
+  }, 0);
+}
+
+// Helper: compute SCI debt monthly principal repayment
+function sciDebtMonthlyPrincipal(state: ProjectState): number {
+  return state.financement.sciDebts.reduce((total, d) => {
+    if (d.durationMonths <= 0) return total;
+    return total + d.amount / d.durationMonths;
+  }, 0);
+}
+
+// Helper: compute annual depreciation from assets
+function annualDepreciation(state: ProjectState): number {
+  return state.build.assets.reduce((total, a) => {
+    if (a.depreciationYears <= 0) return total;
+    return total + a.amount / a.depreciationYears;
+  }, 0);
+}
+
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [initial] = useState(loadFromStorage);
   const [state, setState] = useState<ProjectState>(initial.state);
@@ -146,23 +214,46 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const isProjectComplete = useCallback(() => {
     return (
-      validated.projet && validated.build && validated.financement && validated.exploitation && validated.gouvernance
+      validated.projet && validated.build && validated.financement &&
+      validated.exploitation && validated.fonciere && validated.loyerDynamique && validated.gouvernance
     );
   }, [validated]);
+
+  const computeLoyer = useCallback((): number => {
+    const ld = state.loyerDynamique;
+    if (ld.manualOverride != null && ld.manualOverride > 0) return ld.manualOverride;
+
+    const charges = sciChargesMonthlyHT(state);
+    const interest = sciDebtMonthlyInterest(state);
+    const principal = sciDebtMonthlyPrincipal(state);
+    const depreciation = annualDepreciation(state) / 12;
+
+    switch (ld.mode) {
+      case "AUTONOMIE_SCI":
+        return charges + interest;
+      case "DESENDETTEMENT_SCI":
+        return charges + interest + principal;
+      case "OPTIMISATION_FISCALE":
+        return charges + interest + depreciation;
+      case "MIX":
+        return charges + interest + principal;
+      default:
+        return charges + interest;
+    }
+  }, [state]);
 
   const buildProjectionInputs = useCallback((): ProjectionInputs => {
     const p = state.projet;
     const e = state.exploitation;
     const f = state.financement;
     const g = state.gouvernance;
+    const loyer = computeLoyer();
 
     const phases = e.capacityPhases ?? [createDefaultPhase()];
 
-    // Aggregate surface and CA
     const totalSurface = phases.reduce((s, ph) => s + phaseSurface(ph), 0);
     const totalCA = phases.reduce((s, ph) => s + phaseCAHT(ph), 0);
 
-    // Build projection phases from ramp-up data
     const projectionPhases: PhaseProjection[] = phases.map(ph => ({
       startMonth: ph.startMonth,
       endMonth: ph.startMonth + ph.rampUpMonths - 1,
@@ -193,15 +284,15 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       reserveStrategicRatio: g.reserveStrategicRatio ?? DEFAULT_GOUVERNANCE.reserveStrategicRatio,
       reserveAfterCcaFullyRepaid: g.reserveAfterCcaFullyRepaid ?? DEFAULT_GOUVERNANCE.reserveAfterCcaFullyRepaid,
       rentConstraints: {
-        mode: "DESENDETTEMENT_SCI",
-        monthlyRent: g.rentConstraints?.monthlyRent ?? 0,
+        mode: state.loyerDynamique.mode,
+        monthlyRent: loyer,
       },
     };
-  }, [state]);
+  }, [state, computeLoyer]);
 
   return (
     <ProjectContext.Provider
-      value={{ state, validated, updateSection, validateSection, isProjectComplete, buildProjectionInputs }}
+      value={{ state, validated, updateSection, validateSection, isProjectComplete, buildProjectionInputs, computeLoyer }}
     >
       {children}
     </ProjectContext.Provider>

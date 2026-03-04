@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 
 export default function GouvernancePage() {
@@ -12,8 +11,6 @@ export default function GouvernancePage() {
   const [form, setForm] = useState({ ...state.gouvernance });
 
   const set = (key: string, value: string | number) => setForm(prev => ({ ...prev, [key]: value }));
-  const setRent = (key: string, value: string | number) =>
-    setForm(prev => ({ ...prev, rentConstraints: { ...prev.rentConstraints, [key]: value } }));
 
   const save = () => {
     updateSection("gouvernance", form);
@@ -49,26 +46,6 @@ export default function GouvernancePage() {
           <div className="space-y-2">
             <Label>Réserve après CCA soldé (%)</Label>
             <Input type="number" step="0.01" value={form.reserveAfterCcaFullyRepaid} onChange={e => set("reserveAfterCcaFullyRepaid", Number(e.target.value))} />
-          </div>
-        </div>
-
-        <div className="border-t pt-4 space-y-4">
-          <h3 className="font-medium">Contraintes de loyer SCI</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Mode</Label>
-              <Select value={form.rentConstraints.mode} onValueChange={v => setRent("mode", v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="fixed">Fixe</SelectItem>
-                  <SelectItem value="variable">Variable</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Loyer mensuel (€)</Label>
-              <Input type="number" value={form.rentConstraints.monthlyRent} onChange={e => setRent("monthlyRent", Number(e.target.value))} />
-            </div>
           </div>
         </div>
 

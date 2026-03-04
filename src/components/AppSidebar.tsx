@@ -1,6 +1,6 @@
 import {
   Building2, Hammer, Landmark, TrendingUp, Users, LayoutDashboard,
-  CheckCircle, AlertTriangle,
+  CheckCircle, AlertTriangle, Home, ArrowLeftRight,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -18,6 +18,8 @@ const sections: { title: string; url: string; icon: React.ElementType; section?:
   { title: "Build", url: "/build", icon: Hammer, section: "build" },
   { title: "Financement", url: "/financement", icon: Landmark, section: "financement" },
   { title: "Exploitation", url: "/exploitation", icon: TrendingUp, section: "exploitation" },
+  { title: "Foncière", url: "/fonciere", icon: Home, section: "fonciere" },
+  { title: "Loyer dynamique", url: "/loyer-dynamique", icon: ArrowLeftRight, section: "loyerDynamique" },
   { title: "Gouvernance", url: "/gouvernance", icon: Users, section: "gouvernance" },
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
 ];

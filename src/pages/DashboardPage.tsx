@@ -12,6 +12,8 @@ const SECTION_LABELS: Record<SectionName, string> = {
   build: "Build / CAPEX",
   financement: "Financement",
   exploitation: "Exploitation",
+  fonciere: "Foncière (SCI)",
+  loyerDynamique: "Loyer Dynamique",
   gouvernance: "Gouvernance",
 };
 
