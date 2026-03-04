@@ -15,7 +15,7 @@ import type {
   FonciereData, SCIChargeItem, SCIChargeCategory, SCIRevenueItem, ChargeFrequency,
 } from "@/types/project";
 import {
-  SCI_CHARGE_PRESETS, SCI_CATEGORY_LABELS, DEFAULT_FONCIERE, BUILD_ASSET_CATEGORY_LABELS,
+  SCI_CHARGE_PRESETS, SCI_CATEGORY_LABELS, DEFAULT_FONCIERE, CAPEX_CATEGORY_LABELS,
   isTaxExemptLabel,
 } from "@/types/project";
 import { formatMonthIndex } from "@/lib/monthUtils";
