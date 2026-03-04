@@ -1,48 +1,39 @@
 
 
-## Plan : Implémenter le Cockpit V1 complet
+# Plan : Modifier les defaults et options du type économique des services
 
-### Contexte
-Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
+## Changements
 
-### Fichiers à créer
+### 1. `src/types/project.ts` — Étendre `ServiceCostMode`
 
-**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
+Passer de 2 à 3 options :
+```ts
+export type ServiceCostMode = "PCT_CA_SERVICE" | "PCT_CA_BOXS" | "FIXE";
+```
 
-**2. `src/types/project.ts`** — Types et defaults :
-- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
-- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
-  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
-  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
-  - `revenueParams` (surface, prixM2, tauxRemplissage)
-  - `services` ([] par défaut)
-  - `opexPercentOfRevenue`
-  - `debts`, `sciDebts` ([] par défaut)
-  - `sciChargesCash`, `sciAmortization` (0 par défaut)
-  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
-  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
-- Constantes `DEFAULT_*` exportées pour chaque section
+### 2. `src/pages/ExploitationPage.tsx`
 
-**3. `src/contexts/ProjectContext.tsx`** :
-- State initialisé avec les defaults
-- `validated` flags (5 booleans, tous false)
-- `updateSection()`, `validateSection()`, `isProjectComplete()`
-- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
+**Default typeEco** : Changer `"SANS_COUT"` → `"AVEC_MARGE"` partout (migration `migrateService`, création `addService`, preset).
 
-**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
+**Default coutMode** : Changer `"FIXE"` → `"PCT_CA_SERVICE"` partout.
 
-**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
+**Select des modes de coût** : Remplacer les 2 options par 3 :
+- `PCT_CA_SERVICE` → "% du CA du service" (par défaut)
+- `PCT_CA_BOXS` → "% du CA des boxs"
+- `FIXE` → "Coût fixe mensuel (€)"
 
-**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
-- Formulaires pré-remplis depuis le Context
-- Bouton "Enregistrer" → updateSection + validateSection
-- Champs par page alignés sur les inputs API
+**Calcul `serviceCoutHT`** : Adapter la fonction pour le nouveau mode `PCT_CA_BOXS` (utilise le CA HT agrégé des phases de capacité au lieu du CA du service).
 
-**7. `src/pages/DashboardPage.tsx`** :
-- Liste les sections manquantes si projet incomplet
-- Bouton "Lancer la simulation" désactivé si incomplet
-- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
-- Affiche réponse JSON ou erreur dans `<pre>`
+**Label du champ montant** : Adapter dynamiquement — "Ratio (%)" pour les deux modes %, "Montant (€ HT)" pour FIXE.
 
-**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
+### 3. Calcul du coût pour `PCT_CA_BOXS`
+
+La fonction `serviceCoutHT` recevra le CA HT total des boxs (déjà calculé dans `derived.caHT`) pour calculer `coutMontant * caBoxsHT` quand le mode est `PCT_CA_BOXS`.
+
+## Fichiers impactés
+
+| Fichier | Action |
+|---|---|
+| `src/types/project.ts` | Modifier `ServiceCostMode` (3 valeurs) |
+| `src/pages/ExploitationPage.tsx` | Defaults → AVEC_MARGE + PCT_CA_SERVICE, 3 options dans le Select, adapter calcul |
 
