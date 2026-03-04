@@ -81,7 +81,7 @@ export interface CapacityPhase {
 // ── Exploitation types ──
 
 export type ServiceEcoType = "AVEC_MARGE" | "SANS_COUT";
-export type ServiceCostMode = "FIXE" | "VARIABLE";
+export type ServiceCostMode = "PCT_CA_SERVICE" | "PCT_CA_BOXS" | "FIXE";
 
 export interface ServiceItem {
   id: string;
