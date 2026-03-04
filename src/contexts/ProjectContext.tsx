@@ -206,6 +206,7 @@ function migrateApports(a: any): ApportsData {
 }
 
 function loadFromStorage(): { state: ProjectState; validated: ValidatedFlags } {
+  try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
