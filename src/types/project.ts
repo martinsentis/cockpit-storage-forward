@@ -26,6 +26,8 @@ export interface BuildData {
   posteTravaux: number;
   posteHonoraires: number;
   posteDivers: number;
+  startMonth: number;
+  durationMonths: number;
 }
 
 export interface DebtItem {
