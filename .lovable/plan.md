@@ -1,48 +1,51 @@
 
 
-## Plan : Implémenter le Cockpit V1 complet
+# Plan : Dates calendaires sur tous les modules
 
-### Contexte
-Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
+## Constat
 
-### Fichiers à créer
+Les dates calendaires (via `formatMonthIndex`) sont déjà appliquées sur **Exploitation** et **Projet**. Les modules **Build**, **Financement** et **Gouvernance** n'ont actuellement aucun champ `monthIndex` dans leur UI, mais certains devraient en avoir.
 
-**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
+## Modifications
 
-**2. `src/types/project.ts`** — Types et defaults :
-- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
-- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
-  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
-  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
-  - `revenueParams` (surface, prixM2, tauxRemplissage)
-  - `services` ([] par défaut)
-  - `opexPercentOfRevenue`
-  - `debts`, `sciDebts` ([] par défaut)
-  - `sciChargesCash`, `sciAmortization` (0 par défaut)
-  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
-  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
-- Constantes `DEFAULT_*` exportées pour chaque section
+### 1. `src/types/project.ts` — Ajouter des champs monthIndex manquants
 
-**3. `src/contexts/ProjectContext.tsx`** :
-- State initialisé avec les defaults
-- `validated` flags (5 booleans, tous false)
-- `updateSection()`, `validateSection()`, `isProjectComplete()`
-- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
+- **BuildData** : ajouter `startMonth: number` (début travaux) et `durationMonths: number` (durée travaux)
+- **DEFAULT_BUILD** : `startMonth: 0`, `durationMonths: 6`
 
-**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
+### 2. `src/pages/BuildPage.tsx` — Annoter avec dates calendaires
 
-**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
+Ajouter deux champs :
+- "Début des travaux" : input `startMonth` + annotation `(Juin 2026)`
+- "Durée des travaux" : input `durationMonths` + annotation `jusqu'à Décembre 2026`
+- "Fin des travaux" : calculé et affiché = `startMonth + durationMonths`
 
-**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
-- Formulaires pré-remplis depuis le Context
-- Bouton "Enregistrer" → updateSection + validateSection
-- Champs par page alignés sur les inputs API
+Importer `formatMonthIndex`, `formatMonthRange`, `monthLabel` depuis `monthUtils`.
 
-**7. `src/pages/DashboardPage.tsx`** :
-- Liste les sections manquantes si projet incomplet
-- Bouton "Lancer la simulation" désactivé si incomplet
-- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
-- Affiche réponse JSON ou erreur dans `<pre>`
+### 3. `src/pages/FinancementPage.tsx` — Annoter les dettes
 
-**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
+Le module actuel n'expose pas encore les dettes en UI (note "version ultérieure"). Ajouter un tableau simple pour `debts` et `sciDebts` avec :
+- `deferralMonths` annoté avec la date calendaire (`mois X (Mois Année)`)
+- `durationMonths` annoté avec la date de fin (`jusqu'à Mois Année`)
+
+Chaque dette : label, montant, taux, durée (avec date fin), différé (avec date début remboursement). Bouton ajouter/supprimer.
+
+### 4. `src/pages/GouvernancePage.tsx` — Pas de monthIndex
+
+Aucun champ temporel dans ce module actuellement. Pas de modification nécessaire.
+
+### 5. `src/components/ProjectTimeline.tsx` — Ajouter événement Build
+
+Ajouter un marqueur pour le début et la fin des travaux depuis `state.build.startMonth` et `state.build.startMonth + state.build.durationMonths`.
+
+Nouvelle catégorie `build` (couleur jaune/amber).
+
+## Fichiers impactés
+
+| Fichier | Action |
+|---|---|
+| `src/types/project.ts` | Ajouter `startMonth`, `durationMonths` à `BuildData` |
+| `src/pages/BuildPage.tsx` | Ajouter inputs mois + annotations calendaires |
+| `src/pages/FinancementPage.tsx` | Ajouter tableau dettes avec annotations calendaires |
+| `src/components/ProjectTimeline.tsx` | Ajouter marqueurs Build |
 
