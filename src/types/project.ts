@@ -4,6 +4,7 @@ export type RentMode = "AUTONOMY_SCI" | "OPTIMISATION_FISCALE" | "DESENDETTEMENT
 export type BoxMode = "MACRO" | "TYPOLOGIE";
 export type ChargeCategory = "IMMOBILIER" | "ENERGIE" | "SECURITE" | "MARKETING" | "EXPLOITATION" | "ADMINISTRATIF" | "AUTRE";
 export type ChargeFrequency = "MENSUELLE" | "ANNUELLE";
+export type RampCurve = "LINEAR" | "FAST_START" | "SLOW_START";
 
 export interface ProjetData {
   nom: string;
@@ -42,28 +43,39 @@ export interface FinancementData {
   sciAmortization: number;
 }
 
-export interface Phase {
-  startMonth: number;
-  endMonth: number;
-  occupancyRate: number;
-}
-
-// ── Exploitation types ──
-
 export interface Typologie {
   id: string;
   nom: string;
   surfaceParBox: number;
   nombreDeBox: number;
   prixMensuel: number;
+  prixType: "HT" | "TTC";
+  vatRate: number;
   actif: boolean;
 }
 
-export interface Capacite {
-  surfaceMacro: number | null;
-  prixM2Macro: number | null;
+// ── Capacity Phase (replaces old Phase + Capacite) ──
+
+export interface CapacityPhase {
+  id: string;
+  nom: string;
+  surface: number;
+  modeBox: BoxMode;
+  // Macro
+  prixM2: number;
+  prixType: "HT" | "TTC";
+  vatRate: number;
+  // Typologie
   typologies: Typologie[];
+  // Dates
+  startMonth: number;
+  // Ramp-up
+  targetOccupancy: number;
+  rampUpMonths: number;
+  rampCurve: RampCurve;
 }
+
+// ── Exploitation types ──
 
 export interface ServiceItem {
   id: string;
@@ -107,12 +119,10 @@ export interface ChargeItem {
 }
 
 export interface ExploitationData {
-  modeBox: BoxMode;
-  capacite: Capacite;
+  capacityPhases: CapacityPhase[];
   services: ServiceItem[];
   gestionnaires: Gestionnaire[];
   charges: ChargeItem[];
-  phases: Phase[];
 }
 
 // ── Gouvernance ──
@@ -167,17 +177,28 @@ export const DEFAULT_GESTIONNAIRE_PARAMS: GestionnaireParametres = {
   moisPayes: 12,
 };
 
-export const DEFAULT_EXPLOITATION: ExploitationData = {
-  modeBox: "MACRO",
-  capacite: {
-    surfaceMacro: 500,
-    prixM2Macro: 15,
+export function createDefaultPhase(id?: string, nom?: string, defaultVatRate = 0.20): CapacityPhase {
+  return {
+    id: id ?? crypto.randomUUID(),
+    nom: nom ?? "Phase 1",
+    surface: 500,
+    modeBox: "MACRO",
+    prixM2: 15,
+    prixType: "HT",
+    vatRate: defaultVatRate,
     typologies: [],
-  },
+    startMonth: 1,
+    targetOccupancy: 0.85,
+    rampUpMonths: 12,
+    rampCurve: "LINEAR",
+  };
+}
+
+export const DEFAULT_EXPLOITATION: ExploitationData = {
+  capacityPhases: [createDefaultPhase("default-phase-1", "Phase 1")],
   services: [],
   gestionnaires: [],
   charges: [],
-  phases: [{ startMonth: 1, endMonth: 12, occupancyRate: 1.0 }],
 };
 
 export const DEFAULT_GOUVERNANCE: GouvernanceData = {
@@ -192,6 +213,12 @@ export const DEFAULT_GOUVERNANCE: GouvernanceData = {
 
 // ── API payload type ──
 
+export interface PhaseProjection {
+  startMonth: number;
+  endMonth: number;
+  occupancyRate: number;
+}
+
 export interface ProjectionInputs {
   horizonMonths: number;
   initialCash: number;
@@ -199,7 +226,7 @@ export interface ProjectionInputs {
   taxRate: number;
   bufferMin: number;
   dscrMin: number;
-  phases: Phase[];
+  phases: PhaseProjection[];
   revenueParams: {
     surface: number;
     prixM2: number;
