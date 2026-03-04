@@ -194,7 +194,18 @@ function migrateGouvernance(g: any): GouvernanceData {
   };
 }
 
-function loadFromStorage(): { state: ProjectState; validated: ValidatedFlags } {
+function migrateApports(a: any): ApportsData {
+  if (!a?.apports) return { ...DEFAULT_APPORTS };
+  return {
+    apports: a.apports.map((item: any) => ({
+      ...item,
+      // Migrate old 'beneficiaire' field to 'beneficiaireId'
+      beneficiaireId: item.beneficiaireId ?? item.beneficiaire ?? "",
+    })),
+  };
+}
+
+
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
