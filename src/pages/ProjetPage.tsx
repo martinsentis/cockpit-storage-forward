@@ -6,12 +6,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { MONTH_NAMES } from "@/lib/monthUtils";
 
 export default function ProjetPage() {
   const { state, updateSection, validateSection } = useProject();
   const [form, setForm] = useState({ ...state.projet });
 
   const set = (key: string, value: string | number) => setForm(prev => ({ ...prev, [key]: value }));
+
+  // Parse projectStartDate "YYYY-MM"
+  const [startYear, startMonth] = (form.projectStartDate ?? "2026-06").split("-").map(Number);
+
+  const setStartDate = (month: number, year: number) => {
+    const val = `${year}-${String(month).padStart(2, "0")}`;
+    set("projectStartDate", val);
+  };
 
   const save = () => {
     updateSection("projet", form);
@@ -31,6 +40,25 @@ export default function ProjetPage() {
           <div className="space-y-2">
             <Label>Localisation</Label>
             <Input value={form.localisation} onChange={e => set("localisation", e.target.value)} />
+          </div>
+          <div className="space-y-2 col-span-2">
+            <Label>Date de début du projet (mois 0)</Label>
+            <div className="flex gap-2">
+              <Select value={String(startMonth)} onValueChange={v => setStartDate(Number(v), startYear)}>
+                <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {MONTH_NAMES.map((name, i) => (
+                    <SelectItem key={i + 1} value={String(i + 1)}>{name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                type="number"
+                className="w-24"
+                value={startYear}
+                onChange={e => setStartDate(startMonth, Number(e.target.value))}
+              />
+            </div>
           </div>
           <div className="space-y-2">
             <Label>Horizon (mois)</Label>
