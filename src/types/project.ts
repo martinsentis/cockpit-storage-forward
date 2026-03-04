@@ -413,8 +413,8 @@ export const APPORT_STATUT_LABELS: Record<ApportStatut, string> = {
 
 export interface ApportItem {
   id: string;
-  apporteurId: string;
-  beneficiaire: "EXPLOITATION" | "FONCIERE";
+  apporteurId: string;        // ID of an associe (person or société)
+  beneficiaireId: string;     // ID of a société (personne morale) from Associés module
   type: ApportType;
   montant: number;
   date: string;
