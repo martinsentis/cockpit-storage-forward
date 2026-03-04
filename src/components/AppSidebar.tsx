@@ -1,5 +1,5 @@
 import {
-  Building2, Hammer, Landmark, TrendingUp, Users, LayoutDashboard,
+  Building2, Hammer, Landmark, TrendingUp, Users, Users2, LayoutDashboard,
   CheckCircle, AlertTriangle, Home, ArrowLeftRight,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
