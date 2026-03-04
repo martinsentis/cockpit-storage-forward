@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
 import type { SectionName } from "@/types/project";
+import ProjectTimeline from "@/components/ProjectTimeline";
 
 const SECTION_LABELS: Record<SectionName, string> = {
   projet: "Projet",
@@ -53,7 +54,8 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-5xl">
+      <ProjectTimeline />
       <Card>
         <CardHeader><CardTitle>Dashboard — Simulation</CardTitle></CardHeader>
         <CardContent className="space-y-4">
