@@ -23,7 +23,19 @@ const categories = Object.keys(CAPEX_CATEGORY_LABELS) as CapexCategory[];
 
 export default function BuildPage() {
   const { state, updateSection, validateSection } = useProject();
-  const [form, setForm] = useState<BuildData>(() => ({ ...DEFAULT_BUILD, ...state.build }));
+  const [form, setForm] = useState<BuildData>(() => {
+    const s = state.build;
+    return {
+      startMonth: s.startMonth ?? 0,
+      durationMonths: s.durationMonths ?? 6,
+      budgetLines: s.budgetLines ?? [],
+      assets: s.assets ?? [],
+      taxeAmenagement: s.taxeAmenagement && typeof s.taxeAmenagement === "object"
+        ? s.taxeAmenagement
+        : { montant: 0, mode: "AUTO" as const, echeances: [] },
+      depenses: s.depenses ?? [],
+    };
+  });
   const projectStartDate = state.projet.projectStartDate;
 
   const set = (key: string, value: number) => setForm(prev => ({ ...prev, [key]: value }));
