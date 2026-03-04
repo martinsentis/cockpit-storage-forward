@@ -75,6 +75,7 @@ const defaultValidated: ValidatedFlags = {
   fonciere: false,
   loyerDynamique: false,
   gouvernance: false,
+  associes: false,
 };
 
 function migrateExploitation(e: any): ExploitationData {
