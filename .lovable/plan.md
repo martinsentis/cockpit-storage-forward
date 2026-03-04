@@ -1,48 +1,97 @@
 
 
-## Plan : Implémenter le Cockpit V1 complet
+# Plan : Refonte Bloc Box — Phases de Capacité + Ramp-up
 
-### Contexte
-Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
+## Résumé
 
-### Fichiers à créer
+Remplacer le bloc Box monolithique par un système multi-phases. Chaque phase représente une tranche physique avec sa propre capacité (macro ou typologie), ses dates commerciales et sa courbe de ramp-up. La synthèse agrège toutes les phases.
 
-**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
+## 1. `src/types/project.ts` — Nouveaux types
 
-**2. `src/types/project.ts`** — Types et defaults :
-- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
-- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
-  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
-  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
-  - `revenueParams` (surface, prixM2, tauxRemplissage)
-  - `services` ([] par défaut)
-  - `opexPercentOfRevenue`
-  - `debts`, `sciDebts` ([] par défaut)
-  - `sciChargesCash`, `sciAmortization` (0 par défaut)
-  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
-  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
-- Constantes `DEFAULT_*` exportées pour chaque section
+**Nouveau type `CapacityPhase`** (remplace l'usage direct de `Capacite` + `modeBox`) :
 
-**3. `src/contexts/ProjectContext.tsx`** :
-- State initialisé avec les defaults
-- `validated` flags (5 booleans, tous false)
-- `updateSection()`, `validateSection()`, `isProjectComplete()`
-- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
+```ts
+export type RampCurve = "LINEAR" | "FAST_START" | "SLOW_START";
 
-**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
+export interface CapacityPhase {
+  id: string;
+  nom: string;
+  surface: number;
+  modeBox: BoxMode;
+  // Macro
+  prixM2: number;
+  prixType: "HT" | "TTC";
+  vatRate: number;
+  // Typologie
+  typologies: Typologie[];
+  // Dates
+  startMonth: number; // mois début commercial
+  // Ramp-up
+  targetOccupancy: number; // ex: 0.85
+  rampUpMonths: number;
+  rampCurve: RampCurve;
+}
+```
 
-**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
+**Modifier `Typologie`** : ajouter `prixType: "HT" | "TTC"` et `vatRate: number`.
 
-**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
-- Formulaires pré-remplis depuis le Context
-- Bouton "Enregistrer" → updateSection + validateSection
-- Champs par page alignés sur les inputs API
+**Modifier `ExploitationData`** : remplacer `modeBox` + `capacite` + `phases` par `capacityPhases: CapacityPhase[]`. Garder `services`, `gestionnaires`, `charges`.
 
-**7. `src/pages/DashboardPage.tsx`** :
-- Liste les sections manquantes si projet incomplet
-- Bouton "Lancer la simulation" désactivé si incomplet
-- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
-- Affiche réponse JSON ou erreur dans `<pre>`
+**Mettre à jour `DEFAULT_EXPLOITATION`** avec une phase par défaut.
 
-**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
+**Mettre à jour `Phase`** : supprimer l'ancien type `Phase` (startMonth/endMonth/occupancyRate) — remplacé par les données de ramp-up dans `CapacityPhase`.
+
+**Mettre à jour `ProjectionInputs`** : adapter `phases` et `revenueParams` pour agréger les données de toutes les phases actives.
+
+## 2. `src/contexts/ProjectContext.tsx`
+
+Adapter `buildProjectionInputs()` :
+- Agréger surface totale et CA de toutes les phases
+- Générer les phases de projection depuis les ramp-up de chaque `CapacityPhase`
+- Défensive init pour `capacityPhases`
+
+## 3. `src/pages/ExploitationPage.tsx` — Refonte Bloc 1
+
+**Remplacer le Bloc 1 actuel** par un système de phases :
+
+### Section 1 — Liste des phases
+- Accordion ou Tabs par phase
+- Bouton "Ajouter une phase" (max 4)
+- Chaque phase : nom éditable, bouton supprimer
+
+### Section 2 — Capacité par phase
+- Toggle Macro / Typologie (identique à l'existant mais par phase)
+- **Macro** : surface, prix m², sélecteur HT/TTC, taux TVA, CA HT et TTC calculés
+- **Typologie** : table dynamique par phase avec prix HT/TTC et TVA par ligne
+- Résumé en bas : surface phase, CA 100% HT/TTC, prix m² implicite
+
+### Section 3 — Dates
+- Input "Mois de début commercial" par phase
+
+### Section 4 — Ramp-up
+- Inputs : occupancy cible (%), durée montée (mois), type courbe (select LINEAR/FAST_START/SLOW_START)
+- Calculs affichés : surface cible m², CA cible HT, CA cible TTC
+- Mini graphique recharts (LineChart) : % surface louée vs temps
+
+### Section 5 — Alerte cohérence
+- Lors de l'ajout d'une nouvelle phase (pas la première), afficher un `AlertDialog` :
+  "Cette tranche implique un investissement. Souhaitez-vous créer l'événement de financement associé ?"
+  - Options : "Utiliser trésorerie", "Apport associés", "Dette", "Mix"
+  - Option dette/mix → `navigate("/financement")`
+
+### Résumé global (sous toutes les phases)
+- Surface totale active (somme phases)
+- CA total 100% HT/TTC
+- Nb box total
+- Prix m² moyen global
+
+**Adapter les blocs Services et Synthèse** pour utiliser les agrégats des phases au lieu de l'ancien `capacite`.
+
+## Fichiers impactés
+
+| Fichier | Action |
+|---|---|
+| `src/types/project.ts` | Ajouter `CapacityPhase`, `RampCurve`, modifier `Typologie`, `ExploitationData`, supprimer ancien `Phase` |
+| `src/contexts/ProjectContext.tsx` | Adapter `buildProjectionInputs()`, défensive init |
+| `src/pages/ExploitationPage.tsx` | Refonte bloc Box en système multi-phases avec ramp-up et graphique |
 
