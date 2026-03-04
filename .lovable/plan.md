@@ -1,48 +1,117 @@
 
 
-## Plan : Implémenter le Cockpit V1 complet
+# Plan : Module Associés & Sociétés
 
-### Contexte
-Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
+## Vue d'ensemble
 
-### Fichiers à créer
+Nouveau module permettant de modéliser la structure de détention (personnes physiques, sociétés, holdings) et de calculer la détention économique finale dans les deux sociétés du projet (Exploitation SAS et Foncière SCI). Le module "Apports associés" est prévu pour plus tard ; la section 4 sera un placeholder en lecture seule.
 
-**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
+---
 
-**2. `src/types/project.ts`** — Types et defaults :
-- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
-- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
-  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
-  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
-  - `revenueParams` (surface, prixM2, tauxRemplissage)
-  - `services` ([] par défaut)
-  - `opexPercentOfRevenue`
-  - `debts`, `sciDebts` ([] par défaut)
-  - `sciChargesCash`, `sciAmortization` (0 par défaut)
-  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
-  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
-- Constantes `DEFAULT_*` exportées pour chaque section
+## 1. Types (`src/types/project.ts`)
 
-**3. `src/contexts/ProjectContext.tsx`** :
-- State initialisé avec les defaults
-- `validated` flags (5 booleans, tous false)
-- `updateSection()`, `validateSection()`, `isProjectComplete()`
-- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
+Nouveaux types :
 
-**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
+```typescript
+type PersonType = "PHYSIQUE" | "MORALE";
+type SocieteType = "HOLDING" | "OPERATIONNELLE" | "SCI" | "AUTRE";
 
-**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
+interface Associe {
+  id: string;
+  type: PersonType;
+  nom: string;
+  prenom?: string;           // physique only
+  societeType?: SocieteType;  // morale only
+  // Participations directes dans les 2 sociétés projet
+  partExploitation: number;   // 0-100
+  partFonciere: number;       // 0-100
+  // Participations dans d'autres sociétés (morales) du registre
+  participationsIndirectes: { societeId: string; pourcentage: number }[];
+}
 
-**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
-- Formulaires pré-remplis depuis le Context
-- Bouton "Enregistrer" → updateSection + validateSection
-- Champs par page alignés sur les inputs API
+interface AssociesData {
+  associes: Associe[];
+}
+```
 
-**7. `src/pages/DashboardPage.tsx`** :
-- Liste les sections manquantes si projet incomplet
-- Bouton "Lancer la simulation" désactivé si incomplet
-- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
-- Affiche réponse JSON ou erreur dans `<pre>`
+Default : `{ associes: [] }`
 
-**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
+Ajouter `associes` dans `ProjectState`, `ValidatedFlags`, `SectionName`.
+
+---
+
+## 2. Context (`ProjectContext.tsx`)
+
+- Ajouter `associes: AssociesData` dans `ProjectState` et `defaultState`
+- Ajouter `associes: false` dans `defaultValidated`
+- Migration : `associes: parsed.state?.associes ?? DEFAULT_ASSOCIES`
+
+---
+
+## 3. Page (`src/pages/AssociesPage.tsx`)
+
+4 sections via Tabs :
+
+**Section 1 — Liste des personnes et sociétés**
+- Tableau listant tous les associés (nom, type, participations directes)
+- Bouton "Créer une personne" ouvre un dialog :
+  - Choix type (physique/morale)
+  - Champs conditionnels (nom, prénom / nom société, type société)
+  - Participations directes dans Exploitation et Foncière (% optionnels)
+- Édition inline ou via dialog
+- Suppression avec confirmation
+
+**Section 2 — Structure de détention (participations indirectes)**
+- Pour chaque personne physique : liste des sociétés morales existantes avec champ % de participation
+- Validation en temps réel :
+  - Exploitation détenue à 100%
+  - Foncière détenue à 100%
+  - Alerte si détention circulaire détectée
+  - Alerte si chaîne ne remonte pas à une personne physique
+
+**Section 3 — Synthèse détentions économiques**
+- Tableau : Personne physique | % éco. Exploitation | % éco. Foncière
+- Calcul par parcours de graphe (produit des % sur chaque chemin, somme des chemins)
+- Tooltip au survol montrant le détail du calcul (chemin × chemin)
+- Deux vues toggle :
+  - Vue "depuis les sociétés" : pour chaque société, liste des PP avec %
+  - Vue "depuis une personne" : pour chaque PP, ses participations
+
+**Section 4 — Synthèse apports associés (placeholder)**
+- Message "Les apports associés seront disponibles dans un module dédié"
+- Tableau vide avec colonnes : Personne | Capital | CCA | Total
+
+---
+
+## 4. Logique de calcul détention économique
+
+Fonction pure (dans un utilitaire, pas dans le moteur financier car c'est de la structure juridique, pas du calcul financier) :
+
+```typescript
+// src/lib/ownershipGraph.ts
+function computeEconomicOwnership(associes: Associe[]): 
+  { personId: string; exploitation: number; fonciere: number; paths: PathDetail[] }[]
+```
+
+Algorithme : DFS depuis chaque personne physique, parcours de toutes les chaînes vers Exploitation/Foncière, produit des % à chaque étage, somme des chemins. Détection de cycles par ensemble de nœuds visités.
+
+---
+
+## 5. Routing & Sidebar
+
+- Route `/associes` dans `App.tsx`
+- Entrée "Associés & Sociétés" dans `AppSidebar.tsx` (après Gouvernance, avant Dashboard), icône `Users2`
+
+---
+
+## Fichiers impactés
+
+| Fichier | Action |
+|---|---|
+| `src/types/project.ts` | Nouveaux types `Associe`, `AssociesData`, defaults, ajout ValidatedFlags |
+| `src/contexts/ProjectContext.tsx` | Ajout `associes` dans state + migration |
+| `src/lib/ownershipGraph.ts` | **Nouveau** — calcul détention économique |
+| `src/pages/AssociesPage.tsx` | **Nouveau** — 4 sections |
+| `src/components/AppSidebar.tsx` | Nouvelle entrée |
+| `src/App.tsx` | Nouvelle route |
 
