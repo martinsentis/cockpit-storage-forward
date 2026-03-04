@@ -80,6 +80,7 @@ const defaultValidated: ValidatedFlags = {
   loyerDynamique: false,
   gouvernance: false,
   associes: false,
+  apports: false,
 };
 
 function migrateExploitation(e: any): ExploitationData {
