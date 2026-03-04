@@ -190,6 +190,18 @@ function migrateGouvernance(g: any): GouvernanceData {
     ccaPriorityRatio: g?.ccaPriorityRatio ?? DEFAULT_GOUVERNANCE.ccaPriorityRatio,
     reserveStrategicRatio: g?.reserveStrategicRatio ?? DEFAULT_GOUVERNANCE.reserveStrategicRatio,
     reserveAfterCcaFullyRepaid: g?.reserveAfterCcaFullyRepaid ?? DEFAULT_GOUVERNANCE.reserveAfterCcaFullyRepaid,
+    entityRules: g?.entityRules ?? [],
+  };
+}
+
+function migrateApports(a: any): ApportsData {
+  if (!a?.apports) return { ...DEFAULT_APPORTS };
+  return {
+    apports: a.apports.map((item: any) => ({
+      ...item,
+      // Migrate old 'beneficiaire' field to 'beneficiaireId'
+      beneficiaireId: item.beneficiaireId ?? item.beneficiaire ?? "",
+    })),
   };
 }
 
@@ -208,7 +220,7 @@ function loadFromStorage(): { state: ProjectState; validated: ValidatedFlags } {
           loyerDynamique: { ...DEFAULT_LOYER_DYNAMIQUE, ...parsed.state?.loyerDynamique },
           gouvernance: migrateGouvernance(parsed.state?.gouvernance),
           associes: parsed.state?.associes ?? { ...DEFAULT_ASSOCIES },
-          apports: parsed.state?.apports ?? { ...DEFAULT_APPORTS },
+          apports: migrateApports(parsed.state?.apports),
         },
         validated: { ...defaultValidated, ...parsed.validated },
       };

@@ -264,13 +264,36 @@ export interface LoyerDynamiqueData {
 
 // ── Gouvernance ──
 
+export interface CashAllocationRule {
+  entityId: string;             // société ID from Associés module
+  distributableCashRate: number; // % of cash that is distributable
+  allocationOrder: CashAllocationStep[];
+}
+
+export type CashAllocationStepType = "CCA_REPAYMENT" | "RESERVE" | "DIVIDENDS";
+
+export interface CashAllocationStep {
+  type: CashAllocationStepType;
+  ratio: number;               // % of distributable cash allocated to this step
+  label?: string;
+}
+
+export const CASH_ALLOCATION_STEP_LABELS: Record<CashAllocationStepType, string> = {
+  CCA_REPAYMENT: "Remboursement CCA",
+  RESERVE: "Réserve stratégique",
+  DIVIDENDS: "Distribution de dividendes",
+};
+
 export interface GouvernanceData {
   structureJuridique: string;
+  // Legacy flat fields (still used by engine for now)
   ccaBalance: number;
   distributableCashRate: number;
   ccaPriorityRatio: number;
   reserveStrategicRatio: number;
   reserveAfterCcaFullyRepaid: number;
+  // Per-entity allocation rules (optional, for future engine)
+  entityRules: CashAllocationRule[];
 }
 
 // ── Defaults ──
@@ -358,6 +381,7 @@ export const DEFAULT_GOUVERNANCE: GouvernanceData = {
   ccaPriorityRatio: 0.7,
   reserveStrategicRatio: 0.1,
   reserveAfterCcaFullyRepaid: 0.3,
+  entityRules: [],
 };
 
 // ── Associés & Sociétés ──
@@ -413,8 +437,8 @@ export const APPORT_STATUT_LABELS: Record<ApportStatut, string> = {
 
 export interface ApportItem {
   id: string;
-  apporteurId: string;
-  beneficiaire: "EXPLOITATION" | "FONCIERE";
+  apporteurId: string;        // ID of an associe (person or société)
+  beneficiaireId: string;     // ID of a société (personne morale) from Associés module
   type: ApportType;
   montant: number;
   date: string;

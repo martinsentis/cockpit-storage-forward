@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
 import { useProject } from "@/contexts/ProjectContext";
-import type { ApportItem, ApportType, ApportStatut } from "@/types/project";
+import type { ApportItem, ApportType, ApportStatut, Associe } from "@/types/project";
 import { APPORT_TYPE_LABELS, APPORT_STATUT_LABELS } from "@/types/project";
+import { computeEconomicOwnership } from "@/lib/ownershipGraph";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Pencil, Trash2, CheckCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Plus, Pencil, Trash2, CheckCircle, AlertTriangle, Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function ApportsPage() {
   const { state, updateSection, validateSection, validated } = useProject();
@@ -24,12 +27,18 @@ export default function ApportsPage() {
 
   // Form state
   const [formApporteurId, setFormApporteurId] = useState("");
-  const [formBeneficiaire, setFormBeneficiaire] = useState<"EXPLOITATION" | "FONCIERE">("EXPLOITATION");
+  const [formBeneficiaireId, setFormBeneficiaireId] = useState("");
   const [formType, setFormType] = useState<ApportType>("CAPITAL");
   const [formMontant, setFormMontant] = useState(0);
   const [formDate, setFormDate] = useState("");
   const [formStatut, setFormStatut] = useState<ApportStatut>("PREVU");
   const [formCommentaire, setFormCommentaire] = useState("");
+
+  // All entities: sociétés (morales) are potential beneficiaires
+  const societes = associes.filter(a => a.type === "MORALE");
+
+  // Ownership for consolidation
+  const ownership = useMemo(() => computeEconomicOwnership(associes), [associes]);
 
   function resolveNom(id: string): string {
     const a = associes.find(x => x.id === id);
@@ -37,10 +46,31 @@ export default function ApportsPage() {
     return a.type === "PHYSIQUE" ? `${a.prenom ? a.prenom + " " : ""}${a.nom}` : a.nom;
   }
 
+  // Get valid apporteurs: all associes (persons + sociétés)
+  // But société → personne is forbidden, so we validate in save
+  function getApporteurs(): Associe[] {
+    return associes;
+  }
+
+  // Get valid beneficiaires: only sociétés (personnes morales)
+  function getBeneficiaires(): Associe[] {
+    return societes;
+  }
+
+  // Validate: société → personne is forbidden
+  function isValidFlow(apporteurId: string, beneficiaireId: string): boolean {
+    const apporteur = associes.find(a => a.id === apporteurId);
+    const beneficiaire = associes.find(a => a.id === beneficiaireId);
+    if (!apporteur || !beneficiaire) return false;
+    // société → personne is forbidden
+    if (beneficiaire.type === "PHYSIQUE") return false;
+    return true;
+  }
+
   function openCreate() {
     setEditId(null);
     setFormApporteurId(associes[0]?.id ?? "");
-    setFormBeneficiaire("EXPLOITATION");
+    setFormBeneficiaireId(societes[0]?.id ?? "");
     setFormType("CAPITAL");
     setFormMontant(0);
     setFormDate("");
@@ -52,7 +82,7 @@ export default function ApportsPage() {
   function openEdit(item: ApportItem) {
     setEditId(item.id);
     setFormApporteurId(item.apporteurId);
-    setFormBeneficiaire(item.beneficiaire);
+    setFormBeneficiaireId(item.beneficiaireId);
     setFormType(item.type);
     setFormMontant(item.montant);
     setFormDate(item.date);
@@ -62,10 +92,11 @@ export default function ApportsPage() {
   }
 
   function save() {
+    if (!isValidFlow(formApporteurId, formBeneficiaireId)) return;
     const entry: ApportItem = {
       id: editId ?? crypto.randomUUID(),
       apporteurId: formApporteurId,
-      beneficiaire: formBeneficiaire,
+      beneficiaireId: formBeneficiaireId,
       type: formType,
       montant: formMontant,
       date: formDate,
@@ -83,8 +114,10 @@ export default function ApportsPage() {
     updateSection("apports", { apports: apports.filter(a => a.id !== id) });
   }
 
-  // Synthèse par associé
-  const syntheseParAssocie = useMemo(() => {
+  const fmt = (n: number) => n.toLocaleString("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+
+  // ── Synthèse par apporteur ──
+  const syntheseParApporteur = useMemo(() => {
     const map = new Map<string, { capital: number; cca: number }>();
     for (const a of apports) {
       if (!map.has(a.apporteurId)) map.set(a.apporteurId, { capital: 0, cca: 0 });
@@ -95,24 +128,75 @@ export default function ApportsPage() {
     return Array.from(map.entries()).map(([id, v]) => ({ id, nom: resolveNom(id), ...v, total: v.capital + v.cca }));
   }, [apports, associes]);
 
-  // Synthèse par société
+  // ── Synthèse par société bénéficiaire ──
   const syntheseParSociete = useMemo(() => {
     const map = new Map<string, { capital: number; cca: number }>();
     for (const a of apports) {
-      if (!map.has(a.beneficiaire)) map.set(a.beneficiaire, { capital: 0, cca: 0 });
-      const entry = map.get(a.beneficiaire)!;
+      if (!map.has(a.beneficiaireId)) map.set(a.beneficiaireId, { capital: 0, cca: 0 });
+      const entry = map.get(a.beneficiaireId)!;
       if (a.type === "CAPITAL") entry.capital += a.montant;
       else entry.cca += a.montant;
     }
     return Array.from(map.entries()).map(([id, v]) => ({
-      id,
-      nom: id === "EXPLOITATION" ? "Société d'exploitation" : "Société foncière (SCI)",
-      ...v,
-      total: v.capital + v.cca,
+      id, nom: resolveNom(id), ...v, total: v.capital + v.cca,
     }));
+  }, [apports, associes]);
+
+  // ── CCA par société (dette directe) ──
+  const ccaParSociete = useMemo(() => {
+    const map = new Map<string, Map<string, number>>(); // societeId → Map<crediteurId, solde>
+    for (const a of apports) {
+      if (a.type !== "CCA") continue;
+      if (!map.has(a.beneficiaireId)) map.set(a.beneficiaireId, new Map());
+      const societe = map.get(a.beneficiaireId)!;
+      societe.set(a.apporteurId, (societe.get(a.apporteurId) ?? 0) + a.montant);
+    }
+    return map;
   }, [apports]);
 
-  const fmt = (n: number) => n.toLocaleString("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+  // ── Consolidation économique par personne physique ──
+  const consolidation = useMemo(() => {
+    const physiques = associes.filter(a => a.type === "PHYSIQUE");
+    return physiques.map(pp => {
+      const ppName = `${pp.prenom ? pp.prenom + " " : ""}${pp.nom}`;
+      const expositions: { societeId: string; societeNom: string; ccaDirect: number; ccaIndirect: number; total: number }[] = [];
+
+      for (const societe of societes) {
+        // Direct CCA from this person to this société
+        const directCCA = apports
+          .filter(a => a.type === "CCA" && a.apporteurId === pp.id && a.beneficiaireId === societe.id)
+          .reduce((s, a) => s + a.montant, 0);
+
+        // Indirect CCA: through sociétés this person owns
+        let indirectCCA = 0;
+        for (const pi of pp.participationsIndirectes) {
+          if (pi.pourcentage <= 0) continue;
+          // CCA from this société to the target société
+          const societeCCA = apports
+            .filter(a => a.type === "CCA" && a.apporteurId === pi.societeId && a.beneficiaireId === societe.id)
+            .reduce((s, a) => s + a.montant, 0);
+          indirectCCA += societeCCA * (pi.pourcentage / 100);
+        }
+
+        if (directCCA > 0 || indirectCCA > 0) {
+          expositions.push({
+            societeId: societe.id,
+            societeNom: societe.nom,
+            ccaDirect: directCCA,
+            ccaIndirect: indirectCCA,
+            total: directCCA + indirectCCA,
+          });
+        }
+      }
+
+      return {
+        personId: pp.id,
+        personNom: ppName,
+        expositions,
+        totalExposition: expositions.reduce((s, e) => s + e.total, 0),
+      };
+    });
+  }, [apports, associes, societes]);
 
   return (
     <div className="space-y-6">
@@ -129,28 +213,31 @@ export default function ApportsPage() {
         </div>
       </div>
 
+      {societes.length === 0 && (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Aucune société définie. Créez des sociétés (personnes morales) dans le module "Associés & Sociétés" pour pouvoir enregistrer des apports.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Tabs defaultValue="tableau">
         <TabsList>
           <TabsTrigger value="tableau">Tableau des apports</TabsTrigger>
           <TabsTrigger value="synthese">Synthèse</TabsTrigger>
+          <TabsTrigger value="cca">Dettes CCA</TabsTrigger>
+          <TabsTrigger value="consolidation">Consolidation économique</TabsTrigger>
         </TabsList>
 
-        {/* ── SECTION 1: Tableau ── */}
+        {/* ── TAB 1: Tableau des apports ── */}
         <TabsContent value="tableau" className="space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-semibold text-foreground">Liste des apports</h2>
-            <Button size="sm" onClick={openCreate} disabled={associes.length === 0}>
+            <Button size="sm" onClick={openCreate} disabled={associes.length === 0 || societes.length === 0}>
               <Plus className="h-4 w-4 mr-1" /> Créer un apport
             </Button>
           </div>
-
-          {associes.length === 0 && (
-            <Card>
-              <CardContent className="py-8 text-center text-muted-foreground">
-                Créez d'abord des associés dans le module "Associés & Sociétés".
-              </CardContent>
-            </Card>
-          )}
 
           <Card>
             <CardContent className="p-0">
@@ -159,7 +246,7 @@ export default function ApportsPage() {
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Apporteur</TableHead>
-                    <TableHead>Bénéficiaire</TableHead>
+                    <TableHead>→ Bénéficiaire</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead className="text-right">Montant</TableHead>
                     <TableHead>Statut</TableHead>
@@ -179,9 +266,7 @@ export default function ApportsPage() {
                     <TableRow key={a.id}>
                       <TableCell>{a.date || "—"}</TableCell>
                       <TableCell className="font-medium">{resolveNom(a.apporteurId)}</TableCell>
-                      <TableCell>
-                        {a.beneficiaire === "EXPLOITATION" ? "Exploitation" : "Foncière (SCI)"}
-                      </TableCell>
+                      <TableCell>{resolveNom(a.beneficiaireId)}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{APPORT_TYPE_LABELS[a.type]}</Badge>
                       </TableCell>
@@ -210,31 +295,29 @@ export default function ApportsPage() {
           </Card>
         </TabsContent>
 
-        {/* ── SECTION 2: Synthèse ── */}
+        {/* ── TAB 2: Synthèse ── */}
         <TabsContent value="synthese" className="space-y-6">
           <h2 className="text-lg font-semibold text-foreground">Synthèse des apports</h2>
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Par associé</CardTitle>
+              <CardTitle className="text-base">Par apporteur</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Associé</TableHead>
+                    <TableHead>Apporteur</TableHead>
                     <TableHead className="text-right">Capital</TableHead>
                     <TableHead className="text-right">CCA</TableHead>
                     <TableHead className="text-right">Total</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {syntheseParAssocie.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground py-6">Aucune donnée</TableCell>
-                    </TableRow>
+                  {syntheseParApporteur.length === 0 && (
+                    <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Aucune donnée</TableCell></TableRow>
                   )}
-                  {syntheseParAssocie.map(s => (
+                  {syntheseParApporteur.map(s => (
                     <TableRow key={s.id}>
                       <TableCell className="font-medium">{s.nom}</TableCell>
                       <TableCell className="text-right">{fmt(s.capital)}</TableCell>
@@ -249,7 +332,7 @@ export default function ApportsPage() {
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Par société</CardTitle>
+              <CardTitle className="text-base">Par société bénéficiaire</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
@@ -263,9 +346,7 @@ export default function ApportsPage() {
                 </TableHeader>
                 <TableBody>
                   {syntheseParSociete.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground py-6">Aucune donnée</TableCell>
-                    </TableRow>
+                    <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Aucune donnée</TableCell></TableRow>
                   )}
                   {syntheseParSociete.map(s => (
                     <TableRow key={s.id}>
@@ -279,6 +360,133 @@ export default function ApportsPage() {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ── TAB 3: Dettes CCA par société ── */}
+        <TabsContent value="cca" className="space-y-6">
+          <h2 className="text-lg font-semibold text-foreground">Dettes CCA par société</h2>
+          <p className="text-sm text-muted-foreground">
+            Chaque société ne doit rembourser que son créancier direct. Le remboursement remonte étage par étage selon les règles de gouvernance.
+          </p>
+
+          {societes.map(societe => {
+            const dettes = ccaParSociete.get(societe.id);
+            if (!dettes || dettes.size === 0) return null;
+            const totalDette = Array.from(dettes.values()).reduce((s, v) => s + v, 0);
+            return (
+              <Card key={societe.id}>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center justify-between">
+                    <span>{societe.nom}</span>
+                    <Badge variant="outline">Total CCA : {fmt(totalDette)}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Créancier direct</TableHead>
+                        <TableHead className="text-right">Solde CCA</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {Array.from(dettes.entries()).map(([crediteurId, solde]) => (
+                        <TableRow key={crediteurId}>
+                          <TableCell className="font-medium">{resolveNom(crediteurId)}</TableCell>
+                          <TableCell className="text-right">{fmt(solde)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            );
+          })}
+
+          {Array.from(ccaParSociete.keys()).length === 0 && (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                Aucun CCA enregistré
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* ── TAB 4: Consolidation économique ── */}
+        <TabsContent value="consolidation" className="space-y-6">
+          <div className="space-y-2">
+            <h2 className="text-lg font-semibold text-foreground">Consolidation économique par personne physique</h2>
+            <p className="text-sm text-muted-foreground">
+              Vue analytique uniquement — ne modifie pas les dettes réelles ni les comptes des sociétés.
+              L'exposition indirecte est calculée en pondérant les CCA des sociétés intermédiaires par le pourcentage de détention.
+            </p>
+          </div>
+
+          {consolidation.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                Aucune personne physique définie
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {/* Summary table */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Exposition CCA consolidée</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Personne physique</TableHead>
+                        {societes.map(s => (
+                          <TableHead key={s.id} className="text-right">{s.nom}</TableHead>
+                        ))}
+                        <TableHead className="text-right font-semibold">Total exposition</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {consolidation.map(c => (
+                        <TableRow key={c.personId}>
+                          <TableCell className="font-medium">{c.personNom}</TableCell>
+                          {societes.map(s => {
+                            const expo = c.expositions.find(e => e.societeId === s.id);
+                            return (
+                              <TableCell key={s.id} className="text-right">
+                                {expo ? (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="cursor-help inline-flex items-center gap-1">
+                                        {fmt(expo.total)}
+                                        {expo.ccaIndirect > 0 && <Info className="h-3 w-3 text-muted-foreground" />}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="text-xs">
+                                      <p>Direct : {fmt(expo.ccaDirect)}</p>
+                                      {expo.ccaIndirect > 0 && <p>Indirect : {fmt(expo.ccaIndirect)}</p>}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                ) : "—"}
+                              </TableCell>
+                            );
+                          })}
+                          <TableCell className="text-right font-semibold">{fmt(c.totalExposition)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  Cette consolidation est une vue analytique. Les dettes comptables réelles restent entre chaque société et son créancier direct.
+                </AlertDescription>
+              </Alert>
+            </>
+          )}
         </TabsContent>
       </Tabs>
 
@@ -294,24 +502,33 @@ export default function ApportsPage() {
               <Select value={formApporteurId} onValueChange={setFormApporteurId}>
                 <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                 <SelectContent>
-                  {associes.map(a => (
+                  {getApporteurs().map(a => (
                     <SelectItem key={a.id} value={a.id}>
-                      {a.type === "PHYSIQUE" ? `${a.prenom ? a.prenom + " " : ""}${a.nom}` : a.nom}
+                      {a.type === "PHYSIQUE" ? `${a.prenom ? a.prenom + " " : ""}${a.nom}` : `${a.nom} (société)`}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Personne physique ou société
+              </p>
             </div>
 
             <div>
               <Label>Société bénéficiaire</Label>
-              <Select value={formBeneficiaire} onValueChange={v => setFormBeneficiaire(v as "EXPLOITATION" | "FONCIERE")}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select value={formBeneficiaireId} onValueChange={setFormBeneficiaireId}>
+                <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="EXPLOITATION">Société d'exploitation</SelectItem>
-                  <SelectItem value="FONCIERE">Société foncière (SCI)</SelectItem>
+                  {getBeneficiaires().map(a => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.nom}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Uniquement les sociétés (personnes morales)
+              </p>
             </div>
 
             <div>
@@ -323,6 +540,11 @@ export default function ApportsPage() {
                   <SelectItem value="CCA">Compte courant d'associé (CCA)</SelectItem>
                 </SelectContent>
               </Select>
+              {formType === "CAPITAL" && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  ⚠ Un apport en capital ne modifie pas automatiquement la structure capitalistique.
+                </p>
+              )}
             </div>
 
             <div>
@@ -366,7 +588,7 @@ export default function ApportsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
-            <Button onClick={save} disabled={!formApporteurId || formMontant <= 0}>Enregistrer</Button>
+            <Button onClick={save} disabled={!formApporteurId || !formBeneficiaireId || formMontant <= 0}>Enregistrer</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
