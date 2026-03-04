@@ -36,6 +36,7 @@ export interface ProjectState {
   fonciere: FonciereData;
   loyerDynamique: LoyerDynamiqueData;
   gouvernance: GouvernanceData;
+  associes: AssociesData;
 }
 
 interface ProjectContextValue {
