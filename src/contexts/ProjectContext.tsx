@@ -8,6 +8,7 @@ import {
   FonciereData,
   LoyerDynamiqueData,
   AssociesData,
+  ApportsData,
   ValidatedFlags,
   SectionName,
   ProjectionInputs,
@@ -21,6 +22,7 @@ import {
   DEFAULT_FONCIERE,
   DEFAULT_LOYER_DYNAMIQUE,
   DEFAULT_ASSOCIES,
+  DEFAULT_APPORTS,
   createDefaultPhase,
 } from "@/types/project";
 import { computeEngine } from "@/engine/engine";
