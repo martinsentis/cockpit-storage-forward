@@ -7,6 +7,7 @@ import {
   GouvernanceData,
   FonciereData,
   LoyerDynamiqueData,
+  AssociesData,
   ValidatedFlags,
   SectionName,
   ProjectionInputs,
@@ -19,6 +20,7 @@ import {
   DEFAULT_GOUVERNANCE,
   DEFAULT_FONCIERE,
   DEFAULT_LOYER_DYNAMIQUE,
+  DEFAULT_ASSOCIES,
   createDefaultPhase,
 } from "@/types/project";
 import { computeEngine } from "@/engine/engine";
@@ -34,6 +36,7 @@ export interface ProjectState {
   fonciere: FonciereData;
   loyerDynamique: LoyerDynamiqueData;
   gouvernance: GouvernanceData;
+  associes: AssociesData;
 }
 
 interface ProjectContextValue {
@@ -61,6 +64,7 @@ const defaultState: ProjectState = {
   fonciere: { ...DEFAULT_FONCIERE },
   loyerDynamique: { ...DEFAULT_LOYER_DYNAMIQUE },
   gouvernance: { ...DEFAULT_GOUVERNANCE },
+  associes: { ...DEFAULT_ASSOCIES },
 };
 
 const defaultValidated: ValidatedFlags = {
@@ -71,6 +75,7 @@ const defaultValidated: ValidatedFlags = {
   fonciere: false,
   loyerDynamique: false,
   gouvernance: false,
+  associes: false,
 };
 
 function migrateExploitation(e: any): ExploitationData {
@@ -133,6 +138,7 @@ function loadFromStorage(): { state: ProjectState; validated: ValidatedFlags } {
           fonciere: { ...DEFAULT_FONCIERE, ...parsed.state?.fonciere },
           loyerDynamique: { ...DEFAULT_LOYER_DYNAMIQUE, ...parsed.state?.loyerDynamique },
           gouvernance: migrateGouvernance(parsed.state?.gouvernance),
+          associes: parsed.state?.associes ?? { ...DEFAULT_ASSOCIES },
         },
         validated: { ...defaultValidated, ...parsed.validated },
       };

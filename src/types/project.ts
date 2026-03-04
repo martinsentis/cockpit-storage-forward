@@ -304,6 +304,42 @@ export const DEFAULT_GOUVERNANCE: GouvernanceData = {
   reserveAfterCcaFullyRepaid: 0.3,
 };
 
+// ── Associés & Sociétés ──
+
+export type PersonType = "PHYSIQUE" | "MORALE";
+export type SocieteType = "HOLDING" | "OPERATIONNELLE" | "SCI" | "AUTRE";
+
+export const SOCIETE_TYPE_LABELS: Record<SocieteType, string> = {
+  HOLDING: "Holding",
+  OPERATIONNELLE: "Société opérationnelle",
+  SCI: "SCI",
+  AUTRE: "Autre",
+};
+
+export interface ParticipationIndirecte {
+  societeId: string;
+  pourcentage: number;
+}
+
+export interface Associe {
+  id: string;
+  type: PersonType;
+  nom: string;
+  prenom?: string;
+  societeType?: SocieteType;
+  partExploitation: number;
+  partFonciere: number;
+  participationsIndirectes: ParticipationIndirecte[];
+}
+
+export interface AssociesData {
+  associes: Associe[];
+}
+
+export const DEFAULT_ASSOCIES: AssociesData = {
+  associes: [],
+};
+
 // ── Tax-exempt labels ──
 
 export const TAX_EXEMPT_LABELS = ["Taxe foncière", "CFE", "Taxe d'aménagement"];
@@ -371,6 +407,7 @@ export interface ValidatedFlags {
   fonciere: boolean;
   loyerDynamique: boolean;
   gouvernance: boolean;
+  associes: boolean;
 }
 
 export type SectionName = keyof ValidatedFlags;
