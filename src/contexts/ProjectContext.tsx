@@ -7,6 +7,7 @@ import {
   GouvernanceData,
   FonciereData,
   LoyerDynamiqueData,
+  AssociesData,
   ValidatedFlags,
   SectionName,
   ProjectionInputs,
@@ -19,6 +20,7 @@ import {
   DEFAULT_GOUVERNANCE,
   DEFAULT_FONCIERE,
   DEFAULT_LOYER_DYNAMIQUE,
+  DEFAULT_ASSOCIES,
   createDefaultPhase,
 } from "@/types/project";
 import { computeEngine } from "@/engine/engine";
