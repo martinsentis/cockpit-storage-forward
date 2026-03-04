@@ -282,15 +282,12 @@ export const DEFAULT_PROJET: ProjetData = {
 };
 
 export const DEFAULT_BUILD: BuildData = {
-  capexTotal: 500000,
-  posteFoncier: 150000,
-  posteTravaux: 250000,
-  posteHonoraires: 50000,
-  posteDivers: 50000,
   startMonth: 0,
   durationMonths: 6,
-  taxeAmenagement: 0,
+  budgetLines: [],
   assets: [],
+  taxeAmenagement: { montant: 0, mode: "AUTO", echeances: [] },
+  depenses: [],
 };
 
 export const DEFAULT_FINANCEMENT: FinancementData = {
