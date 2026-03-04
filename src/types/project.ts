@@ -90,13 +90,19 @@ export interface DepenseReelle {
   commentaire?: string;
 }
 
-export interface BuildData {
+export interface CapexEvent {
+  id: string;
+  nom: string;
   startMonth: number;
   durationMonths: number;
   budgetLines: CapexBudgetLine[];
   assets: BuildAsset[];
   taxeAmenagement: TaxeAmenagementData;
   depenses: DepenseReelle[];
+}
+
+export interface BuildData {
+  capexEvents: CapexEvent[];
 }
 
 export interface DebtItem {
