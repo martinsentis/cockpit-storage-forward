@@ -154,6 +154,7 @@ export const DEFAULT_PROJET: ProjetData = {
   sciInitialCash: 50000,
   defaultVatRate: 0.20,
   displayMode: "HT",
+  projectStartDate: "2026-06",
 };
 
 export const DEFAULT_BUILD: BuildData = {
