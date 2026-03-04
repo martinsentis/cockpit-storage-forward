@@ -19,7 +19,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function AssociesPage() {
   const { state, updateSection, validateSection, validated } = useProject();
+  const navigate = useNavigate();
   const associes = state.associes.associes;
+  const apports = state.apports.apports;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
 

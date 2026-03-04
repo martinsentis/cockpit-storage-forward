@@ -37,6 +37,7 @@ const App = () => (
               <Route path="/loyer-dynamique" element={<LoyerDynamiquePage />} />
               <Route path="/gouvernance" element={<GouvernancePage />} />
               <Route path="/associes" element={<AssociesPage />} />
+              <Route path="/apports" element={<ApportsPage />} />
               <Route path="/dashboard" element={<DashboardPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
