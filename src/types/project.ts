@@ -340,6 +340,38 @@ export const DEFAULT_ASSOCIES: AssociesData = {
   associes: [],
 };
 
+// ── Apports Associés ──
+
+export type ApportType = "CAPITAL" | "CCA";
+export type ApportStatut = "PREVU" | "REALISE";
+
+export const APPORT_TYPE_LABELS: Record<ApportType, string> = {
+  CAPITAL: "Apport en capital",
+  CCA: "Compte courant d'associé",
+};
+
+export const APPORT_STATUT_LABELS: Record<ApportStatut, string> = {
+  PREVU: "Prévu",
+  REALISE: "Réalisé",
+};
+
+export interface ApportItem {
+  id: string;
+  apporteurId: string;
+  beneficiaire: "EXPLOITATION" | "FONCIERE";
+  type: ApportType;
+  montant: number;
+  date: string;
+  statut: ApportStatut;
+  commentaire?: string;
+}
+
+export interface ApportsData {
+  apports: ApportItem[];
+}
+
+export const DEFAULT_APPORTS: ApportsData = { apports: [] };
+
 // ── Tax-exempt labels ──
 
 export const TAX_EXEMPT_LABELS = ["Taxe foncière", "CFE", "Taxe d'aménagement"];
