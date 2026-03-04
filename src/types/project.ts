@@ -289,13 +289,21 @@ export const DEFAULT_PROJET: ProjetData = {
   projectStartDate: "2026-06",
 };
 
+export function createDefaultCapexEvent(nom = "CAPEX Initial"): CapexEvent {
+  return {
+    id: crypto.randomUUID(),
+    nom,
+    startMonth: 0,
+    durationMonths: 6,
+    budgetLines: [],
+    assets: [],
+    taxeAmenagement: { montant: 0, mode: "AUTO", echeances: [] },
+    depenses: [],
+  };
+}
+
 export const DEFAULT_BUILD: BuildData = {
-  startMonth: 0,
-  durationMonths: 6,
-  budgetLines: [],
-  assets: [],
-  taxeAmenagement: { montant: 0, mode: "AUTO", echeances: [] },
-  depenses: [],
+  capexEvents: [createDefaultCapexEvent()],
 };
 
 export const DEFAULT_FINANCEMENT: FinancementData = {
