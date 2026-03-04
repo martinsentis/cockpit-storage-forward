@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useProject } from "@/contexts/ProjectContext";
+import { useNavigate } from "react-router-dom";
 import type { Associe, PersonType, SocieteType } from "@/types/project";
 import { SOCIETE_TYPE_LABELS } from "@/types/project";
 import { computeEconomicOwnership, validateOwnership } from "@/lib/ownershipGraph";
