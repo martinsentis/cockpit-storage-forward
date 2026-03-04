@@ -383,7 +383,6 @@ export const DEFAULT_GOUVERNANCE: GouvernanceData = {
   reserveAfterCcaFullyRepaid: 0.3,
   entityRules: [],
 };
-};
 
 // ── Associés & Sociétés ──
 
