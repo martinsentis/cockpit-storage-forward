@@ -93,51 +93,66 @@ export default function FinancementPage() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <Card>
-        <CardHeader><CardTitle>Financement</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Apport fonds propres (€)</Label>
-              <Input type="number" value={form.apportFondsPropres} onChange={e => set("apportFondsPropres", Number(e.target.value))} />
-            </div>
-            <div className="space-y-2">
-              <Label>Charges SCI cash (€/mois)</Label>
-              <Input type="number" value={form.sciChargesCash} onChange={e => set("sciChargesCash", Number(e.target.value))} />
-            </div>
-            <div className="space-y-2">
-              <Label>Amortissement SCI (€/mois)</Label>
-              <Input type="number" value={form.sciAmortization} onChange={e => set("sciAmortization", Number(e.target.value))} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="general">
+        <TabsList className="w-full justify-start">
+          <TabsTrigger value="general">Général</TabsTrigger>
+          <TabsTrigger value="dettes-sas">Dettes SAS</TabsTrigger>
+          <TabsTrigger value="dettes-sci">Dettes SCI</TabsTrigger>
+        </TabsList>
 
-      <Card>
-        <CardHeader><CardTitle>Dettes SAS</CardTitle></CardHeader>
-        <CardContent>
-          <DebtTable
-            title="Dettes SAS"
-            debts={form.debts}
-            onChange={debts => setForm(prev => ({ ...prev, debts }))}
-            projectStartDate={projectStartDate}
-          />
-        </CardContent>
-      </Card>
+        <TabsContent value="general" className="space-y-4">
+          <Card>
+            <CardHeader><CardTitle>Financement</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Apport fonds propres (€)</Label>
+                  <Input type="number" value={form.apportFondsPropres} onChange={e => set("apportFondsPropres", Number(e.target.value))} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Charges SCI cash (€/mois)</Label>
+                  <Input type="number" value={form.sciChargesCash} onChange={e => set("sciChargesCash", Number(e.target.value))} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Amortissement SCI (€/mois)</Label>
+                  <Input type="number" value={form.sciAmortization} onChange={e => set("sciAmortization", Number(e.target.value))} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Button onClick={save} className="w-full">Enregistrer</Button>
+        </TabsContent>
 
-      <Card>
-        <CardHeader><CardTitle>Dettes SCI</CardTitle></CardHeader>
-        <CardContent>
-          <DebtTable
-            title="Dettes SCI"
-            debts={form.sciDebts}
-            onChange={sciDebts => setForm(prev => ({ ...prev, sciDebts }))}
-            projectStartDate={projectStartDate}
-          />
-        </CardContent>
-      </Card>
+        <TabsContent value="dettes-sas" className="space-y-4">
+          <Card>
+            <CardHeader><CardTitle>Dettes SAS</CardTitle></CardHeader>
+            <CardContent>
+              <DebtTable
+                title="Dettes SAS"
+                debts={form.debts}
+                onChange={debts => setForm(prev => ({ ...prev, debts }))}
+                projectStartDate={projectStartDate}
+              />
+            </CardContent>
+          </Card>
+          <Button onClick={save} className="w-full">Enregistrer</Button>
+        </TabsContent>
 
-      <Button onClick={save} className="w-full">Enregistrer</Button>
+        <TabsContent value="dettes-sci" className="space-y-4">
+          <Card>
+            <CardHeader><CardTitle>Dettes SCI</CardTitle></CardHeader>
+            <CardContent>
+              <DebtTable
+                title="Dettes SCI"
+                debts={form.sciDebts}
+                onChange={sciDebts => setForm(prev => ({ ...prev, sciDebts }))}
+                projectStartDate={projectStartDate}
+              />
+            </CardContent>
+          </Card>
+          <Button onClick={save} className="w-full">Enregistrer</Button>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
