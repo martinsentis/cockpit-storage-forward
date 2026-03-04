@@ -21,6 +21,7 @@ const sections: { title: string; url: string; icon: React.ElementType; section?:
   { title: "Foncière", url: "/fonciere", icon: Home, section: "fonciere" },
   { title: "Loyer dynamique", url: "/loyer-dynamique", icon: ArrowLeftRight, section: "loyerDynamique" },
   { title: "Gouvernance", url: "/gouvernance", icon: Users, section: "gouvernance" },
+  { title: "Associés & Sociétés", url: "/associes", icon: Users2, section: "associes" },
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
 ];
 

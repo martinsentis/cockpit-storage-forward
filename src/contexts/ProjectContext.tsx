@@ -138,6 +138,7 @@ function loadFromStorage(): { state: ProjectState; validated: ValidatedFlags } {
           fonciere: { ...DEFAULT_FONCIERE, ...parsed.state?.fonciere },
           loyerDynamique: { ...DEFAULT_LOYER_DYNAMIQUE, ...parsed.state?.loyerDynamique },
           gouvernance: migrateGouvernance(parsed.state?.gouvernance),
+          associes: parsed.state?.associes ?? { ...DEFAULT_ASSOCIES },
         },
         validated: { ...defaultValidated, ...parsed.validated },
       };
