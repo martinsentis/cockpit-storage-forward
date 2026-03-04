@@ -99,9 +99,11 @@ function computeLoyerDynamique(inputs: EngineInputs): LoyerDynamiqueEngineOutput
     (t, d) => d.durationMonths > 0 ? t + d.amount / d.durationMonths : t, 0
   );
 
-  const amortissement = inputs.build.assets.reduce(
-    (t, a) => a.depreciationYears > 0 ? t + a.amount / a.depreciationYears : t, 0
-  ) / 12;
+  const amortissement = inputs.build.assets
+    .filter(a => a.amortissable !== false)
+    .reduce(
+      (t, a) => a.depreciationYears > 0 ? t + a.amount / a.depreciationYears : t, 0
+    ) / 12;
 
   let loyerCalcule: number;
   if (ld.manualOverride != null && ld.manualOverride > 0) {
@@ -227,9 +229,11 @@ function computeFonciere(inputs: EngineInputs, loyerMensuelHT: number): Fonciere
     (t, d) => t + d.amount * (d.annualRate / 100 / 12), 0
   );
 
-  const amortissementAnnuel = inputs.build.assets.reduce(
-    (t, a) => a.depreciationYears > 0 ? t + a.amount / a.depreciationYears : t, 0
-  );
+  const amortissementAnnuel = inputs.build.assets
+    .filter(a => a.amortissable !== false)
+    .reduce(
+      (t, a) => a.depreciationYears > 0 ? t + a.amount / a.depreciationYears : t, 0
+    );
 
   const resultatExploitationSCI = totalRevenusMensuelHT - totalChargesMensuellesHT;
   const resultatCourant = resultatExploitationSCI - interetsMensuels;

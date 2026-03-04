@@ -110,11 +110,51 @@ function migrateExploitation(e: any): ExploitationData {
 }
 
 function migrateBuild(b: any): BuildData {
+  // Already new format
+  if (b?.budgetLines) {
+    return {
+      startMonth: b.startMonth ?? 0,
+      durationMonths: b.durationMonths ?? 6,
+      budgetLines: b.budgetLines,
+      assets: (b.assets ?? []).map((a: any) => ({
+        ...a,
+        amortissable: a.amortissable ?? true,
+        commentaire: a.commentaire ?? "",
+      })),
+      taxeAmenagement: b.taxeAmenagement ?? { montant: 0, mode: "AUTO" as const, echeances: [] },
+      depenses: b.depenses ?? [],
+    };
+  }
+  // Migrate old format
+  const budgetLines: any[] = [];
+  const uid = () => crypto.randomUUID();
+  if (b?.posteFoncier) budgetLines.push({ id: uid(), label: "Foncier", category: "TERRAIN", budgetPrevu: b.posteFoncier });
+  if (b?.posteTravaux) budgetLines.push({ id: uid(), label: "Travaux", category: "BATIMENTS", budgetPrevu: b.posteTravaux });
+  if (b?.posteHonoraires) budgetLines.push({ id: uid(), label: "Honoraires", category: "HONORAIRES", budgetPrevu: b.posteHonoraires });
+  if (b?.posteDivers) budgetLines.push({ id: uid(), label: "Divers", category: "DIVERS", budgetPrevu: b.posteDivers });
+
+  const oldTaxe = typeof b?.taxeAmenagement === "number" ? b.taxeAmenagement : 0;
+
+  // Migrate old asset categories
+  const categoryMap: Record<string, string> = {
+    CLOTURE_PORTAIL: "VRD",
+    CONTENEURS: "EQUIPEMENTS_PRODUCTIFS",
+    EQUIPEMENTS: "EQUIPEMENTS_PRODUCTIFS",
+    AUTRE: "DIVERS",
+  };
+
   return {
-    ...DEFAULT_BUILD,
-    ...b,
-    taxeAmenagement: b?.taxeAmenagement ?? 0,
-    assets: b?.assets ?? [],
+    startMonth: b?.startMonth ?? 0,
+    durationMonths: b?.durationMonths ?? 6,
+    budgetLines,
+    assets: (b?.assets ?? []).map((a: any) => ({
+      ...a,
+      category: categoryMap[a.category] ?? a.category ?? "DIVERS",
+      amortissable: a.amortissable ?? true,
+      commentaire: a.commentaire ?? "",
+    })),
+    taxeAmenagement: { montant: oldTaxe, mode: "AUTO" as const, echeances: [] },
+    depenses: [],
   };
 }
 

@@ -15,7 +15,7 @@ import type {
   FonciereData, SCIChargeItem, SCIChargeCategory, SCIRevenueItem, ChargeFrequency,
 } from "@/types/project";
 import {
-  SCI_CHARGE_PRESETS, SCI_CATEGORY_LABELS, DEFAULT_FONCIERE, BUILD_ASSET_CATEGORY_LABELS,
+  SCI_CHARGE_PRESETS, SCI_CATEGORY_LABELS, DEFAULT_FONCIERE, CAPEX_CATEGORY_LABELS,
   isTaxExemptLabel,
 } from "@/types/project";
 import { formatMonthIndex } from "@/lib/monthUtils";
@@ -121,7 +121,7 @@ export default function FoncierePage() {
                 <TableBody>
                   {state.build.assets.map(a => (
                     <TableRow key={a.id}>
-                      <TableCell>{BUILD_ASSET_CATEGORY_LABELS[a.category]}</TableCell>
+                      <TableCell>{CAPEX_CATEGORY_LABELS[a.category]}</TableCell>
                       <TableCell>{a.label}</TableCell>
                       <TableCell className="text-right">{fmt(a.amount)} €</TableCell>
                       <TableCell className="text-right">{formatMonthIndex(a.commissioningMonth, projectStartDate)}</TableCell>

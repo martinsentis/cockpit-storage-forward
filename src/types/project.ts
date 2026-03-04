@@ -22,36 +22,79 @@ export interface ProjetData {
 
 // ── Build / CAPEX ──
 
-export type BuildAssetCategory = "TERRAIN" | "VRD" | "CLOTURE_PORTAIL" | "CONTENEURS" | "EQUIPEMENTS" | "AUTRE";
+export type CapexCategory = "TERRAIN" | "VRD" | "EQUIPEMENTS_PRODUCTIFS" | "BATIMENTS" | "HONORAIRES" | "FRAIS_FINANCIERS" | "TAXES_URBANISME" | "DIVERS";
+
+export const CAPEX_CATEGORY_LABELS: Record<CapexCategory, string> = {
+  TERRAIN: "Terrain",
+  VRD: "Aménagement terrain / VRD",
+  EQUIPEMENTS_PRODUCTIFS: "Équipements productifs",
+  BATIMENTS: "Bâtiments / Structures",
+  HONORAIRES: "Honoraires techniques",
+  FRAIS_FINANCIERS: "Frais financiers",
+  TAXES_URBANISME: "Taxes d'urbanisme",
+  DIVERS: "Divers",
+};
+
+export const CAPEX_DEFAULT_DEPRECIATION: Record<CapexCategory, { amortissable: boolean; years: number }> = {
+  TERRAIN: { amortissable: false, years: 0 },
+  VRD: { amortissable: true, years: 15 },
+  EQUIPEMENTS_PRODUCTIFS: { amortissable: true, years: 10 },
+  BATIMENTS: { amortissable: true, years: 30 },
+  HONORAIRES: { amortissable: true, years: 10 },
+  FRAIS_FINANCIERS: { amortissable: false, years: 0 },
+  TAXES_URBANISME: { amortissable: false, years: 0 },
+  DIVERS: { amortissable: true, years: 10 },
+};
+
+export interface CapexBudgetLine {
+  id: string;
+  label: string;
+  category: CapexCategory;
+  budgetPrevu: number;
+  commentaire?: string;
+}
 
 export interface BuildAsset {
   id: string;
   label: string;
-  category: BuildAssetCategory;
+  category: CapexCategory;
   amount: number;
-  commissioningMonth: number;
+  amortissable: boolean;
   depreciationYears: number;
+  commissioningMonth: number;
+  commentaire?: string;
 }
 
-export const BUILD_ASSET_CATEGORY_LABELS: Record<BuildAssetCategory, string> = {
-  TERRAIN: "Terrain",
-  VRD: "Aménagement / VRD",
-  CLOTURE_PORTAIL: "Clôture / Portail",
-  CONTENEURS: "Conteneurs / Box",
-  EQUIPEMENTS: "Équipements",
-  AUTRE: "Autre",
-};
+export type TaxePaymentMode = "AUTO" | "MANUEL";
+
+export interface TaxeEcheance {
+  id: string;
+  monthOffset: number;
+  montant: number;
+}
+
+export interface TaxeAmenagementData {
+  montant: number;
+  mode: TaxePaymentMode;
+  echeances: TaxeEcheance[];
+}
+
+export interface DepenseReelle {
+  id: string;
+  date: string;
+  fournisseur: string;
+  posteCapexId?: string;
+  montant: number;
+  commentaire?: string;
+}
 
 export interface BuildData {
-  capexTotal: number;
-  posteFoncier: number;
-  posteTravaux: number;
-  posteHonoraires: number;
-  posteDivers: number;
   startMonth: number;
   durationMonths: number;
-  taxeAmenagement: number;
+  budgetLines: CapexBudgetLine[];
   assets: BuildAsset[];
+  taxeAmenagement: TaxeAmenagementData;
+  depenses: DepenseReelle[];
 }
 
 export interface DebtItem {
@@ -239,15 +282,12 @@ export const DEFAULT_PROJET: ProjetData = {
 };
 
 export const DEFAULT_BUILD: BuildData = {
-  capexTotal: 500000,
-  posteFoncier: 150000,
-  posteTravaux: 250000,
-  posteHonoraires: 50000,
-  posteDivers: 50000,
   startMonth: 0,
   durationMonths: 6,
-  taxeAmenagement: 0,
+  budgetLines: [],
   assets: [],
+  taxeAmenagement: { montant: 0, mode: "AUTO", echeances: [] },
+  depenses: [],
 };
 
 export const DEFAULT_FINANCEMENT: FinancementData = {
