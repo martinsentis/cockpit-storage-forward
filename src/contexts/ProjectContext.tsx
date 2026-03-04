@@ -21,10 +21,12 @@ import {
   DEFAULT_LOYER_DYNAMIQUE,
   createDefaultPhase,
 } from "@/types/project";
+import { computeEngine } from "@/engine/engine";
+import { phaseSurface } from "@/engine/engine";
 
 const STORAGE_KEY = "pilotagebox_project_state";
 
-interface ProjectState {
+export interface ProjectState {
   projet: ProjetData;
   build: BuildData;
   financement: FinancementData;
@@ -41,7 +43,6 @@ interface ProjectContextValue {
   validateSection: (section: SectionName) => void;
   isProjectComplete: () => boolean;
   buildProjectionInputs: () => ProjectionInputs;
-  computeLoyer: () => number;
 }
 
 const ProjectContext = createContext<ProjectContextValue | null>(null);
@@ -142,7 +143,7 @@ function loadFromStorage(): { state: ProjectState; validated: ValidatedFlags } {
   return { state: { ...defaultState }, validated: { ...defaultValidated } };
 }
 
-// Helper: compute phase CA HT for a single CapacityPhase
+// Helper: compute phase CA HT (used only for projection inputs aggregation)
 function phaseCAHT(p: CapacityPhase): number {
   if (p.modeBox === "MACRO") {
     const priceHT = p.prixType === "HT" ? p.prixM2 : p.prixM2 / (1 + p.vatRate);
@@ -152,46 +153,6 @@ function phaseCAHT(p: CapacityPhase): number {
   return active.reduce((sum, t) => {
     const unitHT = t.prixType === "HT" ? t.prixMensuel : t.prixMensuel / (1 + t.vatRate);
     return sum + t.nombreDeBox * unitHT;
-  }, 0);
-}
-
-function phaseSurface(p: CapacityPhase): number {
-  if (p.modeBox === "MACRO") return p.surface;
-  return (p.typologies ?? []).filter(t => t.actif).reduce((s, t) => s + t.surfaceParBox * t.nombreDeBox, 0);
-}
-
-// Helper: compute SCI charges mensuelles HT
-function sciChargesMonthlyHT(state: ProjectState): number {
-  return state.fonciere.charges
-    .filter(c => c.isActive)
-    .reduce((total, c) => {
-      const ht = c.amountType === "HT" ? c.amountInput : c.amountInput / (1 + c.vatRate);
-      const monthly = c.frequency === "ANNUELLE" ? ht / 12 : ht;
-      return total + monthly;
-    }, 0);
-}
-
-// Helper: compute SCI debt monthly interest
-function sciDebtMonthlyInterest(state: ProjectState): number {
-  return state.financement.sciDebts.reduce((total, d) => {
-    const monthlyRate = d.annualRate / 100 / 12;
-    return total + d.amount * monthlyRate;
-  }, 0);
-}
-
-// Helper: compute SCI debt monthly principal repayment
-function sciDebtMonthlyPrincipal(state: ProjectState): number {
-  return state.financement.sciDebts.reduce((total, d) => {
-    if (d.durationMonths <= 0) return total;
-    return total + d.amount / d.durationMonths;
-  }, 0);
-}
-
-// Helper: compute annual depreciation from assets
-function annualDepreciation(state: ProjectState): number {
-  return state.build.assets.reduce((total, a) => {
-    if (a.depreciationYears <= 0) return total;
-    return total + a.amount / a.depreciationYears;
   }, 0);
 }
 
@@ -219,35 +180,15 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     );
   }, [validated]);
 
-  const computeLoyer = useCallback((): number => {
-    const ld = state.loyerDynamique;
-    if (ld.manualOverride != null && ld.manualOverride > 0) return ld.manualOverride;
-
-    const charges = sciChargesMonthlyHT(state);
-    const interest = sciDebtMonthlyInterest(state);
-    const principal = sciDebtMonthlyPrincipal(state);
-    const depreciation = annualDepreciation(state) / 12;
-
-    switch (ld.mode) {
-      case "AUTONOMIE_SCI":
-        return charges + interest;
-      case "DESENDETTEMENT_SCI":
-        return charges + interest + principal;
-      case "OPTIMISATION_FISCALE":
-        return charges + interest + depreciation;
-      case "MIX":
-        return charges + interest + principal;
-      default:
-        return charges + interest;
-    }
-  }, [state]);
-
   const buildProjectionInputs = useCallback((): ProjectionInputs => {
     const p = state.projet;
     const e = state.exploitation;
     const f = state.financement;
     const g = state.gouvernance;
-    const loyer = computeLoyer();
+
+    // Use engine to get the loyer
+    const engineOutputs = computeEngine(state);
+    const loyer = engineOutputs.loyerDynamique.loyerCalcule;
 
     const phases = e.capacityPhases ?? [createDefaultPhase()];
 
@@ -288,11 +229,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         monthlyRent: loyer,
       },
     };
-  }, [state, computeLoyer]);
+  }, [state]);
 
   return (
     <ProjectContext.Provider
-      value={{ state, validated, updateSection, validateSection, isProjectComplete, buildProjectionInputs, computeLoyer }}
+      value={{ state, validated, updateSection, validateSection, isProjectComplete, buildProjectionInputs }}
     >
       {children}
     </ProjectContext.Provider>
