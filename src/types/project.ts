@@ -440,6 +440,7 @@ export interface ValidatedFlags {
   loyerDynamique: boolean;
   gouvernance: boolean;
   associes: boolean;
+  apports: boolean;
 }
 
 export type SectionName = keyof ValidatedFlags;
