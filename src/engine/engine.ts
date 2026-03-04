@@ -24,6 +24,12 @@ function toTTC(amount: number, type: "HT" | "TTC", vatRate: number): number {
   return type === "TTC" ? amount : amount * (1 + vatRate);
 }
 
+// ── Helper to aggregate all assets from capexEvents ──
+
+function getAllAssets(inputs: EngineInputs) {
+  return (inputs.build.capexEvents ?? []).flatMap(ev => ev.assets ?? []);
+}
+
 // ── Phase ──
 
 function phaseCAHT(p: CapacityPhase): number {
@@ -99,7 +105,8 @@ function computeLoyerDynamique(inputs: EngineInputs): LoyerDynamiqueEngineOutput
     (t, d) => d.durationMonths > 0 ? t + d.amount / d.durationMonths : t, 0
   );
 
-  const amortissement = inputs.build.assets
+  const allAssets = getAllAssets(inputs);
+  const amortissement = allAssets
     .filter(a => a.amortissable !== false)
     .reduce(
       (t, a) => a.depreciationYears > 0 ? t + a.amount / a.depreciationYears : t, 0
@@ -229,7 +236,8 @@ function computeFonciere(inputs: EngineInputs, loyerMensuelHT: number): Fonciere
     (t, d) => t + d.amount * (d.annualRate / 100 / 12), 0
   );
 
-  const amortissementAnnuel = inputs.build.assets
+  const allAssets = getAllAssets(inputs);
+  const amortissementAnnuel = allAssets
     .filter(a => a.amortissable !== false)
     .reduce(
       (t, a) => a.depreciationYears > 0 ? t + a.amount / a.depreciationYears : t, 0
@@ -256,28 +264,13 @@ function computeFonciere(inputs: EngineInputs, loyerMensuelHT: number): Fonciere
 // MAIN ENTRY POINT
 // ══════════════════════════════════════════════════════════════
 
-/**
- * Compute all financial outputs from project state.
- * 
- * FUTURE: Replace this function body with:
- *   const response = await fetch(`${API_URL}/compute`, { body: JSON.stringify(inputs) });
- *   return response.json();
- */
 export function computeEngine(inputs: EngineInputs): EngineOutputs {
-  // 1. Loyer dynamique first (needed by both exploitation and foncière)
   const loyerDynamique = computeLoyerDynamique(inputs);
-
-  // 2. Exploitation (uses loyer as a charge)
   const exploitation = computeExploitation(inputs, loyerDynamique.loyerCalcule);
-
-  // 3. Foncière (uses loyer as a revenue)
   const fonciere = computeFonciere(inputs, loyerDynamique.loyerCalcule);
-
   return { exploitation, fonciere, loyerDynamique };
 }
 
 // ── Re-export helpers that pages still need for per-item display ──
-// These are "display helpers" for individual items, not aggregate calculations.
-
 export { toHT, toTTC, chargeHT, chargeTTC, phaseCAHT, phaseCATTC, phaseSurface, phaseNbBox };
 export { serviceRevenuHT, serviceCoutHT, gestCoutMensuelHT };

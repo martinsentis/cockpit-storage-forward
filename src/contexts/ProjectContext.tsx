@@ -14,6 +14,7 @@ import {
   ProjectionInputs,
   PhaseProjection,
   CapacityPhase,
+  CapexEvent,
   DEFAULT_PROJET,
   DEFAULT_BUILD,
   DEFAULT_FINANCEMENT,
@@ -24,6 +25,7 @@ import {
   DEFAULT_ASSOCIES,
   DEFAULT_APPORTS,
   createDefaultPhase,
+  createDefaultCapexEvent,
 } from "@/types/project";
 import { computeEngine } from "@/engine/engine";
 import { phaseSurface } from "@/engine/engine";
@@ -109,53 +111,75 @@ function migrateExploitation(e: any): ExploitationData {
   };
 }
 
+function migrateBudgetLine(l: any): any {
+  return {
+    ...l,
+    montant: l.montant ?? l.budgetPrevu ?? 0,
+    prixType: l.prixType ?? "HT",
+    vatRate: l.vatRate ?? 0.20,
+  };
+}
+
 function migrateBuild(b: any): BuildData {
-  // Already new format
-  if (b?.budgetLines) {
+  // Already new CapexEvent format
+  if (b?.capexEvents && Array.isArray(b.capexEvents)) {
     return {
-      startMonth: b.startMonth ?? 0,
-      durationMonths: b.durationMonths ?? 6,
-      budgetLines: b.budgetLines,
-      assets: (b.assets ?? []).map((a: any) => ({
-        ...a,
-        amortissable: a.amortissable ?? true,
-        commentaire: a.commentaire ?? "",
+      capexEvents: b.capexEvents.map((ev: any) => ({
+        ...ev,
+        budgetLines: (ev.budgetLines ?? []).map(migrateBudgetLine),
+        assets: (ev.assets ?? []).map((a: any) => ({
+          ...a,
+          amortissable: a.amortissable ?? true,
+          commentaire: a.commentaire ?? "",
+        })),
+        taxeAmenagement: ev.taxeAmenagement ?? { montant: 0, mode: "AUTO" as const, echeances: [] },
+        depenses: ev.depenses ?? [],
       })),
-      taxeAmenagement: b.taxeAmenagement ?? { montant: 0, mode: "AUTO" as const, echeances: [] },
-      depenses: b.depenses ?? [],
     };
   }
-  // Migrate old format
-  const budgetLines: any[] = [];
-  const uid = () => crypto.randomUUID();
-  if (b?.posteFoncier) budgetLines.push({ id: uid(), label: "Foncier", category: "TERRAIN", budgetPrevu: b.posteFoncier });
-  if (b?.posteTravaux) budgetLines.push({ id: uid(), label: "Travaux", category: "BATIMENTS", budgetPrevu: b.posteTravaux });
-  if (b?.posteHonoraires) budgetLines.push({ id: uid(), label: "Honoraires", category: "HONORAIRES", budgetPrevu: b.posteHonoraires });
-  if (b?.posteDivers) budgetLines.push({ id: uid(), label: "Divers", category: "DIVERS", budgetPrevu: b.posteDivers });
 
-  const oldTaxe = typeof b?.taxeAmenagement === "number" ? b.taxeAmenagement : 0;
+  // Old flat format → wrap in a single CapexEvent
+  const event: CapexEvent = createDefaultCapexEvent("CAPEX Initial");
+  event.startMonth = b?.startMonth ?? 0;
+  event.durationMonths = b?.durationMonths ?? 6;
 
-  // Migrate old asset categories
+  // Migrate budgetLines
+  if (b?.budgetLines && Array.isArray(b.budgetLines)) {
+    event.budgetLines = b.budgetLines.map(migrateBudgetLine);
+  } else {
+    // Very old format with posteFoncier etc.
+    const uid = () => crypto.randomUUID();
+    const lines: any[] = [];
+    if (b?.posteFoncier) lines.push({ id: uid(), label: "Foncier", category: "TERRAIN", montant: b.posteFoncier, prixType: "HT", vatRate: 0.20 });
+    if (b?.posteTravaux) lines.push({ id: uid(), label: "Travaux", category: "BATIMENTS", montant: b.posteTravaux, prixType: "HT", vatRate: 0.20 });
+    if (b?.posteHonoraires) lines.push({ id: uid(), label: "Honoraires", category: "HONORAIRES", montant: b.posteHonoraires, prixType: "HT", vatRate: 0.20 });
+    if (b?.posteDivers) lines.push({ id: uid(), label: "Divers", category: "DIVERS", montant: b.posteDivers, prixType: "HT", vatRate: 0.20 });
+    event.budgetLines = lines;
+  }
+
+  // Assets
   const categoryMap: Record<string, string> = {
     CLOTURE_PORTAIL: "VRD",
     CONTENEURS: "EQUIPEMENTS_PRODUCTIFS",
     EQUIPEMENTS: "EQUIPEMENTS_PRODUCTIFS",
     AUTRE: "DIVERS",
   };
+  event.assets = (b?.assets ?? []).map((a: any) => ({
+    ...a,
+    category: categoryMap[a.category] ?? a.category ?? "DIVERS",
+    amortissable: a.amortissable ?? true,
+    commentaire: a.commentaire ?? "",
+  }));
 
-  return {
-    startMonth: b?.startMonth ?? 0,
-    durationMonths: b?.durationMonths ?? 6,
-    budgetLines,
-    assets: (b?.assets ?? []).map((a: any) => ({
-      ...a,
-      category: categoryMap[a.category] ?? a.category ?? "DIVERS",
-      amortissable: a.amortissable ?? true,
-      commentaire: a.commentaire ?? "",
-    })),
-    taxeAmenagement: { montant: oldTaxe, mode: "AUTO" as const, echeances: [] },
-    depenses: [],
-  };
+  // Taxe
+  const oldTaxe = typeof b?.taxeAmenagement === "number" ? b.taxeAmenagement : 0;
+  event.taxeAmenagement = (b?.taxeAmenagement && typeof b.taxeAmenagement === "object")
+    ? b.taxeAmenagement
+    : { montant: oldTaxe, mode: "AUTO" as const, echeances: [] };
+
+  event.depenses = b?.depenses ?? [];
+
+  return { capexEvents: [event] };
 }
 
 function migrateGouvernance(g: any): GouvernanceData {
