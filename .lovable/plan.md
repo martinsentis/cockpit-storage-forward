@@ -1,48 +1,92 @@
 
 
-## Plan : Implémenter le Cockpit V1 complet
+# Plan : Module Apports Associés
 
-### Contexte
-Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
+## Vue d'ensemble
 
-### Fichiers à créer
+Nouveau module dédié aux flux financiers d'apports (capital et CCA) des associés vers les sociétés du projet. Séparé de la structure capitalistique (qui reste dans Associés & Sociétés). Les données sont stockées dans le state projet et la section 4 placeholder d'AssociesPage sera connectée en lecture seule.
 
-**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
+---
 
-**2. `src/types/project.ts`** — Types et defaults :
-- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
-- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
-  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
-  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
-  - `revenueParams` (surface, prixM2, tauxRemplissage)
-  - `services` ([] par défaut)
-  - `opexPercentOfRevenue`
-  - `debts`, `sciDebts` ([] par défaut)
-  - `sciChargesCash`, `sciAmortization` (0 par défaut)
-  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
-  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
-- Constantes `DEFAULT_*` exportées pour chaque section
+## 1. Types (`src/types/project.ts`)
 
-**3. `src/contexts/ProjectContext.tsx`** :
-- State initialisé avec les defaults
-- `validated` flags (5 booleans, tous false)
-- `updateSection()`, `validateSection()`, `isProjectComplete()`
-- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
+```typescript
+export type ApportType = "CAPITAL" | "CCA";
+export type ApportStatut = "PREVU" | "REALISE";
 
-**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
+export interface ApportItem {
+  id: string;
+  apporteurId: string;       // ref Associe.id
+  beneficiaire: "EXPLOITATION" | "FONCIERE";
+  type: ApportType;
+  montant: number;
+  date: string;              // "YYYY-MM"
+  statut: ApportStatut;
+  commentaire?: string;
+}
 
-**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
+export interface ApportsData {
+  apports: ApportItem[];
+}
 
-**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
-- Formulaires pré-remplis depuis le Context
-- Bouton "Enregistrer" → updateSection + validateSection
-- Champs par page alignés sur les inputs API
+export const DEFAULT_APPORTS: ApportsData = { apports: [] };
+```
 
-**7. `src/pages/DashboardPage.tsx`** :
-- Liste les sections manquantes si projet incomplet
-- Bouton "Lancer la simulation" désactivé si incomplet
-- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
-- Affiche réponse JSON ou erreur dans `<pre>`
+Ajouter `apports: ApportsData` dans `ProjectState`, `apports: boolean` dans `ValidatedFlags`, `SectionName`.
 
-**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
+---
+
+## 2. Context (`ProjectContext.tsx`)
+
+- Ajouter `apports` dans `defaultState` et migration (`parsed.state?.apports ?? DEFAULT_APPORTS`)
+- Ajouter `apports: false` dans `defaultValidated`
+
+---
+
+## 3. Page (`src/pages/ApportsPage.tsx`) — Nouvelle page
+
+3 sections via Tabs :
+
+**Section 1 — Tableau des apports**
+- Table avec colonnes : Date, Apporteur (nom résolu depuis associés), Bénéficiaire, Type, Montant, Statut, Commentaire
+- Actions : éditer, supprimer
+
+**Section 2 — Création / édition d'un apport**
+- Dialog avec formulaire :
+  - Apporteur : Select parmi les associés existants (personnes physiques + morales)
+  - Bénéficiaire : Select (Exploitation / Foncière)
+  - Type : Capital / CCA
+  - Montant, Date (YYYY-MM), Statut (Prévu / Réalisé), Commentaire
+
+**Section 3 — Synthèse**
+- Tableau par associé : Capital apporté, CCA apporté, Total
+- Tableau par société : Capital reçu, CCA reçu, Total
+
+---
+
+## 4. Mise à jour AssociesPage section 4
+
+Remplacer le placeholder par une lecture seule des données `state.apports.apports` :
+- Tableau par associé avec Capital / CCA / Total
+- Bouton "Voir module Apports associés" → lien vers `/apports`
+
+---
+
+## 5. Routing & Sidebar
+
+- Route `/apports` dans `App.tsx`
+- Entrée "Apports associés" dans `AppSidebar.tsx` (après Associés, avant Dashboard), icône `Wallet` ou `Banknote`
+
+---
+
+## Fichiers impactés
+
+| Fichier | Action |
+|---|---|
+| `src/types/project.ts` | Nouveaux types `ApportItem`, `ApportsData`, default, ValidatedFlags |
+| `src/contexts/ProjectContext.tsx` | Ajout `apports` dans state + migration |
+| `src/pages/ApportsPage.tsx` | **Nouveau** — 3 sections |
+| `src/pages/AssociesPage.tsx` | Section 4 connectée en lecture seule |
+| `src/components/AppSidebar.tsx` | Nouvelle entrée |
+| `src/App.tsx` | Nouvelle route |
 
