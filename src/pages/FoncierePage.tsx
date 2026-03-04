@@ -19,15 +19,21 @@ import {
   isTaxExemptLabel,
 } from "@/types/project";
 import { formatMonthIndex } from "@/lib/monthUtils";
+import { useEngine } from "@/hooks/useEngine";
 
 function uid() { return crypto.randomUUID(); }
 function fmt(n: number) { return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(n); }
 
 export default function FoncierePage() {
-  const { state, updateSection, validateSection, computeLoyer } = useProject();
+  const { state, updateSection, validateSection } = useProject();
   const navigate = useNavigate();
   const projectStartDate = state.projet.projectStartDate;
   const defaultVatRate = state.projet.defaultVatRate ?? 0.20;
+
+  // Engine outputs — all financial values come from here
+  const engine = useEngine();
+  const sci = engine.fonciere;
+  const loyerMensuel = engine.loyerDynamique.loyerCalcule;
 
   const [form, setForm] = useState<FonciereData>(() => ({
     ...DEFAULT_FONCIERE,
@@ -55,7 +61,6 @@ export default function FoncierePage() {
         const updated = { ...c, ...patch };
         if (patch.frequency === "MENSUELLE") updated.annualMonth = null;
         if (patch.frequency === "ANNUELLE" && updated.annualMonth === null) updated.annualMonth = 1;
-        // Enforce tax exempt rule
         if (patch.label && isTaxExemptLabel(patch.label)) {
           updated.vatRate = 0;
           updated.amountType = "HT";
@@ -84,35 +89,6 @@ export default function FoncierePage() {
   const removeRevenue = (id: string) =>
     setForm(prev => ({ ...prev, otherRevenues: prev.otherRevenues.filter(r => r.id !== id) }));
 
-  // ── Computed ──
-  const loyerMensuel = computeLoyer();
-
-  const totalChargesMensuellesHT = form.charges
-    .filter(c => c.isActive)
-    .reduce((t, c) => {
-      const ht = c.amountType === "HT" ? c.amountInput : c.amountInput / (1 + c.vatRate);
-      return t + (c.frequency === "ANNUELLE" ? ht / 12 : ht);
-    }, 0);
-
-  const totalOtherRevenuesMensuellesHT = form.otherRevenues.reduce((t, r) => {
-    const ht = r.prixType === "HT" ? r.montant : r.montant / (1 + r.vatRate);
-    return t + (r.frequency === "ANNUELLE" ? ht / 12 : ht);
-  }, 0);
-
-  const totalRevenusMensuelHT = loyerMensuel + totalOtherRevenuesMensuellesHT;
-
-  const interetsMensuels = state.financement.sciDebts.reduce((t, d) => {
-    return t + d.amount * (d.annualRate / 100 / 12);
-  }, 0);
-
-  const amortissementAnnuel = state.build.assets.reduce((t, a) => {
-    return t + (a.depreciationYears > 0 ? a.amount / a.depreciationYears : 0);
-  }, 0);
-
-  const resultatExploitationSCI = totalRevenusMensuelHT - totalChargesMensuellesHT;
-  const resultatCourant = resultatExploitationSCI - interetsMensuels;
-  const resultatFiscal = resultatCourant - amortissementAnnuel / 12;
-
   const save = () => {
     updateSection("fonciere", form);
     validateSection("fonciere");
@@ -140,7 +116,6 @@ export default function FoncierePage() {
                     <TableHead className="text-right">Valeur d'acquisition</TableHead>
                     <TableHead className="text-right">Mise en service</TableHead>
                     <TableHead className="text-right">Durée amort. (ans)</TableHead>
-                    <TableHead className="text-right">Amort. annuel</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -150,13 +125,15 @@ export default function FoncierePage() {
                       <TableCell>{a.label}</TableCell>
                       <TableCell className="text-right">{fmt(a.amount)} €</TableCell>
                       <TableCell className="text-right">{formatMonthIndex(a.commissioningMonth, projectStartDate)}</TableCell>
-                      <TableCell className="text-right">{a.depreciationYears}</TableCell>
-                      <TableCell className="text-right">{a.depreciationYears > 0 ? fmt(a.amount / a.depreciationYears) : "—"} €</TableCell>
+                      <TableCell className="text-right">{a.depreciationYears} ans</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             )}
+            <p className="text-xs text-muted-foreground">
+              Les amortissements sont calculés par le moteur financier.
+            </p>
             <Button variant="outline" size="sm" onClick={() => navigate("/build")}>
               <ExternalLink className="h-4 w-4 mr-1" /> Modifier dans CAPEX
             </Button>
@@ -179,7 +156,6 @@ export default function FoncierePage() {
                     <TableHead className="text-right">Montant initial</TableHead>
                     <TableHead className="text-right">Taux</TableHead>
                     <TableHead className="text-right">Durée (mois)</TableHead>
-                    <TableHead className="text-right">Intérêts mensuels</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -189,12 +165,14 @@ export default function FoncierePage() {
                       <TableCell className="text-right">{fmt(d.amount)} €</TableCell>
                       <TableCell className="text-right">{d.annualRate} %</TableCell>
                       <TableCell className="text-right">{d.durationMonths}</TableCell>
-                      <TableCell className="text-right">{fmt(d.amount * d.annualRate / 100 / 12)} €</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             )}
+            <p className="text-xs text-muted-foreground">
+              Les intérêts et mensualités sont calculés par le moteur financier.
+            </p>
             <Button variant="outline" size="sm" onClick={() => navigate("/financement")}>
               <ExternalLink className="h-4 w-4 mr-1" /> Modifier dans Financement
             </Button>
@@ -384,6 +362,9 @@ export default function FoncierePage() {
             <span className="font-semibold text-lg">5. Synthèse financière SCI</span>
           </AccordionTrigger>
           <AccordionContent className="pt-2">
+            <p className="text-xs text-muted-foreground mb-3">
+              Valeurs calculées par le moteur financier à partir des données saisies.
+            </p>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -395,48 +376,48 @@ export default function FoncierePage() {
               <TableBody>
                 <TableRow>
                   <TableCell className="text-muted-foreground">Loyer dynamique</TableCell>
-                  <TableCell className="text-right font-medium">{fmt(loyerMensuel)} €</TableCell>
-                  <TableCell className="text-right font-medium">{fmt(loyerMensuel * 12)} €</TableCell>
+                  <TableCell className="text-right font-medium">{fmt(sci.loyerMensuelHT)} €</TableCell>
+                  <TableCell className="text-right font-medium">{fmt(sci.loyerMensuelHT * 12)} €</TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell className="text-muted-foreground">Autres revenus</TableCell>
-                  <TableCell className="text-right font-medium">{fmt(totalOtherRevenuesMensuellesHT)} €</TableCell>
-                  <TableCell className="text-right font-medium">{fmt(totalOtherRevenuesMensuellesHT * 12)} €</TableCell>
+                  <TableCell className="text-right font-medium">{fmt(sci.totalOtherRevenuesMensuellesHT)} €</TableCell>
+                  <TableCell className="text-right font-medium">{fmt(sci.totalOtherRevenuesMensuellesHT * 12)} €</TableCell>
                 </TableRow>
                 <TableRow className="font-semibold">
                   <TableCell>Total revenus fonciers</TableCell>
-                  <TableCell className="text-right">{fmt(totalRevenusMensuelHT)} €</TableCell>
-                  <TableCell className="text-right">{fmt(totalRevenusMensuelHT * 12)} €</TableCell>
+                  <TableCell className="text-right">{fmt(sci.totalRevenusMensuelHT)} €</TableCell>
+                  <TableCell className="text-right">{fmt(sci.totalRevenusMensuelHT * 12)} €</TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell className="text-muted-foreground">− Charges SCI</TableCell>
-                  <TableCell className="text-right font-medium">−{fmt(totalChargesMensuellesHT)} €</TableCell>
-                  <TableCell className="text-right font-medium">−{fmt(totalChargesMensuellesHT * 12)} €</TableCell>
+                  <TableCell className="text-right font-medium">−{fmt(sci.totalChargesMensuellesHT)} €</TableCell>
+                  <TableCell className="text-right font-medium">−{fmt(sci.totalChargesMensuellesHT * 12)} €</TableCell>
                 </TableRow>
                 <TableRow className="border-t-2 font-semibold">
                   <TableCell>= Résultat d'exploitation SCI</TableCell>
-                  <TableCell className={`text-right ${resultatExploitationSCI >= 0 ? "text-green-600" : "text-destructive"}`}>{fmt(resultatExploitationSCI)} €</TableCell>
-                  <TableCell className={`text-right ${resultatExploitationSCI >= 0 ? "text-green-600" : "text-destructive"}`}>{fmt(resultatExploitationSCI * 12)} €</TableCell>
+                  <TableCell className={`text-right ${sci.resultatExploitationSCI >= 0 ? "text-green-600" : "text-destructive"}`}>{fmt(sci.resultatExploitationSCI)} €</TableCell>
+                  <TableCell className={`text-right ${sci.resultatExploitationSCI >= 0 ? "text-green-600" : "text-destructive"}`}>{fmt(sci.resultatExploitationSCI * 12)} €</TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell className="text-muted-foreground">− Intérêts crédits</TableCell>
-                  <TableCell className="text-right font-medium">−{fmt(interetsMensuels)} €</TableCell>
-                  <TableCell className="text-right font-medium">−{fmt(interetsMensuels * 12)} €</TableCell>
+                  <TableCell className="text-right font-medium">−{fmt(sci.interetsMensuels)} €</TableCell>
+                  <TableCell className="text-right font-medium">−{fmt(sci.interetsMensuels * 12)} €</TableCell>
                 </TableRow>
                 <TableRow className="border-t font-semibold">
                   <TableCell>= Résultat courant</TableCell>
-                  <TableCell className={`text-right ${resultatCourant >= 0 ? "text-green-600" : "text-destructive"}`}>{fmt(resultatCourant)} €</TableCell>
-                  <TableCell className={`text-right ${resultatCourant >= 0 ? "text-green-600" : "text-destructive"}`}>{fmt(resultatCourant * 12)} €</TableCell>
+                  <TableCell className={`text-right ${sci.resultatCourant >= 0 ? "text-green-600" : "text-destructive"}`}>{fmt(sci.resultatCourant)} €</TableCell>
+                  <TableCell className={`text-right ${sci.resultatCourant >= 0 ? "text-green-600" : "text-destructive"}`}>{fmt(sci.resultatCourant * 12)} €</TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell className="text-muted-foreground">− Amortissements</TableCell>
-                  <TableCell className="text-right font-medium">−{fmt(amortissementAnnuel / 12)} €</TableCell>
-                  <TableCell className="text-right font-medium">−{fmt(amortissementAnnuel)} €</TableCell>
+                  <TableCell className="text-right font-medium">−{fmt(sci.amortissementAnnuel / 12)} €</TableCell>
+                  <TableCell className="text-right font-medium">−{fmt(sci.amortissementAnnuel)} €</TableCell>
                 </TableRow>
                 <TableRow className="border-t-2 font-bold">
                   <TableCell>= Résultat fiscal SCI</TableCell>
-                  <TableCell className={`text-right ${resultatFiscal >= 0 ? "text-green-600" : "text-destructive"}`}>{fmt(resultatFiscal)} €</TableCell>
-                  <TableCell className={`text-right ${resultatFiscal >= 0 ? "text-green-600" : "text-destructive"}`}>{fmt(resultatFiscal * 12)} €</TableCell>
+                  <TableCell className={`text-right ${sci.resultatFiscal >= 0 ? "text-green-600" : "text-destructive"}`}>{fmt(sci.resultatFiscal)} €</TableCell>
+                  <TableCell className={`text-right ${sci.resultatFiscal >= 0 ? "text-green-600" : "text-destructive"}`}>{fmt(sci.resultatFiscal * 12)} €</TableCell>
                 </TableRow>
               </TableBody>
             </Table>

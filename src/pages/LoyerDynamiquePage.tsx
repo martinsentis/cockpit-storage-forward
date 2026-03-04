@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import type { RentMode, LoyerDynamiqueData } from "@/types/project";
+import { computeEngine } from "@/engine/engine";
+import type { EngineInputs } from "@/engine/engineTypes";
 
 function fmt(n: number) { return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(n); }
 
@@ -26,55 +28,30 @@ const MODE_DESCRIPTIONS: Record<RentMode, string> = {
 };
 
 export default function LoyerDynamiquePage() {
-  const { state, updateSection, validateSection, computeLoyer } = useProject();
+  const { state, updateSection, validateSection } = useProject();
 
   const [form, setForm] = useState<LoyerDynamiqueData>(() => ({
     ...state.loyerDynamique,
   }));
 
-  // Compute components for display
-  const computed = useMemo(() => {
-    const sciCharges = state.fonciere.charges
-      .filter(c => c.isActive)
-      .reduce((t, c) => {
-        const ht = c.amountType === "HT" ? c.amountInput : c.amountInput / (1 + c.vatRate);
-        return t + (c.frequency === "ANNUELLE" ? ht / 12 : ht);
-      }, 0);
+  // Use engine with current form values for live preview
+  const engineOutputs = useMemo(() => {
+    const inputs: EngineInputs = {
+      ...state,
+      loyerDynamique: form,
+    };
+    return computeEngine(inputs);
+  }, [state, form]);
 
-    const interets = state.financement.sciDebts.reduce((t, d) => t + d.amount * (d.annualRate / 100 / 12), 0);
-    const principal = state.financement.sciDebts.reduce((t, d) => d.durationMonths > 0 ? t + d.amount / d.durationMonths : t, 0);
-    const amortissement = state.build.assets.reduce((t, a) => a.depreciationYears > 0 ? t + a.amount / a.depreciationYears : t, 0) / 12;
+  const computed = engineOutputs.loyerDynamique;
+  const loyerPreview = computed.loyerCalcule;
+  const exploitationImpact = computed.exploitationImpact;
 
-    return { sciCharges, interets, principal, amortissement };
-  }, [state.fonciere.charges, state.financement.sciDebts, state.build.assets]);
-
-  // Save to context then recompute
   const save = () => {
     updateSection("loyerDynamique", form);
     validateSection("loyerDynamique");
     toast.success("Loyer dynamique enregistré");
   };
-
-  // Temporarily apply form to compute loyer with current form values
-  const loyerPreview = useMemo(() => {
-    if (form.manualOverride != null && form.manualOverride > 0) return form.manualOverride;
-    const charges = computed.sciCharges;
-    const interest = computed.interets;
-    const principal = computed.principal;
-    const depreciation = computed.amortissement;
-
-    switch (form.mode) {
-      case "AUTONOMIE_SCI": return charges + interest;
-      case "DESENDETTEMENT_SCI": return charges + interest + principal;
-      case "OPTIMISATION_FISCALE": return charges + interest + depreciation;
-      case "MIX": return charges + interest + principal;
-      default: return charges + interest;
-    }
-  }, [form, computed]);
-
-  // Impact on exploitation (simplified — loyer is a cost for exploitation)
-  // We approximate the exploitation EBE impact
-  const exploitationImpact = -loyerPreview;
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -83,7 +60,8 @@ export default function LoyerDynamiquePage() {
         <CardContent className="space-y-6">
 
           <p className="text-sm text-muted-foreground">
-            Ce module calcule le loyer mensuel payé par la société d'exploitation (SAS) à la foncière (SCI).
+            Ce module définit les paramètres du loyer payé par la société d'exploitation (SAS) à la foncière (SCI).
+            Le calcul final est réalisé par le moteur financier.
           </p>
 
           {/* Mode selection */}
@@ -132,6 +110,9 @@ export default function LoyerDynamiquePage() {
       <Card>
         <CardHeader><CardTitle>Détail du calcul</CardTitle></CardHeader>
         <CardContent>
+          <p className="text-xs text-muted-foreground mb-3">
+            Aperçu du calcul avec les paramètres actuels. Valeurs définitives calculées par le moteur financier.
+          </p>
           <Table>
             <TableHeader>
               <TableRow>
