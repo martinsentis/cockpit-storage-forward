@@ -316,7 +316,7 @@ export function isTaxExemptLabel(label: string): boolean {
 
 export const SCI_CHARGE_PRESETS: Record<SCIChargeCategory, string[]> = {
   IMMOBILIER: ["Taxe foncière", "Assurance PNO", "Entretien du site", "Maintenance immobilière"],
-  ADMINISTRATIF: ["Frais comptables SCI", "Frais juridiques", "Frais bancaires SCI", "Frais bancaires", "Assurance RC Pro"],
+  ADMINISTRATIF: ["Frais comptables SCI", "Frais juridiques", "Frais bancaires SCI", "Assurance RC Pro"],
 };
 
 export const SCI_CATEGORY_LABELS: Record<SCIChargeCategory, string> = {
