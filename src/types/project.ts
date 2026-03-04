@@ -100,20 +100,25 @@ export interface ServiceItem {
   endMonth: number | null;
 }
 
-export interface GestionnaireParametres {
-  ratioNetVersBrut: number;
-  tauxChargesPatronales: number;
-  moisPayes: number;
-}
+export type GestionnaireType = "PRESTATAIRE" | "SALARIE";
 
 export interface Gestionnaire {
   id: string;
   nom: string;
+  type: GestionnaireType;
   actif: boolean;
-  dateDebutMois: number;
-  netMensuelCible: number;
-  tauxActivite: number;
-  parametres: GestionnaireParametres;
+  // Prestataire
+  facturationMensuelle: number;
+  prixType: "HT" | "TTC";
+  vatRate: number;
+  // Salarié
+  salaireBrut: number;
+  tauxChargesPatronales: number;
+  // Temporalité
+  activeFromStart: boolean;
+  startMonth: number;
+  hasEndMonth: boolean;
+  endMonth: number | null;
 }
 
 export interface ChargeItem {
