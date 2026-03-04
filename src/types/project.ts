@@ -17,6 +17,7 @@ export interface ProjetData {
   sciInitialCash: number;
   defaultVatRate: number;
   displayMode: "HT" | "TTC";
+  projectStartDate: string; // "YYYY-MM" format, e.g. "2026-06"
 }
 
 export interface BuildData {
@@ -153,6 +154,7 @@ export const DEFAULT_PROJET: ProjetData = {
   sciInitialCash: 50000,
   defaultVatRate: 0.20,
   displayMode: "HT",
+  projectStartDate: "2026-06",
 };
 
 export const DEFAULT_BUILD: BuildData = {

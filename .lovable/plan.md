@@ -1,55 +1,48 @@
 
 
-# Plan : Dates calendaires UX sur monthIndex
+## Plan : Implémenter le Cockpit V1 complet
 
-## Résumé
+### Contexte
+Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
 
-Ajouter un champ `projectStartDate` dans les paramètres projet (mois 0 du modèle). Créer une fonction utilitaire `formatMonthIndex` qui convertit un index en date lisible. Afficher partout `mois X (Mois Année)` sans modifier le modèle interne.
+### Fichiers à créer
 
-## 1. `src/types/project.ts`
+**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
 
-Ajouter à `ProjetData` :
-```ts
-projectStartDate: string; // ISO format "2026-06" (year-month)
-```
+**2. `src/types/project.ts`** — Types et defaults :
+- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
+- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
+  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
+  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
+  - `revenueParams` (surface, prixM2, tauxRemplissage)
+  - `services` ([] par défaut)
+  - `opexPercentOfRevenue`
+  - `debts`, `sciDebts` ([] par défaut)
+  - `sciChargesCash`, `sciAmortization` (0 par défaut)
+  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
+  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
+- Constantes `DEFAULT_*` exportées pour chaque section
 
-Mettre à jour `DEFAULT_PROJET` : `projectStartDate: "2026-06"`.
+**3. `src/contexts/ProjectContext.tsx`** :
+- State initialisé avec les defaults
+- `validated` flags (5 booleans, tous false)
+- `updateSection()`, `validateSection()`, `isProjectComplete()`
+- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
 
-## 2. `src/lib/monthUtils.ts` — Nouveau fichier
+**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
 
-```ts
-export function formatMonthIndex(monthIndex: number, projectStartDate: string): string {
-  const [year, month] = projectStartDate.split("-").map(Number);
-  const date = new Date(year, month - 1 + monthIndex);
-  return date.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
-}
+**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
 
-export function formatMonthRange(startMonth: number, durationMonths: number, projectStartDate: string): string {
-  return formatMonthIndex(startMonth + durationMonths - 1, projectStartDate);
-}
-```
+**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
+- Formulaires pré-remplis depuis le Context
+- Bouton "Enregistrer" → updateSection + validateSection
+- Champs par page alignés sur les inputs API
 
-## 3. `src/pages/ProjetPage.tsx`
+**7. `src/pages/DashboardPage.tsx`** :
+- Liste les sections manquantes si projet incomplet
+- Bouton "Lancer la simulation" désactivé si incomplet
+- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
+- Affiche réponse JSON ou erreur dans `<pre>`
 
-Ajouter un champ "Date de début du projet" avec deux inputs (mois select 1-12 + année input), stocké en format `"YYYY-MM"`.
-
-## 4. `src/pages/ExploitationPage.tsx`
-
-Importer `formatMonthIndex`. Pour chaque champ monthIndex, ajouter un label contextuel :
-
-- **Phase startMonth** (l.428) : afficher `(Septembre 2026)` à côté de l'input
-- **Ramp-up durée** (l.444) : afficher `jusqu'à {formatMonthRange(...)}` 
-- **Gestionnaire dateDebutMois** (l.561) : afficher la date à côté
-- **Charge startMonth** (l.691) : afficher la date à côté
-- **Charge endMonth** (l.692) : afficher la date à côté
-- **Graphique ramp-up** XAxis (l.480) : formatter les ticks en dates calendaires
-
-## Fichiers impactés
-
-| Fichier | Action |
-|---|---|
-| `src/types/project.ts` | Ajouter `projectStartDate` à `ProjetData` + default |
-| `src/lib/monthUtils.ts` | Créer fonctions `formatMonthIndex` et `formatMonthRange` |
-| `src/pages/ProjetPage.tsx` | Ajouter input date de début projet |
-| `src/pages/ExploitationPage.tsx` | Annoter tous les monthIndex avec dates calendaires |
+**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
 
