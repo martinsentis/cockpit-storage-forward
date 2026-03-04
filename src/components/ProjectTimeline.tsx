@@ -10,11 +10,12 @@ import {
 interface TimelineEvent {
   monthIndex: number;
   label: string;
-  category: "start" | "commercial" | "rampup" | "hiring" | "debt";
+  category: "start" | "build" | "commercial" | "rampup" | "hiring" | "debt";
 }
 
 const CATEGORY_COLORS: Record<TimelineEvent["category"], string> = {
   start: "bg-blue-500",
+  build: "bg-amber-500",
   commercial: "bg-green-500",
   rampup: "bg-orange-500",
   hiring: "bg-violet-500",
@@ -23,6 +24,7 @@ const CATEGORY_COLORS: Record<TimelineEvent["category"], string> = {
 
 const CATEGORY_LABELS: Record<TimelineEvent["category"], string> = {
   start: "Début projet",
+  build: "Travaux",
   commercial: "Début commercial",
   rampup: "Fin ramp-up",
   hiring: "Embauche",
@@ -35,11 +37,18 @@ export default function ProjectTimeline() {
   const phases = state.exploitation.capacityPhases ?? [];
   const gestionnaires = state.exploitation.gestionnaires ?? [];
   const debts = state.financement.debts ?? [];
+  const build = state.build;
 
   // Build events
   const events: TimelineEvent[] = [
     { monthIndex: 0, label: "Début du projet", category: "start" },
   ];
+
+  // Build / CAPEX events
+  if (build.startMonth != null) {
+    events.push({ monthIndex: build.startMonth, label: "Début travaux", category: "build" });
+    events.push({ monthIndex: build.startMonth + (build.durationMonths ?? 6), label: "Fin travaux", category: "build" });
+  }
 
   phases.forEach((p) => {
     events.push({ monthIndex: p.startMonth, label: `${p.nom} — Début commercial`, category: "commercial" });

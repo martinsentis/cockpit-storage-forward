@@ -26,6 +26,8 @@ export interface BuildData {
   posteTravaux: number;
   posteHonoraires: number;
   posteDivers: number;
+  startMonth: number;
+  durationMonths: number;
 }
 
 export interface DebtItem {
@@ -163,6 +165,8 @@ export const DEFAULT_BUILD: BuildData = {
   posteTravaux: 250000,
   posteHonoraires: 50000,
   posteDivers: 50000,
+  startMonth: 0,
+  durationMonths: 6,
 };
 
 export const DEFAULT_FINANCEMENT: FinancementData = {
