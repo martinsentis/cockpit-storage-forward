@@ -37,18 +37,18 @@ export default function ProjectTimeline() {
   const phases = state.exploitation.capacityPhases ?? [];
   const gestionnaires = state.exploitation.gestionnaires ?? [];
   const debts = state.financement.debts ?? [];
-  const build = state.build;
+  const capexEvents = state.build.capexEvents ?? [];
 
   // Build events
   const events: TimelineEvent[] = [
     { monthIndex: 0, label: "Début du projet", category: "start" },
   ];
 
-  // Build / CAPEX events
-  if (build.startMonth != null) {
-    events.push({ monthIndex: build.startMonth, label: "Début travaux", category: "build" });
-    events.push({ monthIndex: build.startMonth + (build.durationMonths ?? 6), label: "Fin travaux", category: "build" });
-  }
+  // Build / CAPEX events from all capex blocks
+  capexEvents.forEach(ev => {
+    events.push({ monthIndex: ev.startMonth, label: `${ev.nom} — Début travaux`, category: "build" });
+    events.push({ monthIndex: ev.startMonth + (ev.durationMonths ?? 6), label: `${ev.nom} — Fin travaux`, category: "build" });
+  });
 
   phases.forEach((p) => {
     events.push({ monthIndex: p.startMonth, label: `${p.nom} — Début commercial`, category: "commercial" });
@@ -86,10 +86,8 @@ export default function ProjectTimeline() {
 
         <div className="overflow-x-auto">
           <div className="relative" style={{ width: TIMELINE_WIDTH, height: 100 }}>
-            {/* Main bar */}
             <div className="absolute top-[50px] left-0 right-0 h-[3px] bg-border rounded-full" />
 
-            {/* Year ticks */}
             {Array.from({ length: totalYears + 1 }, (_, i) => {
               const month = i * 12;
               if (month > horizonMonths) return null;
@@ -106,7 +104,6 @@ export default function ProjectTimeline() {
               );
             })}
 
-            {/* 6-month secondary ticks */}
             {Array.from({ length: totalYears * 2 + 1 }, (_, i) => {
               const month = i * 6;
               if (month % 12 === 0 || month > horizonMonths) return null;
@@ -117,7 +114,6 @@ export default function ProjectTimeline() {
               );
             })}
 
-            {/* Event markers */}
             {events.map((ev, idx) => (
               <Tooltip key={idx}>
                 <TooltipTrigger asChild>

@@ -50,7 +50,9 @@ export interface CapexBudgetLine {
   id: string;
   label: string;
   category: CapexCategory;
-  budgetPrevu: number;
+  montant: number;
+  prixType: "HT" | "TTC" | "NON_SOUMIS";
+  vatRate: number;
   commentaire?: string;
 }
 
@@ -88,13 +90,19 @@ export interface DepenseReelle {
   commentaire?: string;
 }
 
-export interface BuildData {
+export interface CapexEvent {
+  id: string;
+  nom: string;
   startMonth: number;
   durationMonths: number;
   budgetLines: CapexBudgetLine[];
   assets: BuildAsset[];
   taxeAmenagement: TaxeAmenagementData;
   depenses: DepenseReelle[];
+}
+
+export interface BuildData {
+  capexEvents: CapexEvent[];
 }
 
 export interface DebtItem {
@@ -281,13 +289,21 @@ export const DEFAULT_PROJET: ProjetData = {
   projectStartDate: "2026-06",
 };
 
+export function createDefaultCapexEvent(nom = "CAPEX Initial"): CapexEvent {
+  return {
+    id: crypto.randomUUID(),
+    nom,
+    startMonth: 0,
+    durationMonths: 6,
+    budgetLines: [],
+    assets: [],
+    taxeAmenagement: { montant: 0, mode: "AUTO", echeances: [] },
+    depenses: [],
+  };
+}
+
 export const DEFAULT_BUILD: BuildData = {
-  startMonth: 0,
-  durationMonths: 6,
-  budgetLines: [],
-  assets: [],
-  taxeAmenagement: { montant: 0, mode: "AUTO", echeances: [] },
-  depenses: [],
+  capexEvents: [createDefaultCapexEvent()],
 };
 
 export const DEFAULT_FINANCEMENT: FinancementData = {

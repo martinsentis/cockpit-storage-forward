@@ -30,10 +30,12 @@ export default function FoncierePage() {
   const projectStartDate = state.projet.projectStartDate;
   const defaultVatRate = state.projet.defaultVatRate ?? 0.20;
 
-  // Engine outputs — all financial values come from here
   const engine = useEngine();
   const sci = engine.fonciere;
   const loyerMensuel = engine.loyerDynamique.loyerCalcule;
+
+  // Aggregate all assets from all capex events
+  const allAssets = (state.build.capexEvents ?? []).flatMap(ev => ev.assets ?? []);
 
   const [form, setForm] = useState<FonciereData>(() => ({
     ...DEFAULT_FONCIERE,
@@ -105,7 +107,7 @@ export default function FoncierePage() {
             <span className="font-semibold text-lg">1. Actifs immobilisés</span>
           </AccordionTrigger>
           <AccordionContent className="space-y-4 pt-2">
-            {state.build.assets.length === 0 ? (
+            {allAssets.length === 0 ? (
               <p className="text-sm text-muted-foreground">Aucun actif défini dans le module Build / CAPEX.</p>
             ) : (
               <Table>
@@ -119,7 +121,7 @@ export default function FoncierePage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {state.build.assets.map(a => (
+                  {allAssets.map(a => (
                     <TableRow key={a.id}>
                       <TableCell>{CAPEX_CATEGORY_LABELS[a.category]}</TableCell>
                       <TableCell>{a.label}</TableCell>
@@ -185,7 +187,6 @@ export default function FoncierePage() {
             <span className="font-semibold text-lg">3. Revenus fonciers</span>
           </AccordionTrigger>
           <AccordionContent className="space-y-4 pt-2">
-            {/* Loyer dynamique (lecture seule) */}
             <Card className="border-dashed">
               <CardContent className="pt-4">
                 <div className="flex items-center justify-between">
@@ -201,7 +202,6 @@ export default function FoncierePage() {
               </CardContent>
             </Card>
 
-            {/* Autres revenus */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h4 className="text-sm font-semibold">Autres revenus fonciers</h4>
