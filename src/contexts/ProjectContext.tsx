@@ -68,6 +68,7 @@ const defaultState: ProjectState = {
   loyerDynamique: { ...DEFAULT_LOYER_DYNAMIQUE },
   gouvernance: { ...DEFAULT_GOUVERNANCE },
   associes: { ...DEFAULT_ASSOCIES },
+  apports: { ...DEFAULT_APPORTS },
 };
 
 const defaultValidated: ValidatedFlags = {
