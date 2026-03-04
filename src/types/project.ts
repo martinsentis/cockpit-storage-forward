@@ -50,7 +50,9 @@ export interface CapexBudgetLine {
   id: string;
   label: string;
   category: CapexCategory;
-  budgetPrevu: number;
+  montant: number;
+  prixType: "HT" | "TTC" | "NON_SOUMIS";
+  vatRate: number;
   commentaire?: string;
 }
 
