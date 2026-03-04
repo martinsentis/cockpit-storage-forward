@@ -1,48 +1,48 @@
 
 
-## Plan : Implémenter le Cockpit V1 complet
+# Plan : Timeline Visuelle du Projet
 
-### Contexte
-Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
+## Résumé
 
-### Fichiers à créer
+Créer un composant `ProjectTimeline` qui affiche une frise horizontale avec repères annuels, mois clés et événements du projet positionnés par `monthIndex`. Le composant est en lecture seule et utilise `formatMonthIndex` existant. Il sera affiché en haut du Dashboard.
 
-**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
+## 1. `src/components/ProjectTimeline.tsx` — Nouveau composant
 
-**2. `src/types/project.ts`** — Types et defaults :
-- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
-- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
-  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
-  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
-  - `revenueParams` (surface, prixM2, tauxRemplissage)
-  - `services` ([] par défaut)
-  - `opexPercentOfRevenue`
-  - `debts`, `sciDebts` ([] par défaut)
-  - `sciChargesCash`, `sciAmortization` (0 par défaut)
-  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
-  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
-- Constantes `DEFAULT_*` exportées pour chaque section
+### Données lues depuis le contexte
+- `state.projet.horizonMonths`, `state.projet.projectStartDate`
+- `state.exploitation.capacityPhases` (startMonth, rampUpMonths, nom)
+- `state.exploitation.gestionnaires` (dateDebutMois, nom)
+- `state.financement.debts` (label, durationMonths, deferralMonths)
 
-**3. `src/contexts/ProjectContext.tsx`** :
-- State initialisé avec les defaults
-- `validated` flags (5 booleans, tous false)
-- `updateSection()`, `validateSection()`, `isProjectComplete()`
-- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
+### Structure visuelle
+- Barre horizontale scrollable représentant l'horizon (0 → horizonMonths)
+- **Repères principaux** : tick + label tous les 12 mois ("Année 1", "Année 2"...) avec date calendaire
+- **Repères secondaires** : petits ticks tous les 6 mois
+- **Marqueurs d'événements** : pastilles colorées positionnées sur la barre, par catégorie :
+  - Bleu : début projet (mois 0)
+  - Vert : début commercial par phase (`phase.startMonth`)
+  - Orange : fin ramp-up par phase (`phase.startMonth + phase.rampUpMonths`)
+  - Violet : embauches gestionnaires (`gestionnaire.dateDebutMois`)
+  - Rouge : début dettes (`debt.deferralMonths`)
 
-**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
+### Tooltip au survol
+Chaque marqueur affiche un tooltip Radix avec :
+- Nom de l'événement
+- `mois X (Mois Année)` via `monthLabel()`
 
-**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
+### Layout
+- Container horizontal avec `overflow-x-auto`
+- Hauteur fixe ~120px
+- Responsive : scroll horizontal si l'horizon est large
 
-**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
-- Formulaires pré-remplis depuis le Context
-- Bouton "Enregistrer" → updateSection + validateSection
-- Champs par page alignés sur les inputs API
+## 2. `src/pages/DashboardPage.tsx`
 
-**7. `src/pages/DashboardPage.tsx`** :
-- Liste les sections manquantes si projet incomplet
-- Bouton "Lancer la simulation" désactivé si incomplet
-- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
-- Affiche réponse JSON ou erreur dans `<pre>`
+Ajouter `<ProjectTimeline />` en haut, avant la carte Dashboard existante.
 
-**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
+## Fichiers impactés
+
+| Fichier | Action |
+|---|---|
+| `src/components/ProjectTimeline.tsx` | Nouveau composant timeline |
+| `src/pages/DashboardPage.tsx` | Intégrer la timeline en haut |
 
