@@ -100,20 +100,25 @@ export interface ServiceItem {
   endMonth: number | null;
 }
 
-export interface GestionnaireParametres {
-  ratioNetVersBrut: number;
-  tauxChargesPatronales: number;
-  moisPayes: number;
-}
+export type GestionnaireType = "PRESTATAIRE" | "SALARIE";
 
 export interface Gestionnaire {
   id: string;
   nom: string;
+  type: GestionnaireType;
   actif: boolean;
-  dateDebutMois: number;
-  netMensuelCible: number;
-  tauxActivite: number;
-  parametres: GestionnaireParametres;
+  // Prestataire
+  facturationMensuelle: number;
+  prixType: "HT" | "TTC";
+  vatRate: number;
+  // Salarié
+  salaireBrut: number;
+  tauxChargesPatronales: number;
+  // Temporalité
+  activeFromStart: boolean;
+  startMonth: number;
+  hasEndMonth: boolean;
+  endMonth: number | null;
 }
 
 export interface ChargeItem {
@@ -189,11 +194,7 @@ export const DEFAULT_FINANCEMENT: FinancementData = {
   sciAmortization: 0,
 };
 
-export const DEFAULT_GESTIONNAIRE_PARAMS: GestionnaireParametres = {
-  ratioNetVersBrut: 0.78,
-  tauxChargesPatronales: 0.42,
-  moisPayes: 12,
-};
+export const DEFAULT_GESTIONNAIRE_TAUX_CHARGES = 0.42;
 
 export function createDefaultPhase(id?: string, nom?: string, defaultVatRate = 0.20): CapacityPhase {
   return {

@@ -56,7 +56,8 @@ export default function ProjectTimeline() {
   });
 
   gestionnaires.filter(g => g.actif).forEach((g) => {
-    events.push({ monthIndex: g.dateDebutMois, label: `Embauche — ${g.nom}`, category: "hiring" });
+    const startM = g.activeFromStart ? 0 : g.startMonth;
+    events.push({ monthIndex: startM, label: `${g.type === "PRESTATAIRE" ? "Prestataire" : "Embauche"} — ${g.nom}`, category: "hiring" });
   });
 
   debts.forEach((d) => {

@@ -1,66 +1,48 @@
 
 
-# Plan : Refonte du bloc Gestionnaire
+## Plan : Implémenter le Cockpit V1 complet
 
-## Constat
+### Contexte
+Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
 
-Le bloc actuel utilise un modèle unique basé sur un calcul net→brut+charges patronales, sans distinction prestataire/salarié, sans gestion HT/TTC pour les prestataires, et sans date de fin optionnelle.
+### Fichiers à créer
 
-## 1. `src/types/project.ts` — Refondre `Gestionnaire`
+**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
 
-```ts
-export type GestionnaireType = "PRESTATAIRE" | "SALARIE";
+**2. `src/types/project.ts`** — Types et defaults :
+- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
+- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
+  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
+  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
+  - `revenueParams` (surface, prixM2, tauxRemplissage)
+  - `services` ([] par défaut)
+  - `opexPercentOfRevenue`
+  - `debts`, `sciDebts` ([] par défaut)
+  - `sciChargesCash`, `sciAmortization` (0 par défaut)
+  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
+  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
+- Constantes `DEFAULT_*` exportées pour chaque section
 
-export interface Gestionnaire {
-  id: string;
-  nom: string;
-  type: GestionnaireType;
-  actif: boolean;
-  // Prestataire
-  facturationMensuelle: number;
-  prixType: "HT" | "TTC";
-  vatRate: number;
-  // Salarié
-  salaireBrut: number;
-  tauxChargesPatronales: number;
-  // Temporalité
-  activeFromStart: boolean;
-  startMonth: number;
-  hasEndMonth: boolean;
-  endMonth: number | null;
-}
-```
+**3. `src/contexts/ProjectContext.tsx`** :
+- State initialisé avec les defaults
+- `validated` flags (5 booleans, tous false)
+- `updateSection()`, `validateSection()`, `isProjectComplete()`
+- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
 
-Supprimer `GestionnaireParametres` (ratioNetVersBrut, moisPayes, tauxActivite — remplacés par le nouveau modèle). Mettre à jour `DEFAULT_GESTIONNAIRE_PARAMS` ou le supprimer.
+**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
 
-## 2. `src/pages/ExploitationPage.tsx` — Refonte UI
+**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
 
-### Calcul du coût mensuel HT
-- **Prestataire** : `toHT(facturationMensuelle, prixType, vatRate)`
-- **Salarié** : `salaireBrut * (1 + tauxChargesPatronales)`
+**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
+- Formulaires pré-remplis depuis le Context
+- Bouton "Enregistrer" → updateSection + validateSection
+- Champs par page alignés sur les inputs API
 
-### Migration des anciens gestionnaires
-Fonction `migrateGestionnaire` : si un gestionnaire n'a pas le champ `type`, le convertir en `SALARIE` avec les anciens champs mappés.
+**7. `src/pages/DashboardPage.tsx`** :
+- Liste les sections manquantes si projet incomplet
+- Bouton "Lancer la simulation" désactivé si incomplet
+- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
+- Affiche réponse JSON ou erreur dans `<pre>`
 
-### UI par gestionnaire (carte dépliable)
-1. **En-tête** : checkbox actif + nom (éditable) + type (Select: Prestataire/Salarié) + coût mensuel HT + supprimer
-2. **Corps conditionnel** :
-   - Si **Prestataire** : facturation mensuelle, sélecteur HT/TTC, taux TVA, affichage montant HT calculé
-   - Si **Salarié** : salaire brut, taux charges patronales (défaut 42%), affichage coût employeur calculé
-3. **Temporalité** : checkbox "Actif dès le début", sinon input startMonth + annotation calendaire. Checkbox "Date de fin", sinon input endMonth + annotation.
-
-### Synthèse
-- Nombre de gestionnaires actifs
-- Coût mensuel total HT
-- Coût annuel total HT (× 12)
-
-### Mise à jour du `derived`
-Adapter le calcul de `coutGestionnaires` pour utiliser le nouveau modèle (prestataire vs salarié).
-
-## Fichiers impactés
-
-| Fichier | Action |
-|---|---|
-| `src/types/project.ts` | Refondre `Gestionnaire`, supprimer `GestionnaireParametres` |
-| `src/pages/ExploitationPage.tsx` | Refonte UI gestionnaires, migration, synthèse enrichie |
+**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
 
