@@ -36,6 +36,44 @@ const STEP_COLORS: Record<CashAllocationStepType, { border: string; bg: string; 
 
 const fmt = (n: number) => n.toLocaleString("fr-FR");
 
+// ── Step type labels for summary ──
+const STEP_TYPE_SUMMARY_LABELS: Record<CashAllocationStepType, string> = {
+  CCA_REPAYMENT: "remboursement des comptes courants",
+  RESERVE: "réserve stratégique",
+  DIVIDENDS: "dividendes",
+};
+
+// ── Financial Policy Summary ──
+function FinancialPolicySummary({ globalRule }: { globalRule: GlobalGouvernanceRule }) {
+  const ratioPercent = Math.round(globalRule.distributableCashRate * 100);
+  const priorityText = globalRule.allocationOrder
+    .map((s) => STEP_TYPE_SUMMARY_LABELS[s.type] ?? s.label ?? s.type)
+    .join(" → ");
+  const dscrText = globalRule.dscrConstraintEnabled ? "activée" : "désactivée";
+
+  return (
+    <Card className="bg-muted/40 border-muted">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Eye className="h-4 w-4 text-primary" />
+          Politique financière actuelle
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="text-sm text-muted-foreground space-y-1.5">
+        <p>
+          La distribution est limitée à <span className="font-semibold text-foreground">{ratioPercent} %</span> du cash disponible, avec une réserve minimale de <span className="font-semibold text-foreground">{fmt(globalRule.minCashReserve)} €</span>.
+        </p>
+        <p>
+          La priorité de distribution est : <span className="font-medium text-foreground">{priorityText}</span>.
+        </p>
+        <p>
+          La protection dette (DSCR) est <span className="font-semibold text-foreground">{dscrText}</span>.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ── Simulator ──
 function GouvernanceSimulator({ globalRule }: { globalRule: GlobalGouvernanceRule }) {
   const TRESORERIE = 20_000;
@@ -656,8 +694,9 @@ export default function GouvernancePage() {
               <Button onClick={save} className="w-full">Enregistrer</Button>
             </div>
 
-            {/* Right column — Simulator */}
-            <div className="lg:col-span-2">
+            {/* Right column — Summary + Simulator */}
+            <div className="lg:col-span-2 space-y-4">
+              <FinancialPolicySummary globalRule={form.globalRule} />
               <GouvernanceSimulator globalRule={form.globalRule} />
             </div>
           </div>
