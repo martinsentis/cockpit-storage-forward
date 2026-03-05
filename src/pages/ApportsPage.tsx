@@ -41,6 +41,9 @@ export default function ApportsPage() {
   const ownership = useMemo(() => computeEconomicOwnership(associes), [associes]);
 
   function resolveNom(id: string): string {
+    // Check built-in entities first
+    const builtIn = BUILT_IN_SOCIETES.find(x => x.id === id);
+    if (builtIn) return builtIn.nom;
     const a = associes.find(x => x.id === id);
     if (!a) return "Inconnu";
     return a.type === "PHYSIQUE" ? `${a.prenom ? a.prenom + " " : ""}${a.nom}` : a.nom;
