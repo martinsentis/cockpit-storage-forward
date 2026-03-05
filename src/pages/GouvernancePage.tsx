@@ -316,14 +316,17 @@ function WaterfallEditor({
                 </div>
 
                 {step.mode === "RATIO" && (
-                  <div className="flex items-center gap-2">
-                    <Label className="text-sm whitespace-nowrap">Part :</Label>
-                    <Input
-                      type="number" className="h-8 w-20" min={0} max={100} step={1}
-                      value={step.ratio}
-                      onChange={(e) => updateStep(idx, { ratio: Number(e.target.value) })}
-                    />
-                    <span className="text-sm text-muted-foreground">%</span>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm whitespace-nowrap">Part :</Label>
+                      <Input
+                        type="number" className="h-8 w-20" min={0} max={100} step={1}
+                        value={step.ratio}
+                        onChange={(e) => updateStep(idx, { ratio: Number(e.target.value) })}
+                      />
+                      <span className="text-sm text-muted-foreground">%</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Le pourcentage s'applique au montant restant au moment de l'étape.</p>
                   </div>
                 )}
 
