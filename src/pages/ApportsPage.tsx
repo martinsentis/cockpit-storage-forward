@@ -162,32 +162,42 @@ export default function ApportsPage() {
     const physiques = associes.filter(a => a.type === "PHYSIQUE");
     return physiques.map(pp => {
       const ppName = `${pp.prenom ? pp.prenom + " " : ""}${pp.nom}`;
-      const expositions: { societeId: string; societeNom: string; ccaDirect: number; ccaIndirect: number; total: number }[] = [];
+      const expositions: { societeId: string; societeNom: string; capitalDirect: number; ccaDirect: number; capitalIndirect: number; ccaIndirect: number; total: number }[] = [];
 
       for (const societe of societes) {
-        // Direct CCA from this person to this société
+        // Direct contributions from this person to this société
+        const directCapital = apports
+          .filter(a => a.type === "CAPITAL" && a.apporteurId === pp.id && a.beneficiaireId === societe.id)
+          .reduce((s, a) => s + a.montant, 0);
         const directCCA = apports
           .filter(a => a.type === "CCA" && a.apporteurId === pp.id && a.beneficiaireId === societe.id)
           .reduce((s, a) => s + a.montant, 0);
 
-        // Indirect CCA: through sociétés this person owns
+        // Indirect contributions: through sociétés this person owns
+        let indirectCapital = 0;
         let indirectCCA = 0;
         for (const pi of pp.participationsIndirectes) {
           if (pi.pourcentage <= 0) continue;
-          // CCA from this société to the target société
+          const societeCapital = apports
+            .filter(a => a.type === "CAPITAL" && a.apporteurId === pi.societeId && a.beneficiaireId === societe.id)
+            .reduce((s, a) => s + a.montant, 0);
           const societeCCA = apports
             .filter(a => a.type === "CCA" && a.apporteurId === pi.societeId && a.beneficiaireId === societe.id)
             .reduce((s, a) => s + a.montant, 0);
+          indirectCapital += societeCapital * (pi.pourcentage / 100);
           indirectCCA += societeCCA * (pi.pourcentage / 100);
         }
 
-        if (directCCA > 0 || indirectCCA > 0) {
+        const total = directCapital + directCCA + indirectCapital + indirectCCA;
+        if (total > 0) {
           expositions.push({
             societeId: societe.id,
             societeNom: societe.nom,
+            capitalDirect: directCapital,
             ccaDirect: directCCA,
+            capitalIndirect: indirectCapital,
             ccaIndirect: indirectCCA,
-            total: directCCA + indirectCCA,
+            total,
           });
         }
       }
@@ -421,7 +431,7 @@ export default function ApportsPage() {
             <h2 className="text-lg font-semibold text-foreground">Consolidation économique par personne physique</h2>
             <p className="text-sm text-muted-foreground">
               Vue analytique uniquement — ne modifie pas les dettes réelles ni les comptes des sociétés.
-              L'exposition indirecte est calculée en pondérant les CCA des sociétés intermédiaires par le pourcentage de détention.
+              L'exposition indirecte est calculée en pondérant les apports des sociétés intermédiaires par le pourcentage de détention.
             </p>
           </div>
 
@@ -436,7 +446,7 @@ export default function ApportsPage() {
               {/* Summary table */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Exposition CCA consolidée</CardTitle>
+                  <CardTitle className="text-base">Exposition consolidée (Capital + CCA)</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
                   <Table>
@@ -462,12 +472,14 @@ export default function ApportsPage() {
                                     <TooltipTrigger asChild>
                                       <span className="cursor-help inline-flex items-center gap-1">
                                         {fmt(expo.total)}
-                                        {expo.ccaIndirect > 0 && <Info className="h-3 w-3 text-muted-foreground" />}
+                                        {(expo.capitalIndirect > 0 || expo.ccaIndirect > 0) && <Info className="h-3 w-3 text-muted-foreground" />}
                                       </span>
                                     </TooltipTrigger>
                                     <TooltipContent className="text-xs">
-                                      <p>Direct : {fmt(expo.ccaDirect)}</p>
-                                      {expo.ccaIndirect > 0 && <p>Indirect : {fmt(expo.ccaIndirect)}</p>}
+                                      <p>Capital direct : {fmt(expo.capitalDirect)}</p>
+                                      {expo.capitalIndirect > 0 && <p>Capital indirect : {fmt(expo.capitalIndirect)}</p>}
+                                      <p>CCA direct : {fmt(expo.ccaDirect)}</p>
+                                      {expo.ccaIndirect > 0 && <p>CCA indirect : {fmt(expo.ccaIndirect)}</p>}
                                     </TooltipContent>
                                   </Tooltip>
                                 ) : "—"}
