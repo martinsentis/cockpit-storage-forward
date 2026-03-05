@@ -726,6 +726,7 @@ export default function GouvernancePage() {
             return (
               <EntityRuleCard
                 key={entity.id}
+                entityId={entity.id}
                 entityName={entity.nom}
                 rule={rule}
                 onChange={updateEntityRule}
