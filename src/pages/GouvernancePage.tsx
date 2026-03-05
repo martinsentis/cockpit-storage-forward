@@ -333,7 +333,6 @@ export default function GouvernancePage() {
     const synced: GouvernanceData = {
       ...form,
       distributableCashRate: form.globalRule.distributableCashRate,
-      reserveStrategicRatio: form.globalRule.reserveStrategicRatio,
     };
     updateSection("gouvernance", synced);
     validateSection("gouvernance");
