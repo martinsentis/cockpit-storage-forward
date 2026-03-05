@@ -1,48 +1,102 @@
 
 
-## Plan : Implémenter le Cockpit V1 complet
+## Plan : Architecture multi-projets + module Fiscalité
 
-### Contexte
-Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
+### Ajustements par rapport au plan précédent
 
-### Fichiers à créer
+1. **IDs internes inchangés** : `__exploitation__` et `__fonciere__` restent tels quels partout. Aucun renommage.
+2. **Noms affichés** : ajout de `entityDisplayNames: Record<string, string>` dans `ProjetData` pour permettre le renommage UI sans toucher aux IDs.
+3. **Nouveau module `FiscaliteData`** : `taxRate` sort de `ProjetData` et va dans un nouveau module dédié.
+4. **`FinancementData`** : reçoit `initialCash`, `sciInitialCash`, `bufferMin`, `dscrMin` (pas `taxRate`).
 
-**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
+### Fichiers impactés
 
-**2. `src/types/project.ts`** — Types et defaults :
-- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
-- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
-  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
-  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
-  - `revenueParams` (surface, prixM2, tauxRemplissage)
-  - `services` ([] par défaut)
-  - `opexPercentOfRevenue`
-  - `debts`, `sciDebts` ([] par défaut)
-  - `sciChargesCash`, `sciAmortization` (0 par défaut)
-  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
-  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
-- Constantes `DEFAULT_*` exportées pour chaque section
+#### 1. `src/types/project.ts`
 
-**3. `src/contexts/ProjectContext.tsx`** :
-- State initialisé avec les defaults
-- `validated` flags (5 booleans, tous false)
-- `updateSection()`, `validateSection()`, `isProjectComplete()`
-- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
+**`ProjetData` simplifié** — retirer `taxRate`, `bufferMin`, `dscrMin`, `initialCash`, `sciInitialCash`. Garder : `nom`, `localisation`, `horizonMonths`, `projectStartDate`, `defaultVatRate`, `displayMode`. Ajouter `entityDisplayNames: Record<string, string>`.
 
-**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
+**Nouveau type `FiscaliteData`** :
+```typescript
+export interface FiscaliteData {
+  corporateTaxRate: number; // ex: 0.25
+}
+export const DEFAULT_FISCALITE: FiscaliteData = { corporateTaxRate: 0.25 };
+```
 
-**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
+**`FinancementData`** — ajouter `initialCash`, `sciInitialCash`, `bufferMin`, `dscrMin`.
 
-**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
-- Formulaires pré-remplis depuis le Context
-- Bouton "Enregistrer" → updateSection + validateSection
-- Champs par page alignés sur les inputs API
+**`ProjectMeta`** (nouveau) :
+```typescript
+export interface ProjectMeta {
+  id: string;
+  nom: string;
+  localisation: string;
+  projectStartDate: string;
+  horizonMonths: number;
+  createdAt: string;
+}
+```
 
-**7. `src/pages/DashboardPage.tsx`** :
-- Liste les sections manquantes si projet incomplet
-- Bouton "Lancer la simulation" désactivé si incomplet
-- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
-- Affiche réponse JSON ou erreur dans `<pre>`
+**`ValidatedFlags`** — ajouter `fiscalite: boolean`.
 
-**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
+#### 2. `src/contexts/ProjectContext.tsx`
+
+**Multi-projets** :
+- `MultiProjectState = { projects: Record<string, { meta: ProjectMeta; state: ProjectState; validated: ValidatedFlags }>; activeProjectId: string | null }`
+- Nouvelles actions : `createProject(meta)`, `switchProject(id)`, `deleteProject(id)`, `getProjectList()`
+- `state` / `validated` pointent sur le projet actif
+- Migration : l'ancien `pilotagebox_project_state` est importé comme premier projet avec un ID généré
+- `ProjectState` ajoute `fiscalite: FiscaliteData`
+- Migration de `taxRate` depuis `ProjetData` vers `FiscaliteData.corporateTaxRate`
+- Migration de `initialCash`, `sciInitialCash`, `bufferMin`, `dscrMin` depuis `ProjetData` vers `FinancementData`
+- `buildProjectionInputs` lit `taxRate` depuis `state.fiscalite.corporateTaxRate`, et les autres depuis `state.financement`
+
+**localStorage** : clé `pilotagebox_projects` (nouvelle structure multi-projets).
+
+#### 3. `src/pages/Index.tsx` — Page de sélection de projets
+
+- Liste des projets (cards : nom, localisation, date)
+- Bouton "Nouveau projet" → dialog avec uniquement : nom, localisation, date début, horizon
+- Clic sur un projet → `switchProject(id)` → navigate `/projet`
+- Bouton supprimer avec confirmation
+
+#### 4. `src/pages/ProjetPage.tsx` — Simplification
+
+- Retirer les champs financiers (`taxRate`, `bufferMin`, `dscrMin`, `initialCash`, `sciInitialCash`)
+- Garder : nom, localisation, date début, horizon, TVA par défaut, mode affichage
+- Ajouter section "Noms affichés des sociétés" avec champs éditables pour `entityDisplayNames`
+
+#### 5. `src/pages/FinancementPage.tsx`
+
+- Ajouter les champs migrés : `initialCash` (trésorerie initiale SAS), `sciInitialCash` (trésorerie initiale SCI), `bufferMin`, `dscrMin`
+
+#### 6. Nouveau `src/pages/FiscalitePage.tsx`
+
+- Champ `corporateTaxRate` (taux IS %)
+- Enregistrer → `updateSection("fiscalite", ...)` + `validateSection("fiscalite")`
+
+#### 7. `src/components/AppSidebar.tsx`
+
+- Ajouter entrée "Fiscalité" dans la sidebar (entre Gouvernance et Dashboard)
+- Ajouter sélecteur de projet en haut (nom du projet actif + lien vers `/`)
+
+#### 8. `src/App.tsx`
+
+- Ajouter route `/fiscalite` → `FiscalitePage`
+- Route `/` → `Index` (page de sélection de projets, plus de redirect vers `/projet`)
+
+#### 9. `src/engine/engine.ts` et `src/engine/engineTypes.ts`
+
+- `EngineInputs` ajoute `fiscalite: FiscaliteData`
+- Le moteur lit `inputs.fiscalite.corporateTaxRate` au lieu de `inputs.projet.taxRate`
+
+#### 10. `src/hooks/useEngine.ts`
+
+- Passer `state.fiscalite` dans les inputs du moteur
+
+### Ce qui ne change PAS
+- IDs `__exploitation__` et `__fonciere__` : inchangés
+- `ownershipGraph.ts` : inchangé
+- `GouvernancePage` : inchangé
+- Structure du moteur financier : inchangée (juste la source de `taxRate`)
 
