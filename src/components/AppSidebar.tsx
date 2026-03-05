@@ -1,9 +1,9 @@
 import {
   Building2, Hammer, Landmark, TrendingUp, Users, Users2, LayoutDashboard,
-  CheckCircle, AlertTriangle, Home, ArrowLeftRight, Wallet,
+  CheckCircle, AlertTriangle, Home, ArrowLeftRight, Wallet, Receipt, FolderOpen,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useProject } from "@/contexts/ProjectContext";
 import type { SectionName } from "@/types/project";
 
@@ -21,6 +21,7 @@ const sections: { title: string; url: string; icon: React.ElementType; section?:
   { title: "Foncière", url: "/fonciere", icon: Home, section: "fonciere" },
   { title: "Loyer dynamique", url: "/loyer-dynamique", icon: ArrowLeftRight, section: "loyerDynamique" },
   { title: "Gouvernance", url: "/gouvernance", icon: Users, section: "gouvernance" },
+  { title: "Fiscalité", url: "/fiscalite", icon: Receipt, section: "fiscalite" },
   { title: "Associés & Sociétés", url: "/associes", icon: Users2, section: "associes" },
   { title: "Apports associés", url: "/apports", icon: Wallet, section: "apports" },
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -30,43 +31,65 @@ export function AppSidebar() {
   const { state: sidebarState } = useSidebar();
   const collapsed = sidebarState === "collapsed";
   const location = useLocation();
-  const { validated } = useProject();
+  const navigate = useNavigate();
+  const { validated, activeProjectMeta, hasActiveProject } = useProject();
 
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
+        {/* Project selector */}
         <SidebarGroup>
-          <SidebarGroupLabel>Cockpit</SidebarGroupLabel>
+          <SidebarGroupLabel>Projet actif</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {sections.map((item) => {
-                const isActive = location.pathname === item.url;
-                const isValidated = item.section ? validated[item.section] : undefined;
-
-                return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild>
-                      <NavLink
-                        to={item.url}
-                        end
-                        className="hover:bg-muted/50"
-                        activeClassName="bg-muted text-primary font-medium"
-                      >
-                        <item.icon className="mr-2 h-4 w-4" />
-                        {!collapsed && <span className="flex-1">{item.title}</span>}
-                        {!collapsed && isValidated !== undefined && (
-                          isValidated
-                            ? <CheckCircle className="h-4 w-4 text-green-500" />
-                            : <AlertTriangle className="h-4 w-4 text-orange-500" />
-                        )}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={() => navigate("/")}>
+                  <FolderOpen className="mr-2 h-4 w-4" />
+                  {!collapsed && (
+                    <span className="flex-1 truncate text-sm font-medium">
+                      {hasActiveProject && activeProjectMeta ? activeProjectMeta.nom : "Sélectionner un projet"}
+                    </span>
+                  )}
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Navigation sections (only when project active) */}
+        {hasActiveProject && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Cockpit</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {sections.map((item) => {
+                  const isValidated = item.section ? validated[item.section] : undefined;
+
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton asChild>
+                        <NavLink
+                          to={item.url}
+                          end
+                          className="hover:bg-muted/50"
+                          activeClassName="bg-muted text-primary font-medium"
+                        >
+                          <item.icon className="mr-2 h-4 w-4" />
+                          {!collapsed && <span className="flex-1">{item.title}</span>}
+                          {!collapsed && isValidated !== undefined && (
+                            isValidated
+                              ? <CheckCircle className="h-4 w-4 text-green-500" />
+                              : <AlertTriangle className="h-4 w-4 text-orange-500" />
+                          )}
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
     </Sidebar>
   );

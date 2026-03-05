@@ -9,12 +9,14 @@ import {
   LoyerDynamiqueData,
   AssociesData,
   ApportsData,
+  FiscaliteData,
   ValidatedFlags,
   SectionName,
   ProjectionInputs,
   PhaseProjection,
   CapacityPhase,
   CapexEvent,
+  ProjectMeta,
   DEFAULT_PROJET,
   DEFAULT_BUILD,
   DEFAULT_FINANCEMENT,
@@ -24,6 +26,7 @@ import {
   DEFAULT_LOYER_DYNAMIQUE,
   DEFAULT_ASSOCIES,
   DEFAULT_APPORTS,
+  DEFAULT_FISCALITE,
   DEFAULT_GLOBAL_RULE,
   createDefaultPhase,
   createDefaultCapexEvent,
@@ -32,7 +35,8 @@ import {
 import { computeEngine } from "@/engine/engine";
 import { phaseSurface } from "@/engine/engine";
 
-const STORAGE_KEY = "pilotagebox_project_state";
+const STORAGE_KEY = "pilotagebox_projects";
+const LEGACY_STORAGE_KEY = "pilotagebox_project_state";
 
 export interface ProjectState {
   projet: ProjetData;
@@ -44,15 +48,37 @@ export interface ProjectState {
   gouvernance: GouvernanceData;
   associes: AssociesData;
   apports: ApportsData;
+  fiscalite: FiscaliteData;
+}
+
+export interface ProjectEntry {
+  meta: ProjectMeta;
+  state: ProjectState;
+  validated: ValidatedFlags;
+}
+
+export interface MultiProjectState {
+  projects: Record<string, ProjectEntry>;
+  activeProjectId: string | null;
 }
 
 interface ProjectContextValue {
+  // Active project (null if none selected)
   state: ProjectState;
   validated: ValidatedFlags;
+  activeProjectId: string | null;
+  activeProjectMeta: ProjectMeta | null;
   updateSection: <K extends keyof ProjectState>(section: K, data: Partial<ProjectState[K]>) => void;
   validateSection: (section: SectionName) => void;
   isProjectComplete: () => boolean;
   buildProjectionInputs: () => ProjectionInputs;
+  // Multi-project management
+  projectList: ProjectMeta[];
+  createProject: (meta: Omit<ProjectMeta, "id" | "createdAt">) => string;
+  switchProject: (id: string) => void;
+  deleteProject: (id: string) => void;
+  updateProjectMeta: (id: string, updates: Partial<Omit<ProjectMeta, "id" | "createdAt">>) => void;
+  hasActiveProject: boolean;
 }
 
 const ProjectContext = createContext<ProjectContextValue | null>(null);
@@ -73,6 +99,7 @@ const defaultState: ProjectState = {
   gouvernance: { ...DEFAULT_GOUVERNANCE },
   associes: { ...DEFAULT_ASSOCIES },
   apports: { ...DEFAULT_APPORTS },
+  fiscalite: { ...DEFAULT_FISCALITE },
 };
 
 const defaultValidated: ValidatedFlags = {
@@ -85,7 +112,10 @@ const defaultValidated: ValidatedFlags = {
   gouvernance: false,
   associes: false,
   apports: false,
+  fiscalite: false,
 };
+
+// ── Migration helpers ──
 
 function migrateExploitation(e: any): ExploitationData {
   if (e?.capacityPhases) {
@@ -123,7 +153,6 @@ function migrateBudgetLine(l: any): any {
 }
 
 function migrateBuild(b: any): BuildData {
-  // Already new CapexEvent format
   if (b?.capexEvents && Array.isArray(b.capexEvents)) {
     return {
       capexEvents: b.capexEvents.map((ev: any) => ({
@@ -139,17 +168,12 @@ function migrateBuild(b: any): BuildData {
       })),
     };
   }
-
-  // Old flat format → wrap in a single CapexEvent
   const event: CapexEvent = createDefaultCapexEvent("CAPEX Initial");
   event.startMonth = b?.startMonth ?? 0;
   event.durationMonths = b?.durationMonths ?? 6;
-
-  // Migrate budgetLines
   if (b?.budgetLines && Array.isArray(b.budgetLines)) {
     event.budgetLines = b.budgetLines.map(migrateBudgetLine);
   } else {
-    // Very old format with posteFoncier etc.
     const uid = () => crypto.randomUUID();
     const lines: any[] = [];
     if (b?.posteFoncier) lines.push({ id: uid(), label: "Foncier", category: "TERRAIN", montant: b.posteFoncier, prixType: "HT", vatRate: 0.20 });
@@ -158,8 +182,6 @@ function migrateBuild(b: any): BuildData {
     if (b?.posteDivers) lines.push({ id: uid(), label: "Divers", category: "DIVERS", montant: b.posteDivers, prixType: "HT", vatRate: 0.20 });
     event.budgetLines = lines;
   }
-
-  // Assets
   const categoryMap: Record<string, string> = {
     CLOTURE_PORTAIL: "VRD",
     CONTENEURS: "EQUIPEMENTS_PRODUCTIFS",
@@ -172,20 +194,15 @@ function migrateBuild(b: any): BuildData {
     amortissable: a.amortissable ?? true,
     commentaire: a.commentaire ?? "",
   }));
-
-  // Taxe
   const oldTaxe = typeof b?.taxeAmenagement === "number" ? b.taxeAmenagement : 0;
   event.taxeAmenagement = (b?.taxeAmenagement && typeof b.taxeAmenagement === "object")
     ? b.taxeAmenagement
     : { montant: oldTaxe, mode: "AUTO" as const, echeances: [] };
-
   event.depenses = b?.depenses ?? [];
-
   return { capexEvents: [event] };
 }
 
 function migrateGouvernance(g: any): GouvernanceData {
-  // Build globalRule from legacy flat fields or existing globalRule
   const globalRule = g?.globalRule ?? {
     distributableCashRate: g?.distributableCashRate ?? DEFAULT_GLOBAL_RULE.distributableCashRate,
     reserveStrategicRatio: g?.reserveStrategicRatio ?? DEFAULT_GLOBAL_RULE.reserveStrategicRatio,
@@ -194,16 +211,12 @@ function migrateGouvernance(g: any): GouvernanceData {
     dividendFlatTaxRate: g?.dividendFlatTaxRate ?? DEFAULT_GLOBAL_RULE.dividendFlatTaxRate,
     allocationOrder: createDefaultAllocationOrder(),
   };
-
-  // Ensure allocationOrder items have ids
   if (globalRule.allocationOrder) {
     globalRule.allocationOrder = globalRule.allocationOrder.map((step: any) => ({
       ...step,
       id: step.id ?? crypto.randomUUID(),
     }));
   }
-
-  // Migrate entity rules: enforce transparence → inheritGlobalRule constraint
   const entityRules = (g?.entityRules ?? []).map((rule: any) => ({
     ...rule,
     inheritGlobalRule: rule.transparentDistribution ? true : (rule.inheritGlobalRule ?? true),
@@ -213,13 +226,11 @@ function migrateGouvernance(g: any): GouvernanceData {
       id: step.id ?? crypto.randomUUID(),
     })),
   }));
-
   return {
     structureJuridique: g?.structureJuridique ?? DEFAULT_GOUVERNANCE.structureJuridique,
     globalRule,
     entityRules,
     distributionHistory: g?.distributionHistory ?? [],
-    // Legacy fields
     ccaBalance: g?.ccaBalance ?? DEFAULT_GOUVERNANCE.ccaBalance,
     distributableCashRate: g?.distributableCashRate ?? DEFAULT_GOUVERNANCE.distributableCashRate,
     ccaPriorityRatio: g?.ccaPriorityRatio ?? DEFAULT_GOUVERNANCE.ccaPriorityRatio,
@@ -233,39 +244,117 @@ function migrateApports(a: any): ApportsData {
   return {
     apports: a.apports.map((item: any) => ({
       ...item,
-      // Migrate old 'beneficiaire' field to 'beneficiaireId'
       beneficiaireId: item.beneficiaireId ?? item.beneficiaire ?? "",
     })),
   };
 }
 
-function loadFromStorage(): { state: ProjectState; validated: ValidatedFlags } {
+/**
+ * Migrate a single legacy project state into the new multi-project structure.
+ * Handles migrating taxRate → FiscaliteData, financial fields → FinancementData.
+ */
+function migrateSingleProjectState(parsed: any): { state: ProjectState; validated: ValidatedFlags } {
+  const rawState = parsed.state ?? parsed;
+  const rawProjet = rawState?.projet ?? {};
+  const rawFinancement = rawState?.financement ?? {};
+
+  // Extract fields that moved from ProjetData
+  const taxRate = rawProjet.taxRate ?? DEFAULT_FISCALITE.corporateTaxRate;
+  const initialCash = rawProjet.initialCash ?? rawFinancement.initialCash ?? DEFAULT_FINANCEMENT.initialCash;
+  const sciInitialCash = rawProjet.sciInitialCash ?? rawFinancement.sciInitialCash ?? DEFAULT_FINANCEMENT.sciInitialCash;
+  const bufferMin = rawProjet.bufferMin ?? rawFinancement.bufferMin ?? DEFAULT_FINANCEMENT.bufferMin;
+  const dscrMin = rawProjet.dscrMin ?? rawFinancement.dscrMin ?? DEFAULT_FINANCEMENT.dscrMin;
+
+  const projet: ProjetData = {
+    nom: rawProjet.nom ?? DEFAULT_PROJET.nom,
+    localisation: rawProjet.localisation ?? DEFAULT_PROJET.localisation,
+    horizonMonths: rawProjet.horizonMonths ?? DEFAULT_PROJET.horizonMonths,
+    defaultVatRate: rawProjet.defaultVatRate ?? DEFAULT_PROJET.defaultVatRate,
+    displayMode: rawProjet.displayMode ?? DEFAULT_PROJET.displayMode,
+    projectStartDate: rawProjet.projectStartDate ?? DEFAULT_PROJET.projectStartDate,
+    entityDisplayNames: rawProjet.entityDisplayNames ?? {},
+  };
+
+  const financement: FinancementData = {
+    apportFondsPropres: rawFinancement.apportFondsPropres ?? DEFAULT_FINANCEMENT.apportFondsPropres,
+    debts: rawFinancement.debts ?? [],
+    sciDebts: rawFinancement.sciDebts ?? [],
+    sciChargesCash: rawFinancement.sciChargesCash ?? DEFAULT_FINANCEMENT.sciChargesCash,
+    sciAmortization: rawFinancement.sciAmortization ?? DEFAULT_FINANCEMENT.sciAmortization,
+    initialCash,
+    sciInitialCash,
+    bufferMin,
+    dscrMin,
+  };
+
+  const fiscalite: FiscaliteData = {
+    corporateTaxRate: taxRate,
+  };
+
+  return {
+    state: {
+      projet,
+      build: migrateBuild(rawState?.build),
+      financement,
+      exploitation: migrateExploitation(rawState?.exploitation),
+      fonciere: { ...DEFAULT_FONCIERE, ...rawState?.fonciere },
+      loyerDynamique: { ...DEFAULT_LOYER_DYNAMIQUE, ...rawState?.loyerDynamique },
+      gouvernance: migrateGouvernance(rawState?.gouvernance),
+      associes: rawState?.associes ?? { ...DEFAULT_ASSOCIES },
+      apports: migrateApports(rawState?.apports),
+      fiscalite,
+    },
+    validated: { ...defaultValidated, ...parsed.validated, fiscalite: parsed.validated?.fiscalite ?? false },
+  };
+}
+
+function loadFromStorage(): MultiProjectState {
   try {
+    // Try new multi-project format first
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw);
+      const parsed = JSON.parse(raw) as MultiProjectState;
+      // Re-migrate each project to handle any new fields
+      const projects: Record<string, ProjectEntry> = {};
+      for (const [id, entry] of Object.entries(parsed.projects)) {
+        const migrated = migrateSingleProjectState({ state: entry.state, validated: entry.validated });
+        projects[id] = {
+          meta: entry.meta,
+          state: migrated.state,
+          validated: migrated.validated,
+        };
+      }
+      return { projects, activeProjectId: parsed.activeProjectId };
+    }
+
+    // Try legacy single-project format
+    const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (legacy) {
+      const parsed = JSON.parse(legacy);
+      const migrated = migrateSingleProjectState(parsed);
+      const id = crypto.randomUUID();
+      const meta: ProjectMeta = {
+        id,
+        nom: migrated.state.projet.nom,
+        localisation: migrated.state.projet.localisation,
+        projectStartDate: migrated.state.projet.projectStartDate,
+        horizonMonths: migrated.state.projet.horizonMonths,
+        createdAt: new Date().toISOString(),
+      };
+      // Clean up legacy key
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
       return {
-        state: {
-          ...defaultState,
-          ...parsed.state,
-          build: migrateBuild(parsed.state?.build),
-          exploitation: migrateExploitation(parsed.state?.exploitation),
-          fonciere: { ...DEFAULT_FONCIERE, ...parsed.state?.fonciere },
-          loyerDynamique: { ...DEFAULT_LOYER_DYNAMIQUE, ...parsed.state?.loyerDynamique },
-          gouvernance: migrateGouvernance(parsed.state?.gouvernance),
-          associes: parsed.state?.associes ?? { ...DEFAULT_ASSOCIES },
-          apports: migrateApports(parsed.state?.apports),
-        },
-        validated: { ...defaultValidated, ...parsed.validated },
+        projects: { [id]: { meta, state: migrated.state, validated: migrated.validated } },
+        activeProjectId: id,
       };
     }
   } catch {
     // ignore
   }
-  return { state: { ...defaultState }, validated: { ...defaultValidated } };
+  return { projects: {}, activeProjectId: null };
 }
 
-// Helper: compute phase CA HT (used only for projection inputs aggregation)
+// Helper: compute phase CA HT
 function phaseCAHT(p: CapacityPhase): number {
   if (p.modeBox === "MACRO") {
     const priceHT = p.prixType === "HT" ? p.prixM2 : p.prixM2 / (1 + p.vatRate);
@@ -279,41 +368,140 @@ function phaseCAHT(p: CapacityPhase): number {
 }
 
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [initial] = useState(loadFromStorage);
-  const [state, setState] = useState<ProjectState>(initial.state);
-  const [validated, setValidated] = useState<ValidatedFlags>(initial.validated);
+  const [multiState, setMultiState] = useState<MultiProjectState>(loadFromStorage);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ state, validated }));
-  }, [state, validated]);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(multiState));
+  }, [multiState]);
+
+  const activeEntry = multiState.activeProjectId
+    ? multiState.projects[multiState.activeProjectId] ?? null
+    : null;
+
+  const state = activeEntry?.state ?? defaultState;
+  const validated = activeEntry?.validated ?? defaultValidated;
+  const hasActiveProject = activeEntry !== null;
+
+  const projectList: ProjectMeta[] = Object.values(multiState.projects)
+    .map(e => e.meta)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
   const updateSection = useCallback(<K extends keyof ProjectState>(section: K, data: Partial<ProjectState[K]>) => {
-    setState((prev) => ({ ...prev, [section]: { ...prev[section], ...data } }));
+    setMultiState(prev => {
+      const id = prev.activeProjectId;
+      if (!id || !prev.projects[id]) return prev;
+      const entry = prev.projects[id];
+      return {
+        ...prev,
+        projects: {
+          ...prev.projects,
+          [id]: {
+            ...entry,
+            state: { ...entry.state, [section]: { ...entry.state[section], ...data } },
+          },
+        },
+      };
+    });
   }, []);
 
   const validateSection = useCallback((section: SectionName) => {
-    setValidated((prev) => ({ ...prev, [section]: true }));
+    setMultiState(prev => {
+      const id = prev.activeProjectId;
+      if (!id || !prev.projects[id]) return prev;
+      const entry = prev.projects[id];
+      return {
+        ...prev,
+        projects: {
+          ...prev.projects,
+          [id]: {
+            ...entry,
+            validated: { ...entry.validated, [section]: true },
+          },
+        },
+      };
+    });
   }, []);
 
   const isProjectComplete = useCallback(() => {
     return (
       validated.projet && validated.build && validated.financement &&
-      validated.exploitation && validated.fonciere && validated.loyerDynamique && validated.gouvernance
+      validated.exploitation && validated.fonciere && validated.loyerDynamique &&
+      validated.gouvernance && validated.fiscalite
     );
   }, [validated]);
+
+  const createProject = useCallback((meta: Omit<ProjectMeta, "id" | "createdAt">) => {
+    const id = crypto.randomUUID();
+    const fullMeta: ProjectMeta = { ...meta, id, createdAt: new Date().toISOString() };
+    const projectState: ProjectState = {
+      ...defaultState,
+      projet: {
+        ...DEFAULT_PROJET,
+        nom: meta.nom,
+        localisation: meta.localisation,
+        projectStartDate: meta.projectStartDate,
+        horizonMonths: meta.horizonMonths,
+      },
+    };
+    setMultiState(prev => ({
+      projects: {
+        ...prev.projects,
+        [id]: { meta: fullMeta, state: projectState, validated: { ...defaultValidated } },
+      },
+      activeProjectId: id,
+    }));
+    return id;
+  }, []);
+
+  const switchProject = useCallback((id: string) => {
+    setMultiState(prev => {
+      if (!prev.projects[id]) return prev;
+      return { ...prev, activeProjectId: id };
+    });
+  }, []);
+
+  const deleteProject = useCallback((id: string) => {
+    setMultiState(prev => {
+      const { [id]: _, ...rest } = prev.projects;
+      const newActive = prev.activeProjectId === id ? null : prev.activeProjectId;
+      return { projects: rest, activeProjectId: newActive };
+    });
+  }, []);
+
+  const updateProjectMeta = useCallback((id: string, updates: Partial<Omit<ProjectMeta, "id" | "createdAt">>) => {
+    setMultiState(prev => {
+      const entry = prev.projects[id];
+      if (!entry) return prev;
+      return {
+        ...prev,
+        projects: {
+          ...prev.projects,
+          [id]: { ...entry, meta: { ...entry.meta, ...updates } },
+        },
+      };
+    });
+  }, []);
 
   const buildProjectionInputs = useCallback((): ProjectionInputs => {
     const p = state.projet;
     const e = state.exploitation;
     const f = state.financement;
     const g = state.gouvernance;
+    const fi = state.fiscalite;
 
-    // Use engine to get the loyer
-    const engineOutputs = computeEngine(state);
+    const engineOutputs = computeEngine({
+      projet: state.projet,
+      build: state.build,
+      financement: state.financement,
+      exploitation: state.exploitation,
+      fonciere: state.fonciere,
+      loyerDynamique: state.loyerDynamique,
+      gouvernance: state.gouvernance,
+      fiscalite: state.fiscalite,
+    });
     const loyer = engineOutputs.loyerDynamique.loyerCalcule;
 
     const phases = e.capacityPhases ?? [createDefaultPhase()];
-
     const totalSurface = phases.reduce((s, ph) => s + phaseSurface(ph), 0);
     const totalCA = phases.reduce((s, ph) => s + phaseCAHT(ph), 0);
 
@@ -325,11 +513,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     return {
       horizonMonths: p.horizonMonths ?? DEFAULT_PROJET.horizonMonths,
-      initialCash: p.initialCash ?? DEFAULT_PROJET.initialCash,
-      sciInitialCash: p.sciInitialCash ?? DEFAULT_PROJET.sciInitialCash,
-      taxRate: p.taxRate ?? DEFAULT_PROJET.taxRate,
-      bufferMin: p.bufferMin ?? DEFAULT_PROJET.bufferMin,
-      dscrMin: p.dscrMin ?? DEFAULT_PROJET.dscrMin,
+      initialCash: f.initialCash ?? DEFAULT_FINANCEMENT.initialCash,
+      sciInitialCash: f.sciInitialCash ?? DEFAULT_FINANCEMENT.sciInitialCash,
+      taxRate: fi.corporateTaxRate ?? DEFAULT_FISCALITE.corporateTaxRate,
+      bufferMin: f.bufferMin ?? DEFAULT_FINANCEMENT.bufferMin,
+      dscrMin: f.dscrMin ?? DEFAULT_FINANCEMENT.dscrMin,
       phases: projectionPhases,
       revenueParams: {
         surface: totalSurface,
@@ -355,7 +543,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   return (
     <ProjectContext.Provider
-      value={{ state, validated, updateSection, validateSection, isProjectComplete, buildProjectionInputs }}
+      value={{
+        state, validated, activeProjectId: multiState.activeProjectId,
+        activeProjectMeta: activeEntry?.meta ?? null,
+        updateSection, validateSection, isProjectComplete, buildProjectionInputs,
+        projectList, createProject, switchProject, deleteProject, updateProjectMeta,
+        hasActiveProject,
+      }}
     >
       {children}
     </ProjectContext.Provider>

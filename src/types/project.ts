@@ -10,15 +10,21 @@ export interface ProjetData {
   nom: string;
   localisation: string;
   horizonMonths: number;
-  taxRate: number;
-  bufferMin: number;
-  dscrMin: number;
-  initialCash: number;
-  sciInitialCash: number;
   defaultVatRate: number;
   displayMode: "HT" | "TTC";
   projectStartDate: string; // "YYYY-MM" format, e.g. "2026-06"
+  entityDisplayNames: Record<string, string>;
 }
+
+// ── Fiscalité ──
+
+export interface FiscaliteData {
+  corporateTaxRate: number; // e.g. 0.25
+}
+
+export const DEFAULT_FISCALITE: FiscaliteData = {
+  corporateTaxRate: 0.25,
+};
 
 // ── Build / CAPEX ──
 
@@ -119,6 +125,11 @@ export interface FinancementData {
   sciDebts: DebtItem[];
   sciChargesCash: number;
   sciAmortization: number;
+  // Migrated from ProjetData
+  initialCash: number;
+  sciInitialCash: number;
+  bufferMin: number;
+  dscrMin: number;
 }
 
 export interface Typologie {
@@ -268,11 +279,11 @@ export type CashAllocationStepType = "CCA_REPAYMENT" | "RESERVE" | "DIVIDENDS";
 export type AllocationStepMode = "RATIO" | "UNTIL_ZERO" | "UNTIL_TARGET";
 
 export interface CashAllocationStep {
-  id: string;                    // stable key for reorder UI
+  id: string;
   type: CashAllocationStepType;
   mode: AllocationStepMode;
-  ratio: number;                 // % (0-100) of distributable cash allocated to this step
-  target?: number;               // used when mode = UNTIL_TARGET
+  ratio: number;
+  target?: number;
   label?: string;
 }
 
@@ -297,17 +308,6 @@ export interface GlobalGouvernanceRule {
   allocationOrder: CashAllocationStep[];
 }
 
-/**
- * Règle de gouvernance spécifique à une entité.
- *
- * `entityId` peut référencer :
- * - `"__exploitation__"` — Société d'exploitation système (SAS)
- * - `"__fonciere__"` — Société foncière système (SCI)
- * - Un `Associe.id` de type `MORALE` — Holding ou société utilisateur
- *
- * Si `transparentDistribution = true`, `inheritGlobalRule` est forcé à `true`
- * (une entité transparente ne peut pas avoir de règle propre).
- */
 export interface EntityGouvernanceRule {
   entityId: string;
   inheritGlobalRule: boolean;
@@ -350,14 +350,10 @@ export const DEFAULT_PROJET: ProjetData = {
   nom: "Mon projet",
   localisation: "Paris",
   horizonMonths: 120,
-  taxRate: 0.25,
-  bufferMin: 10000,
-  dscrMin: 1.2,
-  initialCash: 100000,
-  sciInitialCash: 50000,
   defaultVatRate: 0.20,
   displayMode: "HT",
   projectStartDate: "2026-06",
+  entityDisplayNames: {},
 };
 
 export function createDefaultCapexEvent(nom = "CAPEX Initial"): CapexEvent {
@@ -383,6 +379,10 @@ export const DEFAULT_FINANCEMENT: FinancementData = {
   sciDebts: [],
   sciChargesCash: 0,
   sciAmortization: 0,
+  initialCash: 100000,
+  sciInitialCash: 50000,
+  bufferMin: 10000,
+  dscrMin: 1.2,
 };
 
 export const DEFAULT_GESTIONNAIRE_TAUX_CHARGES = 0.42;
@@ -546,8 +546,8 @@ export const APPORT_STATUT_LABELS: Record<ApportStatut, string> = {
 
 export interface ApportItem {
   id: string;
-  apporteurId: string;        // ID of an associe (person or société)
-  beneficiaireId: string;     // ID of a société (personne morale) from Associés module
+  apporteurId: string;
+  beneficiaireId: string;
   type: ApportType;
   montant: number;
   date: string;
@@ -580,6 +580,17 @@ export const SCI_CATEGORY_LABELS: Record<SCIChargeCategory, string> = {
   IMMOBILIER: "Immobilier",
   ADMINISTRATIF: "Administratif",
 };
+
+// ── Project Meta (multi-project) ──
+
+export interface ProjectMeta {
+  id: string;
+  nom: string;
+  localisation: string;
+  projectStartDate: string;
+  horizonMonths: number;
+  createdAt: string;
+}
 
 // ── API payload type ──
 
@@ -630,6 +641,7 @@ export interface ValidatedFlags {
   gouvernance: boolean;
   associes: boolean;
   apports: boolean;
+  fiscalite: boolean;
 }
 
 export type SectionName = keyof ValidatedFlags;

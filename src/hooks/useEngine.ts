@@ -1,11 +1,5 @@
 /**
  * useEngine — React hook that provides engine outputs from project state.
- * 
- * All financial calculations are delegated to the engine.
- * Components consume this hook instead of computing values themselves.
- * 
- * FUTURE: When the backend engine is ready, this hook will call the API
- * instead of the local engine. No component changes needed.
  */
 
 import { useMemo } from "react";
@@ -25,15 +19,12 @@ export function useEngine(): EngineOutputs {
       fonciere: state.fonciere,
       loyerDynamique: state.loyerDynamique,
       gouvernance: state.gouvernance,
+      fiscalite: state.fiscalite,
     };
     return computeEngine(inputs);
   }, [state]);
 }
 
-/**
- * Compute engine outputs from arbitrary inputs (e.g., local form state).
- * Used when a page has unsaved form state that differs from context.
- */
 export function useEngineWithOverrides(overrides: Partial<EngineInputs>): EngineOutputs {
   const { state } = useProject();
 
@@ -46,6 +37,7 @@ export function useEngineWithOverrides(overrides: Partial<EngineInputs>): Engine
       fonciere: state.fonciere,
       loyerDynamique: state.loyerDynamique,
       gouvernance: state.gouvernance,
+      fiscalite: state.fiscalite,
       ...overrides,
     };
     return computeEngine(inputs);
