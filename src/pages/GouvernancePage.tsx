@@ -24,6 +24,8 @@ import {
   CASH_ALLOCATION_STEP_LABELS,
   ALLOCATION_MODE_LABELS,
   BUILT_IN_SOCIETES,
+  EXPLOITATION_ENTITY_ID,
+  FONCIERE_ENTITY_ID,
   createDefaultEntityRule,
 } from "@/types/project";
 
@@ -354,12 +356,15 @@ function WaterfallEditor({
 function EntityRuleCard({
   rule,
   entityName,
+  entityId,
   onChange,
 }: {
   rule: EntityGouvernanceRule;
   entityName: string;
+  entityId: string;
   onChange: (r: EntityGouvernanceRule) => void;
 }) {
+  const isStructural = entityId === EXPLOITATION_ENTITY_ID || entityId === FONCIERE_ENTITY_ID;
   const update = (patch: Partial<EntityGouvernanceRule>) => {
     const next = { ...rule, ...patch };
     if (next.transparentDistribution) {
@@ -374,22 +379,24 @@ function EntityRuleCard({
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">{entityName}</CardTitle>
           <div className="flex items-center gap-4">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center gap-2">
-                    <Label className="text-xs text-muted-foreground">Transparente</Label>
-                    <Switch
-                      checked={rule.transparentDistribution}
-                      onCheckedChange={(v) => update({ transparentDistribution: v })}
-                    />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  <p>Les flux traversent cette société sans application de gouvernance propre. Utilisé pour les holdings intermédiaires.</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            {!isStructural && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs text-muted-foreground">Transparente</Label>
+                      <Switch
+                        checked={rule.transparentDistribution}
+                        onCheckedChange={(v) => update({ transparentDistribution: v })}
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p>Les flux traversent cette société sans application de gouvernance propre. Utilisé pour les holdings intermédiaires.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
           </div>
         </div>
       </CardHeader>
@@ -721,6 +728,7 @@ export default function GouvernancePage() {
             return (
               <EntityRuleCard
                 key={entity.id}
+                entityId={entity.id}
                 entityName={entity.nom}
                 rule={rule}
                 onChange={updateEntityRule}
