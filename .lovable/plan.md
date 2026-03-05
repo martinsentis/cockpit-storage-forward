@@ -1,67 +1,48 @@
 
 
-## Plan ajusté — Module Gouvernance
+## Plan : Implémenter le Cockpit V1 complet
 
-### Ajustements intégrés au plan précédent
+### Contexte
+Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
 
-**1. `CashAllocationStep` — ajout `id`**
+### Fichiers à créer
 
-```typescript
-export interface CashAllocationStep {
-  id: string;                    // stable key for reorder UI
-  type: CashAllocationStepType;
-  mode: AllocationStepMode;      // "RATIO" | "UNTIL_ZERO" | "UNTIL_TARGET"
-  ratio: number;
-  target?: number;
-  label?: string;
-}
-```
+**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
 
-**2. `EntityGouvernanceRule` — ajout `dividendFlatTaxRate`**
+**2. `src/types/project.ts`** — Types et defaults :
+- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
+- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
+  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
+  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
+  - `revenueParams` (surface, prixM2, tauxRemplissage)
+  - `services` ([] par défaut)
+  - `opexPercentOfRevenue`
+  - `debts`, `sciDebts` ([] par défaut)
+  - `sciChargesCash`, `sciAmortization` (0 par défaut)
+  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
+  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
+- Constantes `DEFAULT_*` exportées pour chaque section
 
-```typescript
-export interface EntityGouvernanceRule {
-  entityId: string;
-  // entityId peut référencer :
-  // - "__exploitation__" (société d'exploitation système)
-  // - "__fonciere__" (SCI foncière système)
-  // - un Associe.id de type MORALE (holding utilisateur)
-  inheritGlobalRule: boolean;
-  transparentDistribution: boolean;
-  distributionOverrideEnabled: boolean;
-  distributionOverrideAmount: number | null;
-  dividendFlatTaxRate: number;       // ajouté — surcharge par entité
-  distributableCashRate: number;
-  reserveStrategicRatio: number;
-  minCashReserve: number;
-  dscrConstraintEnabled: boolean;
-  allocationOrder: CashAllocationStep[];
-}
-```
+**3. `src/contexts/ProjectContext.tsx`** :
+- State initialisé avec les defaults
+- `validated` flags (5 booleans, tous false)
+- `updateSection()`, `validateSection()`, `isProjectComplete()`
+- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
 
-**3. Contrainte transparence → héritage**
+**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
 
-Dans le UI et dans la logique de sauvegarde : si `transparentDistribution = true`, forcer `inheritGlobalRule = true`. Le toggle "Règle propre" sera désactivé (disabled + tooltip explicatif). Côté migration, si on détecte `transparentDistribution && !inheritGlobalRule`, on corrige.
+**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
 
-**4. Documentation `entityId`**
+**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
+- Formulaires pré-remplis depuis le Context
+- Bouton "Enregistrer" → updateSection + validateSection
+- Champs par page alignés sur les inputs API
 
-Commentaire JSDoc sur `EntityGouvernanceRule.entityId` précisant les 3 valeurs possibles (`__exploitation__`, `__fonciere__`, `Associe.id` de type `MORALE`).
+**7. `src/pages/DashboardPage.tsx`** :
+- Liste les sections manquantes si projet incomplet
+- Bouton "Lancer la simulation" désactivé si incomplet
+- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
+- Affiche réponse JSON ou erreur dans `<pre>`
 
-### Fichiers impactés
-
-| Fichier | Changements |
-|---|---|
-| `src/types/project.ts` | Refonte types Gouvernance (ajout `id` sur steps, `AllocationStepMode`, `GlobalGouvernanceRule`, `EntityGouvernanceRule` avec `dividendFlatTaxRate`, `DistributionEvent`, mise à jour `GouvernanceData` et defaults) |
-| `src/contexts/ProjectContext.tsx` | Migration legacy → nouveau format, contrainte transparence/héritage, adapter `buildProjectionInputs` |
-| `src/pages/GouvernancePage.tsx` | Réécriture complète : 3 onglets (Règle globale, Règles par société, Historique), waterfall configurable, toggle transparence désactive règle propre |
-
-### Default waterfall
-
-```typescript
-[
-  { id: crypto.randomUUID(), type: "CCA_REPAYMENT", mode: "UNTIL_ZERO", ratio: 100, label: "Remboursement CCA" },
-  { id: crypto.randomUUID(), type: "RESERVE", mode: "RATIO", ratio: 20, label: "Réserve stratégique" },
-  { id: crypto.randomUUID(), type: "DIVIDENDS", mode: "RATIO", ratio: 80, label: "Distribution dividendes" },
-]
-```
+**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
 

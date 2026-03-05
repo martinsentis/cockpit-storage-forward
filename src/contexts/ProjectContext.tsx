@@ -24,8 +24,10 @@ import {
   DEFAULT_LOYER_DYNAMIQUE,
   DEFAULT_ASSOCIES,
   DEFAULT_APPORTS,
+  DEFAULT_GLOBAL_RULE,
   createDefaultPhase,
   createDefaultCapexEvent,
+  createDefaultAllocationOrder,
 } from "@/types/project";
 import { computeEngine } from "@/engine/engine";
 import { phaseSurface } from "@/engine/engine";
@@ -183,14 +185,46 @@ function migrateBuild(b: any): BuildData {
 }
 
 function migrateGouvernance(g: any): GouvernanceData {
+  // Build globalRule from legacy flat fields or existing globalRule
+  const globalRule = g?.globalRule ?? {
+    distributableCashRate: g?.distributableCashRate ?? DEFAULT_GLOBAL_RULE.distributableCashRate,
+    reserveStrategicRatio: g?.reserveStrategicRatio ?? DEFAULT_GLOBAL_RULE.reserveStrategicRatio,
+    minCashReserve: g?.minCashReserve ?? DEFAULT_GLOBAL_RULE.minCashReserve,
+    dscrConstraintEnabled: g?.dscrConstraintEnabled ?? DEFAULT_GLOBAL_RULE.dscrConstraintEnabled,
+    dividendFlatTaxRate: g?.dividendFlatTaxRate ?? DEFAULT_GLOBAL_RULE.dividendFlatTaxRate,
+    allocationOrder: createDefaultAllocationOrder(),
+  };
+
+  // Ensure allocationOrder items have ids
+  if (globalRule.allocationOrder) {
+    globalRule.allocationOrder = globalRule.allocationOrder.map((step: any) => ({
+      ...step,
+      id: step.id ?? crypto.randomUUID(),
+    }));
+  }
+
+  // Migrate entity rules: enforce transparence → inheritGlobalRule constraint
+  const entityRules = (g?.entityRules ?? []).map((rule: any) => ({
+    ...rule,
+    inheritGlobalRule: rule.transparentDistribution ? true : (rule.inheritGlobalRule ?? true),
+    dividendFlatTaxRate: rule.dividendFlatTaxRate ?? 0.30,
+    allocationOrder: (rule.allocationOrder ?? createDefaultAllocationOrder()).map((step: any) => ({
+      ...step,
+      id: step.id ?? crypto.randomUUID(),
+    })),
+  }));
+
   return {
     structureJuridique: g?.structureJuridique ?? DEFAULT_GOUVERNANCE.structureJuridique,
+    globalRule,
+    entityRules,
+    distributionHistory: g?.distributionHistory ?? [],
+    // Legacy fields
     ccaBalance: g?.ccaBalance ?? DEFAULT_GOUVERNANCE.ccaBalance,
     distributableCashRate: g?.distributableCashRate ?? DEFAULT_GOUVERNANCE.distributableCashRate,
     ccaPriorityRatio: g?.ccaPriorityRatio ?? DEFAULT_GOUVERNANCE.ccaPriorityRatio,
     reserveStrategicRatio: g?.reserveStrategicRatio ?? DEFAULT_GOUVERNANCE.reserveStrategicRatio,
     reserveAfterCcaFullyRepaid: g?.reserveAfterCcaFullyRepaid ?? DEFAULT_GOUVERNANCE.reserveAfterCcaFullyRepaid,
-    entityRules: g?.entityRules ?? [],
   };
 }
 
