@@ -218,6 +218,7 @@ function GouvernanceSimulator({ globalRule }: { globalRule: GlobalGouvernanceRul
               {waterfallResult.map((step, idx) => {
                 const colors = STEP_COLORS[step.type];
                 const pct = cashDistribuable > 0 ? (step.allocated / cashDistribuable) * 100 : 0;
+                const modeLabel = step.mode === "RATIO" ? `${step.ratio} %` : step.mode === "UNTIL_TARGET" ? `cible ${fmt(step.target ?? 0)} €` : "tout";
                 return (
                   <div key={step.id} className={`rounded-lg border p-3 space-y-2 ${colors.border} ${colors.bg}`}>
                     <div className="flex justify-between items-center">
@@ -227,7 +228,11 @@ function GouvernanceSimulator({ globalRule }: { globalRule: GlobalGouvernanceRul
                     <div className="h-2 rounded-full bg-muted overflow-hidden">
                       <div className={`h-full rounded-full ${colors.progress} transition-all`} style={{ width: `${pct}%` }} />
                     </div>
-                    <p className="text-xs text-muted-foreground">Reste : {fmt(step.remaining)} €</p>
+                    <div className="text-xs text-muted-foreground space-y-0.5">
+                      <p>Avant : {fmt(Math.round(step.remainingBefore))} €</p>
+                      <p>Prélèvement ({modeLabel}) : {fmt(step.allocated)} €</p>
+                      <p>Reste : {fmt(step.remaining)} €</p>
+                    </div>
                   </div>
                 );
               })}
