@@ -489,6 +489,23 @@ export default function ApportsPage() {
                           <TableCell className="text-right font-semibold">{fmt(c.totalExposition)}</TableCell>
                         </TableRow>
                       ))}
+                      <TableRow className="border-t-2 bg-muted/30">
+                        <TableCell className="font-semibold">Total</TableCell>
+                        {societes.map(s => {
+                          const total = consolidation.reduce((sum, c) => {
+                            const expo = c.expositions.find(e => e.societeId === s.id);
+                            return sum + (expo?.total ?? 0);
+                          }, 0);
+                          return (
+                            <TableCell key={s.id} className="text-right font-semibold">
+                              {total > 0 ? fmt(total) : "—"}
+                            </TableCell>
+                          );
+                        })}
+                        <TableCell className="text-right font-bold">
+                          {fmt(consolidation.reduce((s, c) => s + c.totalExposition, 0))}
+                        </TableCell>
+                      </TableRow>
                     </TableBody>
                   </Table>
                 </CardContent>
