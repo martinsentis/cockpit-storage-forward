@@ -96,6 +96,7 @@ export default function FinancementPage() {
       <Tabs defaultValue="general">
         <TabsList className="w-full justify-start">
           <TabsTrigger value="general">Général</TabsTrigger>
+          <TabsTrigger value="tresorerie">Trésorerie & Contraintes</TabsTrigger>
           <TabsTrigger value="dettes-sas">Dettes SAS</TabsTrigger>
           <TabsTrigger value="dettes-sci">Dettes SCI</TabsTrigger>
         </TabsList>
@@ -116,6 +117,33 @@ export default function FinancementPage() {
                 <div className="space-y-2">
                   <Label>Amortissement SCI (€/mois)</Label>
                   <Input type="number" value={form.sciAmortization} onChange={e => set("sciAmortization", Number(e.target.value))} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Button onClick={save} className="w-full">Enregistrer</Button>
+        </TabsContent>
+
+        <TabsContent value="tresorerie" className="space-y-4">
+          <Card>
+            <CardHeader><CardTitle>Trésorerie & Contraintes financières</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Trésorerie initiale SAS (€)</Label>
+                  <Input type="number" value={form.initialCash} onChange={e => set("initialCash", Number(e.target.value))} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Trésorerie initiale SCI (€)</Label>
+                  <Input type="number" value={form.sciInitialCash} onChange={e => set("sciInitialCash", Number(e.target.value))} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Buffer trésorerie min (€)</Label>
+                  <Input type="number" value={form.bufferMin} onChange={e => set("bufferMin", Number(e.target.value))} />
+                </div>
+                <div className="space-y-2">
+                  <Label>DSCR min</Label>
+                  <Input type="number" step="0.1" value={form.dscrMin} onChange={e => set("dscrMin", Number(e.target.value))} />
                 </div>
               </div>
             </CardContent>

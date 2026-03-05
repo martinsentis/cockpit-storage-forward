@@ -17,6 +17,7 @@ const SECTION_LABELS: Record<SectionName, string> = {
   gouvernance: "Gouvernance",
   associes: "Associés & Sociétés",
   apports: "Apports associés",
+  fiscalite: "Fiscalité",
 };
 
 export default function DashboardPage() {

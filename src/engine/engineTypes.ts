@@ -1,20 +1,10 @@
 /**
  * Engine Types — Output interfaces for the financial engine.
- * 
- * ARCHITECTURE PRINCIPLE:
- * The frontend NEVER computes financial values directly.
- * All calculations go through the engine service (src/engine/engine.ts),
- * which will eventually be replaced by a backend API call.
- * 
- * The frontend only:
- * 1. Collects user inputs
- * 2. Sends inputs to the engine
- * 3. Displays engine outputs
  */
 
 import type {
   ProjetData, BuildData, FinancementData, ExploitationData,
-  FonciereData, LoyerDynamiqueData, GouvernanceData,
+  FonciereData, LoyerDynamiqueData, GouvernanceData, FiscaliteData,
 } from "@/types/project";
 
 // ── Engine Input (all project state needed for calculations) ──
@@ -27,6 +17,7 @@ export interface EngineInputs {
   fonciere: FonciereData;
   loyerDynamique: LoyerDynamiqueData;
   gouvernance: GouvernanceData;
+  fiscalite: FiscaliteData;
 }
 
 // ── Exploitation Engine Outputs ──
@@ -40,42 +31,27 @@ export interface PhaseMetrics {
 }
 
 export interface ExploitationEngineOutputs {
-  // Aggregates
   totalSurface: number;
   totalNbBox: number;
   totalCAHT: number;
   totalCATTC: number;
   prixM2Global: number;
   targetOccupancyWeighted: number;
-
-  // Services
   caServicesHT: number;
   coutServicesHT: number;
   margeServicesHT: number;
   margeServicesPct: number;
-
-  // Gestionnaires
   coutGestionnaires: number;
-
-  // Charges
   totalChargesHT: number;
   totalChargesTTC: number;
-
-  // Loyer SCI
   loyerSCI: number;
-
-  // Totals
   caTotal: number;
-  resultat: number; // EBE
-
-  // Target occupancy variants
+  resultat: number;
   totalCAHT_cible: number;
   totalCATTC_cible: number;
   caServicesHT_cible: number;
   caTotal_cible: number;
   resultat_cible: number;
-
-  // Per-phase metrics (for display in phase cards)
   phaseMetrics: PhaseMetrics[];
 }
 
