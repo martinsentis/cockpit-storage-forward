@@ -1,48 +1,34 @@
 
 
-## Plan : Implémenter le Cockpit V1 complet
+## Plan : Ajouter `FinancialPolicySummary` au-dessus du simulateur
 
-### Contexte
-Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
+### Fichier impacté : `src/pages/GouvernancePage.tsx`
 
-### Fichiers à créer
+### Changement unique
 
-**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
+Créer un composant `FinancialPolicySummary` inline (dans le même fichier) et l'insérer dans la colonne droite (ligne ~660), juste avant `<GouvernanceSimulator>`.
 
-**2. `src/types/project.ts`** — Types et defaults :
-- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
-- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
-  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
-  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
-  - `revenueParams` (surface, prixM2, tauxRemplissage)
-  - `services` ([] par défaut)
-  - `opexPercentOfRevenue`
-  - `debts`, `sciDebts` ([] par défaut)
-  - `sciChargesCash`, `sciAmortization` (0 par défaut)
-  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
-  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
-- Constantes `DEFAULT_*` exportées pour chaque section
+**Composant `FinancialPolicySummary`** :
+- Reçoit `globalRule: GlobalGouvernanceRule` en props
+- Carte avec fond différencié (`bg-muted/40` ou `bg-accent/10`)
+- Titre : "Politique financière actuelle"
+- Génère dynamiquement 3 lignes de texte :
+  1. `"La distribution est limitée à {distributableCashRate×100} % du cash disponible, avec une réserve minimale de {fmt(minCashReserve)} €."`
+  2. `"La priorité de distribution est : {allocationOrder mappé}."`  
+     Mapping : `CCA_REPAYMENT` → "remboursement des comptes courants", `RESERVE` → "réserve stratégique", `DIVIDENDS` → "dividendes", séparés par " → "
+  3. `"La protection dette (DSCR) est {activée/désactivée}."`
+- Se met à jour automatiquement (lecture directe du state)
 
-**3. `src/contexts/ProjectContext.tsx`** :
-- State initialisé avec les defaults
-- `validated` flags (5 booleans, tous false)
-- `updateSection()`, `validateSection()`, `isProjectComplete()`
-- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
+**Placement** (ligne ~660-662) :
 
-**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
+```tsx
+<div className="lg:col-span-2">
+  <FinancialPolicySummary globalRule={form.globalRule} />
+  <GouvernanceSimulator globalRule={form.globalRule} />
+</div>
+```
 
-**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
+Avec un `space-y-4` ou `mb-4` pour l'espacement.
 
-**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
-- Formulaires pré-remplis depuis le Context
-- Bouton "Enregistrer" → updateSection + validateSection
-- Champs par page alignés sur les inputs API
-
-**7. `src/pages/DashboardPage.tsx`** :
-- Liste les sections manquantes si projet incomplet
-- Bouton "Lancer la simulation" désactivé si incomplet
-- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
-- Affiche réponse JSON ou erreur dans `<pre>`
-
-**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
+Aucun changement sur le modèle, la sauvegarde, le WaterfallEditor, l'EntityRuleCard ni l'onglet Historique.
 
