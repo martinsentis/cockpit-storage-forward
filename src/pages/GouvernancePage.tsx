@@ -89,9 +89,10 @@ function GouvernanceSimulator({ globalRule }: { globalRule: GlobalGouvernanceRul
   const waterfallResult = useMemo(() => {
     let remaining = cashDistribuable;
     return globalRule.allocationOrder.map((step) => {
+      const remainingBefore = remaining;
       let allocated = 0;
       if (step.mode === "RATIO") {
-        allocated = Math.min(remaining, cashDistribuable * (step.ratio / 100));
+        allocated = remaining * (step.ratio / 100);
       } else if (step.mode === "UNTIL_TARGET") {
         allocated = Math.min(remaining, step.target ?? 0);
       } else {
@@ -99,7 +100,7 @@ function GouvernanceSimulator({ globalRule }: { globalRule: GlobalGouvernanceRul
       }
       allocated = Math.max(0, Math.round(allocated));
       remaining = Math.max(0, remaining - allocated);
-      return { ...step, allocated, remaining };
+      return { ...step, allocated, remaining, remainingBefore };
     });
   }, [cashDistribuable, globalRule.allocationOrder]);
 
