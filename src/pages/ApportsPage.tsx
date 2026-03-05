@@ -431,7 +431,7 @@ export default function ApportsPage() {
             <h2 className="text-lg font-semibold text-foreground">Consolidation économique par personne physique</h2>
             <p className="text-sm text-muted-foreground">
               Vue analytique uniquement — ne modifie pas les dettes réelles ni les comptes des sociétés.
-              L'exposition indirecte est calculée en pondérant les CCA des sociétés intermédiaires par le pourcentage de détention.
+              L'exposition indirecte est calculée en pondérant les apports des sociétés intermédiaires par le pourcentage de détention.
             </p>
           </div>
 
