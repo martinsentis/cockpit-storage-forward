@@ -62,8 +62,8 @@ export default function ApportsPage() {
 
   // Validate: société → personne is forbidden
   function isValidFlow(apporteurId: string, beneficiaireId: string): boolean {
-    const apporteur = associes.find(a => a.id === apporteurId);
-    const beneficiaire = associes.find(a => a.id === beneficiaireId);
+    const apporteur = [...BUILT_IN_SOCIETES, ...associes].find(a => a.id === apporteurId);
+    const beneficiaire = [...BUILT_IN_SOCIETES, ...associes].find(a => a.id === beneficiaireId);
     if (!apporteur || !beneficiaire) return false;
     // société → personne is forbidden
     if (beneficiaire.type === "PHYSIQUE") return false;
