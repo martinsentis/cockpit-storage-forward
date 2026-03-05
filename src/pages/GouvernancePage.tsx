@@ -694,8 +694,9 @@ export default function GouvernancePage() {
               <Button onClick={save} className="w-full">Enregistrer</Button>
             </div>
 
-            {/* Right column — Simulator */}
-            <div className="lg:col-span-2">
+            {/* Right column — Summary + Simulator */}
+            <div className="lg:col-span-2 space-y-4">
+              <FinancialPolicySummary globalRule={form.globalRule} />
               <GouvernanceSimulator globalRule={form.globalRule} />
             </div>
           </div>
