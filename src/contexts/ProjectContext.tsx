@@ -24,8 +24,10 @@ import {
   DEFAULT_LOYER_DYNAMIQUE,
   DEFAULT_ASSOCIES,
   DEFAULT_APPORTS,
+  DEFAULT_GLOBAL_RULE,
   createDefaultPhase,
   createDefaultCapexEvent,
+  createDefaultAllocationOrder,
 } from "@/types/project";
 import { computeEngine } from "@/engine/engine";
 import { phaseSurface } from "@/engine/engine";
