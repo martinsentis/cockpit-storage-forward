@@ -430,6 +430,7 @@ export function createDefaultPhase(id?: string, nom?: string, defaultVatRate = 0
   return {
     id: id ?? crypto.randomUUID(),
     nom: nom ?? "Phase 1",
+    status: "ACTIVE",
     surface: 500,
     modeBox: "MACRO",
     prixM2: 15,
@@ -440,6 +441,17 @@ export function createDefaultPhase(id?: string, nom?: string, defaultVatRate = 0
     targetOccupancy: 0.85,
     rampUpMonths: 12,
     rampCurve: "LINEAR",
+  };
+}
+
+export function createDefaultPhaseDraft(): PhaseDraft {
+  return {
+    currentStep: 0,
+    capexEstimate: { equipementProductifM2: 0, amenagement: 0, taxeAmenagement: 0, honoraires: 0, divers: 0 },
+    financing: [],
+    entityPorteuse: "SCI",
+    amortissable: true,
+    dureeAmortissement: 10,
   };
 }
 
