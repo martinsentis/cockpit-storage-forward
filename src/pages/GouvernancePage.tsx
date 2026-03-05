@@ -205,33 +205,54 @@ function EntityRuleCard({
             </div>
 
             {!rule.inheritGlobalRule && (
-              <div className="space-y-4 pt-2 border-t">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Cash distribuable (%)</Label>
-                    <Input
-                      type="number" min={0} max={100}
-                      value={Math.round(rule.distributableCashRate * 100)}
-                      onChange={(e) => update({ distributableCashRate: Number(e.target.value) / 100 })}
-                    />
+              <div className="space-y-6 pt-2 border-t">
+                {/* Section A — Contraintes de prudence */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold">Contraintes de prudence</Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Cash distribuable (%)</Label>
+                      <Input
+                        type="number" min={0} max={100}
+                        value={Math.round(rule.distributableCashRate * 100)}
+                        onChange={(e) => update({ distributableCashRate: Number(e.target.value) / 100 })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Réserve cash min (€)</Label>
+                      <Input
+                        type="number" min={0}
+                        value={rule.minCashReserve}
+                        onChange={(e) => update({ minCashReserve: Number(e.target.value) })}
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Réserve stratégique (%)</Label>
-                    <Input
-                      type="number" min={0} max={100}
-                      value={Math.round(rule.reserveStrategicRatio * 100)}
-                      onChange={(e) => update({ reserveStrategicRatio: Number(e.target.value) / 100 })}
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={rule.dscrConstraintEnabled}
+                      onCheckedChange={(v) => update({ dscrConstraintEnabled: v })}
                     />
+                    <Label className="text-sm">Contrainte DSCR active</Label>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Réserve cash min (€)</Label>
-                    <Input
-                      type="number" min={0}
-                      value={rule.minCashReserve}
-                      onChange={(e) => update({ minCashReserve: Number(e.target.value) })}
-                    />
-                  </div>
-                  <div className="space-y-1">
+                </div>
+
+                <Separator />
+
+                {/* Section B — Waterfall */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold">Waterfall de distribution</Label>
+                  <WaterfallEditor
+                    steps={rule.allocationOrder}
+                    onChange={(steps) => update({ allocationOrder: steps })}
+                  />
+                </div>
+
+                <Separator />
+
+                {/* Section C — Fiscalité dividendes */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold">Fiscalité des dividendes</Label>
+                  <div className="space-y-1 max-w-xs">
                     <Label className="text-xs">Flat tax dividendes (%)</Label>
                     <Input
                       type="number" min={0} max={100}
@@ -241,22 +262,9 @@ function EntityRuleCard({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <Switch
-                    checked={rule.dscrConstraintEnabled}
-                    onCheckedChange={(v) => update({ dscrConstraintEnabled: v })}
-                  />
-                  <Label className="text-sm">Contrainte DSCR active</Label>
-                </div>
-
                 <Separator />
-                <Label className="text-sm font-semibold">Waterfall de distribution</Label>
-                <WaterfallEditor
-                  steps={rule.allocationOrder}
-                  onChange={(steps) => update({ allocationOrder: steps })}
-                />
 
-                <Separator />
+                {/* Override de distribution */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Switch
