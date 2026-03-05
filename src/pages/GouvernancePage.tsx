@@ -8,8 +8,9 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { ArrowDown, Info, ShieldCheck, Eye, History, ChevronUp, ChevronDown } from "lucide-react";
+import { ArrowDown, Info, ShieldCheck, Eye, History, ChevronUp, ChevronDown, Banknote, Shield, Calculator, Layers } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
@@ -22,20 +23,182 @@ import {
   CashAllocationStepType,
   CASH_ALLOCATION_STEP_LABELS,
   ALLOCATION_MODE_LABELS,
-  EXPLOITATION_ENTITY_ID,
-  FONCIERE_ENTITY_ID,
   BUILT_IN_SOCIETES,
-  createDefaultAllocationOrder,
   createDefaultEntityRule,
-  DEFAULT_GLOBAL_RULE,
 } from "@/types/project";
 
 // ── Waterfall step colors ──
-const STEP_COLORS: Record<CashAllocationStepType, { border: string; bg: string; badge: string; circle: string }> = {
-  CCA_REPAYMENT: { border: "border-blue-200", bg: "bg-blue-50/50", badge: "bg-blue-100 text-blue-700", circle: "bg-blue-600" },
-  RESERVE: { border: "border-amber-200", bg: "bg-amber-50/50", badge: "bg-amber-100 text-amber-700", circle: "bg-amber-600" },
-  DIVIDENDS: { border: "border-green-200", bg: "bg-green-50/50", badge: "bg-green-100 text-green-700", circle: "bg-green-600" },
+const STEP_COLORS: Record<CashAllocationStepType, { border: string; bg: string; badge: string; circle: string; progress: string }> = {
+  CCA_REPAYMENT: { border: "border-blue-200", bg: "bg-blue-50/50", badge: "bg-blue-100 text-blue-700", circle: "bg-blue-600", progress: "bg-blue-500" },
+  RESERVE: { border: "border-amber-200", bg: "bg-amber-50/50", badge: "bg-amber-100 text-amber-700", circle: "bg-amber-600", progress: "bg-amber-500" },
+  DIVIDENDS: { border: "border-green-200", bg: "bg-green-50/50", badge: "bg-green-100 text-green-700", circle: "bg-green-600", progress: "bg-green-500" },
 };
+
+const fmt = (n: number) => n.toLocaleString("fr-FR");
+
+// ── Simulator ──
+function GouvernanceSimulator({ globalRule }: { globalRule: GlobalGouvernanceRule }) {
+  const TRESORERIE = 20_000;
+  const RESULTAT = 50_000;
+  const CASH_DISPO = TRESORERIE + RESULTAT;
+
+  const limiteReserve = Math.max(0, CASH_DISPO - globalRule.minCashReserve);
+  const limiteRatio = CASH_DISPO * globalRule.distributableCashRate;
+  const cashDistribuable = Math.min(limiteReserve, limiteRatio);
+  const limiteRetenue = limiteRatio <= limiteReserve ? "ratio" : "reserve";
+
+  // Waterfall simulation
+  const waterfallResult = useMemo(() => {
+    let remaining = cashDistribuable;
+    return globalRule.allocationOrder.map((step) => {
+      let allocated = 0;
+      if (step.mode === "RATIO") {
+        allocated = Math.min(remaining, cashDistribuable * (step.ratio / 100));
+      } else if (step.mode === "UNTIL_TARGET") {
+        allocated = Math.min(remaining, step.target ?? 0);
+      } else {
+        allocated = remaining;
+      }
+      allocated = Math.max(0, Math.round(allocated));
+      remaining = Math.max(0, remaining - allocated);
+      return { ...step, allocated, remaining };
+    });
+  }, [cashDistribuable, globalRule.allocationOrder]);
+
+  return (
+    <div className="sticky top-4 space-y-4">
+      <Card className="border-primary/20">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Calculator className="h-4 w-4" />
+            Simulateur de gouvernance
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {/* Disclaimer */}
+          <Alert className="border-primary/20 bg-primary/5">
+            <Info className="h-4 w-4" />
+            <AlertDescription className="text-xs">
+              <strong>Exemple pédagogique.</strong> Les montants utilisés dans ce simulateur sont fixes et servent uniquement à illustrer le fonctionnement des règles de gouvernance. Ils ne correspondent pas aux données réelles du projet.
+            </AlertDescription>
+          </Alert>
+
+          {/* Hypothèses */}
+          <div className="rounded-lg bg-muted/50 p-3 space-y-1">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Hypothèses fixes</p>
+            <div className="flex justify-between text-sm">
+              <span>Trésorerie début d'année</span>
+              <span className="font-medium">{fmt(TRESORERIE)} €</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span>Résultat net après impôt</span>
+              <span className="font-medium">{fmt(RESULTAT)} €</span>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Étape 1 — Cash disponible */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-foreground text-background text-xs font-bold">1</span>
+              <span className="text-sm font-semibold">Cash disponible</span>
+            </div>
+            <div className="pl-8 text-sm space-y-1">
+              <p className="text-muted-foreground">{fmt(TRESORERIE)} € + {fmt(RESULTAT)} € = <strong className="text-foreground">{fmt(CASH_DISPO)} €</strong></p>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Étape 2 — Contraintes de prudence */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-foreground text-background text-xs font-bold">2</span>
+              <span className="text-sm font-semibold">Contraintes de prudence</span>
+            </div>
+            <div className="pl-8 text-sm space-y-2">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Réserve minimum</span>
+                <span className="font-medium">{fmt(globalRule.minCashReserve)} €</span>
+              </div>
+              <p className="text-muted-foreground">
+                {fmt(CASH_DISPO)} € − {fmt(globalRule.minCashReserve)} € = <strong className="text-foreground">{fmt(limiteReserve)} €</strong>
+              </p>
+              <div className="rounded bg-muted/50 px-2 py-1.5 text-xs">
+                {globalRule.dscrConstraintEnabled ? (
+                  <span className="text-primary font-medium">✓ Protection dette activée — Distribution autorisée uniquement si DSCR ≥ seuil</span>
+                ) : (
+                  <span className="text-muted-foreground">Protection dette désactivée</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Étape 3 — Cash distribuable */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-foreground text-background text-xs font-bold">3</span>
+              <span className="text-sm font-semibold">Cash distribuable</span>
+            </div>
+            <div className="pl-8 text-sm space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Limite par ratio</span>
+                <span className={`font-medium ${limiteRetenue === "ratio" ? "text-foreground" : "text-muted-foreground"}`}>
+                  {fmt(CASH_DISPO)} € × {Math.round(globalRule.distributableCashRate * 100)}% = {fmt(Math.round(limiteRatio))} €
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Limite par réserve</span>
+                <span className={`font-medium ${limiteRetenue === "reserve" ? "text-foreground" : "text-muted-foreground"}`}>
+                  {fmt(CASH_DISPO)} € − {fmt(globalRule.minCashReserve)} € = {fmt(limiteReserve)} €
+                </span>
+              </div>
+              <div className="rounded-lg border-2 border-primary/30 bg-primary/5 px-3 py-2 flex justify-between items-center">
+                <span className="text-sm font-semibold">Cash distribuable</span>
+                <span className="text-lg font-bold text-primary">{fmt(Math.round(cashDistribuable))} €</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                = min({fmt(Math.round(limiteRatio))} €, {fmt(limiteReserve)} €) → la {limiteRetenue === "ratio" ? "limite par ratio" : "limite par réserve"} s'applique
+              </p>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Étape 4 — Waterfall */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-foreground text-background text-xs font-bold">4</span>
+              <span className="text-sm font-semibold">Waterfall de distribution</span>
+            </div>
+            <div className="pl-8 space-y-3">
+              <p className="text-xs text-muted-foreground">Cash distribuable : {fmt(Math.round(cashDistribuable))} €</p>
+              {waterfallResult.map((step, idx) => {
+                const colors = STEP_COLORS[step.type];
+                const pct = cashDistribuable > 0 ? (step.allocated / cashDistribuable) * 100 : 0;
+                return (
+                  <div key={step.id} className={`rounded-lg border p-3 space-y-2 ${colors.border} ${colors.bg}`}>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">{CASH_ALLOCATION_STEP_LABELS[step.type]}</span>
+                      <span className="text-sm font-bold">{fmt(step.allocated)} €</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-muted overflow-hidden">
+                      <div className={`h-full rounded-full ${colors.progress} transition-all`} style={{ width: `${pct}%` }} />
+                    </div>
+                    <p className="text-xs text-muted-foreground">Reste : {fmt(step.remaining)} €</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 // ── Waterfall Editor (reusable for global + entity) ──
 function WaterfallEditor({
@@ -152,7 +315,6 @@ function EntityRuleCard({
 }) {
   const update = (patch: Partial<EntityGouvernanceRule>) => {
     const next = { ...rule, ...patch };
-    // Enforce: transparent → inheritGlobalRule = true
     if (next.transparentDistribution) {
       next.inheritGlobalRule = true;
     }
@@ -206,7 +368,6 @@ function EntityRuleCard({
 
             {!rule.inheritGlobalRule && (
               <div className="space-y-6 pt-2 border-t">
-                {/* Section A — Contraintes de prudence */}
                 <div className="space-y-3">
                   <Label className="text-sm font-semibold">Contraintes de prudence</Label>
                   <div className="grid grid-cols-2 gap-4">
@@ -238,7 +399,6 @@ function EntityRuleCard({
 
                 <Separator />
 
-                {/* Section B — Waterfall */}
                 <div className="space-y-3">
                   <Label className="text-sm font-semibold">Waterfall de distribution</Label>
                   <WaterfallEditor
@@ -249,7 +409,6 @@ function EntityRuleCard({
 
                 <Separator />
 
-                {/* Section C — Fiscalité dividendes */}
                 <div className="space-y-3">
                   <Label className="text-sm font-semibold">Fiscalité des dividendes</Label>
                   <div className="space-y-1 max-w-xs">
@@ -264,7 +423,6 @@ function EntityRuleCard({
 
                 <Separator />
 
-                {/* Override de distribution */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Switch
@@ -299,14 +457,12 @@ export default function GouvernancePage() {
   const { state, updateSection, validateSection } = useProject();
   const [form, setForm] = useState<GouvernanceData>({ ...state.gouvernance });
 
-  // Entities eligible for governance rules
   const entities = useMemo(() => {
     const builtIn = BUILT_IN_SOCIETES;
     const userMorales = state.associes.associes.filter(a => a.type === "MORALE");
     return [...builtIn, ...userMorales];
   }, [state.associes.associes]);
 
-  // Ensure all entities have a rule
   const entityRulesMap = useMemo(() => {
     const map = new Map(form.entityRules.map(r => [r.entityId, r]));
     for (const e of entities) {
@@ -329,7 +485,6 @@ export default function GouvernancePage() {
   };
 
   const save = () => {
-    // Sync legacy fields from globalRule for engine compatibility
     const synced: GouvernanceData = {
       ...form,
       distributableCashRate: form.globalRule.distributableCashRate,
@@ -340,11 +495,11 @@ export default function GouvernancePage() {
   };
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6">
       <h1 className="text-2xl font-bold text-foreground">Gouvernance des flux</h1>
 
       <Tabs defaultValue="global">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-3 max-w-lg">
           <TabsTrigger value="global" className="gap-1.5">
             <ShieldCheck className="h-4 w-4" /> Règle globale
           </TabsTrigger>
@@ -356,104 +511,160 @@ export default function GouvernancePage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* ── Tab: Global Rule ── */}
-        <TabsContent value="global" className="space-y-6 mt-4">
-          {/* Bloc A — Contraintes de prudence */}
-          <Card>
-            <CardHeader><CardTitle>Contraintes de prudence</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Détermine <strong>combien</strong> de cash peut être distribué. S'applique par défaut à toutes les sociétés qui héritent de la règle globale.
-              </p>
+        {/* ── Tab: Global Rule — 2 columns ── */}
+        <TabsContent value="global" className="mt-4">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+            {/* Left column — Parameters */}
+            <div className="lg:col-span-3 space-y-6">
+              {/* Bloc 1 — Cash disponible (informatif) */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Banknote className="h-5 w-5" /> Cash disponible
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Le cash disponible correspond à la trésorerie restante après exploitation, remboursement de la dette et paiement des impôts.
+                  </p>
+                  <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      Le cash distribuable est calculé <strong>par entité</strong> (exploitation, foncière, holding). Chaque entité possède sa propre trésorerie et sa propre logique de distribution.
+                    </AlertDescription>
+                  </Alert>
+                </CardContent>
+              </Card>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label>Cash distribuable (%)</Label>
-                  <div className="flex items-center gap-2">
+              {/* Bloc 2 — Contraintes de prudence */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="h-5 w-5" /> Contraintes de prudence
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Ces règles empêchent une distribution si la situation financière devient trop fragile.
+                  </p>
+
+                  <div className="space-y-1">
+                    <Label>Trésorerie minimum à conserver (€)</Label>
                     <Input
-                      type="number" min={0} max={100}
-                      value={Math.round(form.globalRule.distributableCashRate * 100)}
-                      onChange={(e) => updateGlobalRule({ distributableCashRate: Number(e.target.value) / 100 })}
+                      type="number" min={0}
+                      value={form.globalRule.minCashReserve}
+                      onChange={(e) => updateGlobalRule({ minCashReserve: Number(e.target.value) })}
                     />
-                    <span className="text-sm text-muted-foreground">%</span>
+                    <p className="text-xs text-muted-foreground">
+                      Après distribution, la société doit conserver au moins ce niveau de trésorerie.
+                    </p>
                   </div>
-                </div>
-                <div className="space-y-1">
-                  <Label>Réserve cash minimum (€)</Label>
-                  <Input
-                    type="number" min={0}
-                    value={form.globalRule.minCashReserve}
-                    onChange={(e) => updateGlobalRule({ minCashReserve: Number(e.target.value) })}
+
+                  <Separator />
+
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={form.globalRule.dscrConstraintEnabled}
+                        onCheckedChange={(v) => updateGlobalRule({ dscrConstraintEnabled: v })}
+                      />
+                      <Label>Protection dette (DSCR)</Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground pl-11">
+                      La distribution est bloquée si la société ne couvre plus correctement le service de sa dette.
+                    </p>
+                    {form.globalRule.dscrConstraintEnabled && (
+                      <p className="text-xs text-primary pl-11 font-medium">
+                        La distribution est autorisée uniquement si le DSCR reste supérieur au seuil défini.
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Bloc 3 — Calcul du cash distribuable */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calculator className="h-5 w-5" /> Calcul du cash distribuable
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-1">
+                    <Label>Cash distribuable (%)</Label>
+                    <div className="flex items-center gap-2 max-w-xs">
+                      <Input
+                        type="number" min={0} max={100}
+                        value={Math.round(form.globalRule.distributableCashRate * 100)}
+                        onChange={(e) => updateGlobalRule({ distributableCashRate: Number(e.target.value) / 100 })}
+                      />
+                      <span className="text-sm text-muted-foreground">%</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Part maximale du cash disponible pouvant être distribuée chaque année.
+                    </p>
+                  </div>
+
+                  <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertDescription className="text-xs font-mono">
+                      cash_distribuable = min(cash × ratio, cash − réserve_minimum)
+                    </AlertDescription>
+                  </Alert>
+                </CardContent>
+              </Card>
+
+              {/* Bloc 4 — Waterfall */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Layers className="h-5 w-5" /> Waterfall de distribution
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Le cash distribuable est ensuite alloué selon l'ordre de priorité défini ci-dessous.
+                  </p>
+                  <WaterfallEditor
+                    steps={form.globalRule.allocationOrder}
+                    onChange={(steps) => updateGlobalRule({ allocationOrder: steps })}
                   />
-                  <p className="text-xs text-muted-foreground">Trésorerie plancher sous laquelle aucune distribution n'est possible</p>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
 
-              <div className="flex items-center gap-2 pt-2">
-                <Switch
-                  checked={form.globalRule.dscrConstraintEnabled}
-                  onCheckedChange={(v) => updateGlobalRule({ dscrConstraintEnabled: v })}
-                />
-                <Label>Contrainte DSCR active</Label>
-                <p className="text-xs text-muted-foreground ml-2">
-                  La distribution sera bloquée si le DSCR descend sous le seuil projet
-                </p>
-              </div>
+              {/* Bloc 5 — Fiscalité dividendes */}
+              <Card>
+                <CardHeader><CardTitle>Fiscalité des dividendes</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-1 max-w-xs">
+                    <Label>Prélèvement Forfaitaire Unique (%)</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number" min={0} max={100}
+                        value={Math.round(form.globalRule.dividendFlatTaxRate * 100)}
+                        onChange={(e) => updateGlobalRule({ dividendFlatTaxRate: Number(e.target.value) / 100 })}
+                      />
+                      <span className="text-sm text-muted-foreground">%</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Appliqué au niveau de la personne physique. Distingue dividendes bruts et dividendes nets.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
 
-              <Alert>
-                <Info className="h-4 w-4" />
-                <AlertDescription className="text-xs">
-                  <strong>Formule :</strong> cash_distribuable = min(cash × taux, cash − réserve)
-                </AlertDescription>
-              </Alert>
-            </CardContent>
-          </Card>
+              <Button onClick={save} className="w-full">Enregistrer</Button>
+            </div>
 
-          {/* Bloc B — Waterfall de distribution */}
-          <Card>
-            <CardHeader><CardTitle>Waterfall de distribution</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Séquence d'allocation du cash distribuable calculé par les contraintes ci-dessus. Le moteur applique ces étapes dans l'ordre.
-              </p>
-              <WaterfallEditor
-                steps={form.globalRule.allocationOrder}
-                onChange={(steps) => updateGlobalRule({ allocationOrder: steps })}
-              />
-            </CardContent>
-          </Card>
-
-          {/* Bloc C — Fiscalité des dividendes */}
-          <Card>
-            <CardHeader><CardTitle>Fiscalité des dividendes</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-1 max-w-xs">
-                <Label>Prélèvement Forfaitaire Unique (%)</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number" min={0} max={100}
-                    value={Math.round(form.globalRule.dividendFlatTaxRate * 100)}
-                    onChange={(e) => updateGlobalRule({ dividendFlatTaxRate: Number(e.target.value) / 100 })}
-                  />
-                  <span className="text-sm text-muted-foreground">%</span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Appliqué au niveau de la personne physique. Distingue dividendes bruts et dividendes nets.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Alert>
-            <Info className="h-4 w-4" />
-            <AlertDescription>
-              <strong>Rappel :</strong> Le moteur financier est responsable de tous les calculs (remboursement CCA au prorata, distribution au prorata du capital, fiscalité). Ce module ne fait que paramétrer les règles.
-            </AlertDescription>
-          </Alert>
+            {/* Right column — Simulator */}
+            <div className="lg:col-span-2">
+              <GouvernanceSimulator globalRule={form.globalRule} />
+            </div>
+          </div>
         </TabsContent>
 
         {/* ── Tab: Entity Rules ── */}
-        <TabsContent value="entities" className="space-y-6 mt-4">
+        <TabsContent value="entities" className="space-y-6 mt-4 max-w-3xl">
           <p className="text-sm text-muted-foreground">
             Configurez les règles de distribution pour chaque société. Par défaut, chaque société hérite de la règle globale.
           </p>
@@ -468,10 +679,11 @@ export default function GouvernancePage() {
               />
             );
           })}
+          <Button onClick={save} className="w-full">Enregistrer</Button>
         </TabsContent>
 
         {/* ── Tab: History ── */}
-        <TabsContent value="history" className="space-y-4 mt-4">
+        <TabsContent value="history" className="space-y-4 mt-4 max-w-3xl">
           <Card>
             <CardHeader><CardTitle>Historique des distributions</CardTitle></CardHeader>
             <CardContent>
@@ -497,8 +709,6 @@ export default function GouvernancePage() {
           </Card>
         </TabsContent>
       </Tabs>
-
-      <Button onClick={save} className="w-full">Enregistrer</Button>
     </div>
   );
 }

@@ -1,90 +1,48 @@
 
 
-## Plan : Refonte GouvernancePage en 2 colonnes avec simulateur pédagogique
+## Plan : Implémenter le Cockpit V1 complet
 
-### Seul fichier impacté : `src/pages/GouvernancePage.tsx`
+### Contexte
+Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
 
-Aucun changement sur le modèle de données, la logique de sauvegarde, WaterfallEditor, EntityRuleCard, ni l'onglet Historique.
+### Fichiers à créer
 
----
+**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
 
-### 1. Layout 2 colonnes (onglet "Règle globale" uniquement)
+**2. `src/types/project.ts`** — Types et defaults :
+- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
+- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
+  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
+  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
+  - `revenueParams` (surface, prixM2, tauxRemplissage)
+  - `services` ([] par défaut)
+  - `opexPercentOfRevenue`
+  - `debts`, `sciDebts` ([] par défaut)
+  - `sciChargesCash`, `sciAmortization` (0 par défaut)
+  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
+  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
+- Constantes `DEFAULT_*` exportées pour chaque section
 
-Remplacer le contenu de `TabsContent value="global"` par un `grid grid-cols-5 gap-6` :
-- Colonne gauche (`col-span-3`) : 4 blocs de paramétrage
-- Colonne droite (`col-span-2`) : composant `GouvernanceSimulator` sticky
+**3. `src/contexts/ProjectContext.tsx`** :
+- State initialisé avec les defaults
+- `validated` flags (5 booleans, tous false)
+- `updateSection()`, `validateSection()`, `isProjectComplete()`
+- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
 
-### 2. Colonne gauche — 4 blocs
+**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
 
-**Bloc 1 — Cash disponible** (informatif, aucun champ)
-- Titre + description : "Le cash disponible correspond à la trésorerie restante après exploitation, remboursement de la dette et paiement des impôts."
-- Encart Alert : "Le cash distribuable est calculé par entité. Chaque entité possède sa propre trésorerie et sa propre logique de distribution."
+**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
 
-**Bloc 2 — Contraintes de prudence** (champs existants déplacés)
-- `minCashReserve` (€) — "Après distribution, la société doit conserver au moins ce niveau de trésorerie."
-- `dscrConstraintEnabled` (switch) — "La distribution est bloquée si la société ne couvre plus correctement le service de sa dette." + texte pédagogique DSCR
-- Retirer `distributableCashRate` de ce bloc (déplacé vers Bloc 3)
+**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
+- Formulaires pré-remplis depuis le Context
+- Bouton "Enregistrer" → updateSection + validateSection
+- Champs par page alignés sur les inputs API
 
-**Bloc 3 — Calcul du cash distribuable** (1 champ)
-- `distributableCashRate` (%) — "Part maximale du cash disponible pouvant être distribuée chaque année."
-- Formule affichée : `cash_distribuable = min(cash × ratio, cash − réserve_minimum)`
+**7. `src/pages/DashboardPage.tsx`** :
+- Liste les sections manquantes si projet incomplet
+- Bouton "Lancer la simulation" désactivé si incomplet
+- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
+- Affiche réponse JSON ou erreur dans `<pre>`
 
-**Bloc 4 — Waterfall de distribution** (inchangé)
-- WaterfallEditor existant avec description
-
-Le Bloc C "Fiscalité des dividendes" (PFU) est conservé en dessous de la waterfall comme bloc complémentaire.
-
-### 3. Colonne droite — `GouvernanceSimulator`
-
-Composant inline dans le même fichier. Sticky (`sticky top-4`). Reçoit `form.globalRule` en props.
-
-**En-tête** : Alert avec texte "Exemple pédagogique. Les montants utilisés dans ce simulateur sont fixes et servent uniquement à illustrer le fonctionnement des règles de gouvernance. Ils ne correspondent pas aux données réelles du projet."
-
-**Hypothèses fixes** : Trésorerie = 20 000 €, Résultat net = 50 000 €, Cash disponible = 70 000 €
-
-**Étape 1 — Cash disponible** : Affiche 20 000 + 50 000 = 70 000 €
-
-**Étape 2 — Contraintes de prudence** :
-- Réserve minimum : affiche `minCashReserve`, calcule 70 000 − minCashReserve = X €
-- Si DSCR activé : "Protection dette activée — Distribution autorisée uniquement si DSCR ≥ seuil"
-- Sinon : "Protection dette désactivée"
-
-**Étape 3 — Cash distribuable** : Affiche les deux limites séparément :
-- Limite par ratio : 70 000 × distributableCashRate = Y €
-- Limite par réserve : 70 000 − minCashReserve = X €
-- Cash distribuable = min(X, Y) — valeur retenue mise en évidence (font-bold, bg coloré)
-
-**Étape 4 — Waterfall** : Itère sur `form.globalRule.allocationOrder`, pour chaque step :
-- Calcul du montant alloué selon le mode (RATIO → cashDistribuable × ratio/100, UNTIL_TARGET → min(target, restant), UNTIL_ZERO → restant)
-- Affiche : nom de l'étape, montant alloué, montant restant
-- Barre de progression (Progress component) avec les couleurs de STEP_COLORS
-
-Le simulateur se recalcule automatiquement car il lit directement les valeurs du state `form`.
-
-### Structure visuelle
-
-```text
-┌─────────────────────────────────────────────────────┐
-│  Gouvernance des flux                               │
-│  [Règle globale] [Par société] [Historique]         │
-├──────────────────────────┬──────────────────────────┤
-│  col-span-3              │  col-span-2 (sticky)     │
-│                          │                          │
-│  Card: Cash disponible   │  Alert: Exemple péda.    │
-│    (informatif)          │                          │
-│                          │  Étape 1: 70 000 €       │
-│  Card: Prudence          │  Étape 2: contraintes    │
-│    minCash, DSCR         │  Étape 3: 2 limites      │
-│                          │    → min(X,Y) en gras    │
-│  Card: Cash distribuable │  Étape 4: waterfall      │
-│    ratio %               │    CCA: xx € (reste: ..) │
-│                          │    Réserve: xx €          │
-│  Card: Waterfall         │    Dividendes: xx €       │
-│    WaterfallEditor       │    [barres progression]  │
-│                          │                          │
-│  Card: Fiscalité (PFU)   │                          │
-│                          │                          │
-│  [Enregistrer]           │                          │
-└──────────────────────────┴──────────────────────────┘
-```
+**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
 
