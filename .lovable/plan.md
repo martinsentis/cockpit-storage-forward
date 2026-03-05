@@ -1,48 +1,75 @@
 
 
-## Plan : Implémenter le Cockpit V1 complet
+# Diagnostic : Bénéficiaires manquants dans le module Apports
 
-### Contexte
-Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
+## Problème identifié
 
-### Fichiers à créer
+Le dropdown "Société bénéficiaire" dans le formulaire d'apport filtre uniquement les `Associe` de type `MORALE` créés manuellement par l'utilisateur. Or, les deux sociétés structurelles du projet -- la **société d'exploitation** et la **société foncière (SCI)** -- n'existent pas en tant qu'entrées `Associe`. Ce sont des concepts implicites dans le modèle actuel (les associés ont des champs `partExploitation` et `partFonciere`, mais il n'y a pas d'entité `Associe` correspondante pour ces deux sociétés).
 
-**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
+## Solution proposée
 
-**2. `src/types/project.ts`** — Types et defaults :
-- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
-- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
-  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
-  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
-  - `revenueParams` (surface, prixM2, tauxRemplissage)
-  - `services` ([] par défaut)
-  - `opexPercentOfRevenue`
-  - `debts`, `sciDebts` ([] par défaut)
-  - `sciChargesCash`, `sciAmortization` (0 par défaut)
-  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
-  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
-- Constantes `DEFAULT_*` exportées pour chaque section
+Ajouter deux constantes immuables représentant la société d'exploitation et la SCI foncière, avec des IDs stables et prédéfinis. Ces entités virtuelles seront injectées dans la liste des bénéficiaires éligibles aux côtés des sociétés MORALE créées manuellement.
 
-**3. `src/contexts/ProjectContext.tsx`** :
-- State initialisé avec les defaults
-- `validated` flags (5 booleans, tous false)
-- `updateSection()`, `validateSection()`, `isProjectComplete()`
-- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
+### Modification dans `src/types/project.ts`
 
-**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
+Ajouter deux constantes :
 
-**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
+```typescript
+export const EXPLOITATION_ENTITY_ID = "__exploitation__";
+export const FONCIERE_ENTITY_ID = "__fonciere__";
 
-**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
-- Formulaires pré-remplis depuis le Context
-- Bouton "Enregistrer" → updateSection + validateSection
-- Champs par page alignés sur les inputs API
+export const BUILT_IN_SOCIETES: Associe[] = [
+  {
+    id: EXPLOITATION_ENTITY_ID,
+    type: "MORALE",
+    nom: "Société d'exploitation",
+    societeType: "OPERATIONNELLE",
+    partExploitation: 0,
+    partFonciere: 0,
+    participationsIndirectes: [],
+  },
+  {
+    id: FONCIERE_ENTITY_ID,
+    type: "MORALE",
+    nom: "Société foncière (SCI)",
+    societeType: "SCI",
+    partExploitation: 0,
+    partFonciere: 0,
+    participationsIndirectes: [],
+  },
+];
+```
 
-**7. `src/pages/DashboardPage.tsx`** :
-- Liste les sections manquantes si projet incomplet
-- Bouton "Lancer la simulation" désactivé si incomplet
-- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
-- Affiche réponse JSON ou erreur dans `<pre>`
+### Modification dans `src/pages/ApportsPage.tsx`
 
-**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
+Modifier `getBeneficiaires()` pour inclure les entités built-in :
+
+```typescript
+const societes = [
+  ...BUILT_IN_SOCIETES,
+  ...associes.filter(a => a.type === "MORALE"),
+];
+```
+
+Modifier aussi `resolveNom()` pour résoudre ces IDs built-in.
+
+### Modification dans `src/pages/AssociesPage.tsx`
+
+Ajouter la même liste dans les vues ownership et consolidation pour que ces sociétés soient reconnues partout.
+
+---
+
+## Question de conformité moteur
+
+Ces deux entités sont des constantes d'affichage front uniquement -- elles ne créent pas de nouveaux objets métier. L'`ApportItem.beneficiaireId` stockera `"__exploitation__"` ou `"__fonciere__"`, ce qui est un ID conventionnel que le moteur devra reconnaître. **Ceci constitue un nouveau contrat d'identifiant** entre front et moteur.
+
+**Conformément à la règle établie** : ce plan propose ces IDs avant implémentation. Si cette approche est validée, je procède.
+
+## Fichiers impactés
+
+| Fichier | Changement |
+|---|---|
+| `src/types/project.ts` | Ajout des 2 constantes built-in |
+| `src/pages/ApportsPage.tsx` | Inclusion des built-in dans la liste bénéficiaires |
+| `src/pages/GouvernancePage.tsx` | Même inclusion pour les règles par entité |
 
