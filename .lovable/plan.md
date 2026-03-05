@@ -1,48 +1,114 @@
 
 
-## Plan : Implémenter le Cockpit V1 complet
+## Plan : Tunnel de création de phase capacitaire (avec ajustements)
 
-### Contexte
-Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
+### 1. Modifications types — `src/types/project.ts`
 
-### Fichiers à créer
+Ajouter les nouveaux types et étendre `CapacityPhase` :
 
-**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
+```ts
+export type CapacityPhaseStatus = "DRAFT" | "ACTIVE";
 
-**2. `src/types/project.ts`** — Types et defaults :
-- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
-- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
-  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
-  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
-  - `revenueParams` (surface, prixM2, tauxRemplissage)
-  - `services` ([] par défaut)
-  - `opexPercentOfRevenue`
-  - `debts`, `sciDebts` ([] par défaut)
-  - `sciChargesCash`, `sciAmortization` (0 par défaut)
-  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
-  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
-- Constantes `DEFAULT_*` exportées pour chaque section
+export interface PhaseCapexEstimate {
+  equipementProductifM2: number;
+  amenagement: number;
+  taxeAmenagement: number;
+  honoraires: number;
+  divers: number;
+}
 
-**3. `src/contexts/ProjectContext.tsx`** :
-- State initialisé avec les defaults
-- `validated` flags (5 booleans, tous false)
-- `updateSection()`, `validateSection()`, `isProjectComplete()`
-- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
+export type PhaseFinancingSource = "TRESORERIE" | "CCA" | "CAPITAL" | "DETTE_BANCAIRE" | "CREDIT_BAIL";
 
-**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
+export interface PhaseFinancingLine {
+  id: string;
+  source: PhaseFinancingSource;
+  montant: number;
+  percent?: number;
+}
 
-**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
+export interface PhaseDraft {
+  currentStep: number;
+  capexEstimate: PhaseCapexEstimate;
+  financing: PhaseFinancingLine[];
+  entityPorteuse: "SCI" | "EXPLOITATION";
+  amortissable: boolean;
+  dureeAmortissement: number;
+}
+```
 
-**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
-- Formulaires pré-remplis depuis le Context
-- Bouton "Enregistrer" → updateSection + validateSection
-- Champs par page alignés sur les inputs API
+Ajouter à `CapacityPhase` :
+```ts
+status: CapacityPhaseStatus;  // "DRAFT" | "ACTIVE"
+draft?: PhaseDraft;
+```
 
-**7. `src/pages/DashboardPage.tsx`** :
-- Liste les sections manquantes si projet incomplet
-- Bouton "Lancer la simulation" désactivé si incomplet
-- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
-- Affiche réponse JSON ou erreur dans `<pre>`
+Mettre à jour `createDefaultPhase` pour inclure `status: "ACTIVE"` par défaut (rétrocompatibilité).
 
-**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
+### 2. Nouveau fichier — `src/components/CapacityPhaseWizard.tsx`
+
+Composant Dialog en 7 étapes. Props :
+- `phase: CapacityPhase`
+- `existingPhases: CapacityPhase[]` (phases actives, pour pré-remplissage)
+- `onUpdate: (patch: Partial<CapacityPhase>) => void`
+- `onFinalize: () => void`
+- `onClose: () => void`
+- `defaultVatRate`, `projectStartDate`
+
+**State interne** : `step` (0-6), initialisé depuis `phase.draft?.currentStep ?? 0`.
+
+**Sauvegarde** : toutes les modifications de champs passent par un `debouncedUpdate` (300ms) via un `useRef`+`setTimeout` pattern (pas de dépendance externe). `currentStep` est mis à jour uniquement lors de Suivant/Précédent (appel direct `onUpdate`, pas debounced).
+
+**Étapes** :
+
+| # | Titre | Contenu |
+|---|---|---|
+| 0 | Mode de création | 2 cartes : Macro / Typologie → écrit `modeBox` |
+| 1 | Paramétrage capacitaire | Macro : surface + prix/m² (pré-rempli si phases existantes). Typologie : table avec pré-remplissage |
+| 2 | Ramp-up | startMonth, targetOccupancy, rampUpMonths, rampCurve — aucune valeur par défaut |
+| 3 | CAPEX estimatif | 5 champs dans `draft.capexEstimate`. Équipement productif en €/m² × surface totale (même en mode typologie). Total auto-calculé |
+| 4 | Financement CAPEX | Table source/montant/%. Validation : somme = CAPEX total. Messages "Reste à financer" / "Surfinancement". Bouton Suivant désactivé si déséquilibre. Encart trésorerie placeholder |
+| 5 | Traitement comptable | entityPorteuse (SCI/Exploitation), amortissable (oui/non), durée |
+| 6 | Synthèse | Résumé lecture seule + bouton "Créer cette phase capacitaire" → `onFinalize` |
+
+**Navigation** : Précédent / Suivant en bas. Indicateur de progression (étape X/7).
+
+### 3. Modifications — `src/pages/ExploitationPage.tsx`
+
+**State** : ajouter `wizardPhaseId: string | null`.
+
+**Bouton "Ajouter une phase"** : crée une phase avec `status: "DRAFT"`, `draft` initialisé (currentStep: 0, capexEstimate à zéros, financing: [], entityPorteuse: "SCI", amortissable: true, dureeAmortissement: 10), puis ouvre le wizard.
+
+**Liste des phases** : dans l'`AccordionTrigger`, si `phase.status === "DRAFT"` :
+- Badge orange "Brouillon"
+- Texte "Étape X/7"
+- Clic ouvre le wizard au lieu de l'accordion content
+
+**Finalisation** (`onFinalize`) : `updatePhase(id, { status: "ACTIVE", draft: undefined })`.
+
+**Rendu du wizard** :
+```tsx
+{wizardPhaseId && (
+  <CapacityPhaseWizard
+    phase={form.capacityPhases.find(p => p.id === wizardPhaseId)!}
+    existingPhases={form.capacityPhases.filter(p => p.status === "ACTIVE")}
+    onUpdate={(patch) => updatePhase(wizardPhaseId, patch)}
+    onFinalize={() => { updatePhase(wizardPhaseId, { status: "ACTIVE", draft: undefined }); setWizardPhaseId(null); }}
+    onClose={() => setWizardPhaseId(null)}
+    defaultVatRate={defaultVatRate}
+    projectStartDate={projectStartDate}
+  />
+)}
+```
+
+### 4. Rétrocompatibilité
+
+Dans l'initialisation de `form` dans `ExploitationPage`, ajouter `status: phase.status ?? "ACTIVE"` pour les phases existantes qui n'ont pas encore le champ.
+
+### Fichiers impactés
+
+| Fichier | Action |
+|---|---|
+| `src/types/project.ts` | Ajouter types + `status`/`draft` sur `CapacityPhase` |
+| `src/components/CapacityPhaseWizard.tsx` | Créer (wizard 7 étapes) |
+| `src/pages/ExploitationPage.tsx` | Intégrer wizard + gestion brouillons |
 
