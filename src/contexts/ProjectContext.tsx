@@ -398,6 +398,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           [id]: {
             ...entry,
             state: { ...entry.state, [section]: { ...entry.state[section], ...data } },
+            validated: { ...entry.validated, [section]: true },
           },
         },
       };

@@ -205,33 +205,54 @@ function EntityRuleCard({
             </div>
 
             {!rule.inheritGlobalRule && (
-              <div className="space-y-4 pt-2 border-t">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Cash distribuable (%)</Label>
-                    <Input
-                      type="number" min={0} max={100}
-                      value={Math.round(rule.distributableCashRate * 100)}
-                      onChange={(e) => update({ distributableCashRate: Number(e.target.value) / 100 })}
-                    />
+              <div className="space-y-6 pt-2 border-t">
+                {/* Section A — Contraintes de prudence */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold">Contraintes de prudence</Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Cash distribuable (%)</Label>
+                      <Input
+                        type="number" min={0} max={100}
+                        value={Math.round(rule.distributableCashRate * 100)}
+                        onChange={(e) => update({ distributableCashRate: Number(e.target.value) / 100 })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Réserve cash min (€)</Label>
+                      <Input
+                        type="number" min={0}
+                        value={rule.minCashReserve}
+                        onChange={(e) => update({ minCashReserve: Number(e.target.value) })}
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Réserve stratégique (%)</Label>
-                    <Input
-                      type="number" min={0} max={100}
-                      value={Math.round(rule.reserveStrategicRatio * 100)}
-                      onChange={(e) => update({ reserveStrategicRatio: Number(e.target.value) / 100 })}
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={rule.dscrConstraintEnabled}
+                      onCheckedChange={(v) => update({ dscrConstraintEnabled: v })}
                     />
+                    <Label className="text-sm">Contrainte DSCR active</Label>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Réserve cash min (€)</Label>
-                    <Input
-                      type="number" min={0}
-                      value={rule.minCashReserve}
-                      onChange={(e) => update({ minCashReserve: Number(e.target.value) })}
-                    />
-                  </div>
-                  <div className="space-y-1">
+                </div>
+
+                <Separator />
+
+                {/* Section B — Waterfall */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold">Waterfall de distribution</Label>
+                  <WaterfallEditor
+                    steps={rule.allocationOrder}
+                    onChange={(steps) => update({ allocationOrder: steps })}
+                  />
+                </div>
+
+                <Separator />
+
+                {/* Section C — Fiscalité dividendes */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold">Fiscalité des dividendes</Label>
+                  <div className="space-y-1 max-w-xs">
                     <Label className="text-xs">Flat tax dividendes (%)</Label>
                     <Input
                       type="number" min={0} max={100}
@@ -241,22 +262,9 @@ function EntityRuleCard({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <Switch
-                    checked={rule.dscrConstraintEnabled}
-                    onCheckedChange={(v) => update({ dscrConstraintEnabled: v })}
-                  />
-                  <Label className="text-sm">Contrainte DSCR active</Label>
-                </div>
-
                 <Separator />
-                <Label className="text-sm font-semibold">Waterfall de distribution</Label>
-                <WaterfallEditor
-                  steps={rule.allocationOrder}
-                  onChange={(steps) => update({ allocationOrder: steps })}
-                />
 
-                <Separator />
+                {/* Override de distribution */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Switch
@@ -325,7 +333,6 @@ export default function GouvernancePage() {
     const synced: GouvernanceData = {
       ...form,
       distributableCashRate: form.globalRule.distributableCashRate,
-      reserveStrategicRatio: form.globalRule.reserveStrategicRatio,
     };
     updateSection("gouvernance", synced);
     validateSection("gouvernance");
@@ -351,11 +358,12 @@ export default function GouvernancePage() {
 
         {/* ── Tab: Global Rule ── */}
         <TabsContent value="global" className="space-y-6 mt-4">
+          {/* Bloc A — Contraintes de prudence */}
           <Card>
-            <CardHeader><CardTitle>Paramètres globaux</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Contraintes de prudence</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Ces paramètres s'appliquent par défaut à toutes les sociétés qui héritent de la règle globale.
+                Détermine <strong>combien</strong> de cash peut être distribué. S'applique par défaut à toutes les sociétés qui héritent de la règle globale.
               </p>
 
               <div className="grid grid-cols-2 gap-4">
@@ -371,17 +379,6 @@ export default function GouvernancePage() {
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <Label>Réserve stratégique (%)</Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number" min={0} max={100}
-                      value={Math.round(form.globalRule.reserveStrategicRatio * 100)}
-                      onChange={(e) => updateGlobalRule({ reserveStrategicRatio: Number(e.target.value) / 100 })}
-                    />
-                    <span className="text-sm text-muted-foreground">%</span>
-                  </div>
-                </div>
-                <div className="space-y-1">
                   <Label>Réserve cash minimum (€)</Label>
                   <Input
                     type="number" min={0}
@@ -389,18 +386,6 @@ export default function GouvernancePage() {
                     onChange={(e) => updateGlobalRule({ minCashReserve: Number(e.target.value) })}
                   />
                   <p className="text-xs text-muted-foreground">Trésorerie plancher sous laquelle aucune distribution n'est possible</p>
-                </div>
-                <div className="space-y-1">
-                  <Label>Flat tax dividendes (%)</Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number" min={0} max={100}
-                      value={Math.round(form.globalRule.dividendFlatTaxRate * 100)}
-                      onChange={(e) => updateGlobalRule({ dividendFlatTaxRate: Number(e.target.value) / 100 })}
-                    />
-                    <span className="text-sm text-muted-foreground">%</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">PFU appliqué aux dividendes des personnes physiques</p>
                 </div>
               </div>
 
@@ -414,19 +399,48 @@ export default function GouvernancePage() {
                   La distribution sera bloquée si le DSCR descend sous le seuil projet
                 </p>
               </div>
+
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  <strong>Formule :</strong> cash_distribuable = min(cash × taux, cash − réserve)
+                </AlertDescription>
+              </Alert>
             </CardContent>
           </Card>
 
+          {/* Bloc B — Waterfall de distribution */}
           <Card>
             <CardHeader><CardTitle>Waterfall de distribution</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Séquence d'allocation du cash distribuable. Le moteur applique ces étapes dans l'ordre.
+                Séquence d'allocation du cash distribuable calculé par les contraintes ci-dessus. Le moteur applique ces étapes dans l'ordre.
               </p>
               <WaterfallEditor
                 steps={form.globalRule.allocationOrder}
                 onChange={(steps) => updateGlobalRule({ allocationOrder: steps })}
               />
+            </CardContent>
+          </Card>
+
+          {/* Bloc C — Fiscalité des dividendes */}
+          <Card>
+            <CardHeader><CardTitle>Fiscalité des dividendes</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-1 max-w-xs">
+                <Label>Prélèvement Forfaitaire Unique (%)</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number" min={0} max={100}
+                    value={Math.round(form.globalRule.dividendFlatTaxRate * 100)}
+                    onChange={(e) => updateGlobalRule({ dividendFlatTaxRate: Number(e.target.value) / 100 })}
+                  />
+                  <span className="text-sm text-muted-foreground">%</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Appliqué au niveau de la personne physique. Distingue dividendes bruts et dividendes nets.
+                </p>
+              </div>
             </CardContent>
           </Card>
 
