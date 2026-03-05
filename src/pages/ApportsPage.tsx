@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useProject } from "@/contexts/ProjectContext";
 import type { ApportItem, ApportType, ApportStatut, Associe } from "@/types/project";
-import { APPORT_TYPE_LABELS, APPORT_STATUT_LABELS } from "@/types/project";
+import { APPORT_TYPE_LABELS, APPORT_STATUT_LABELS, BUILT_IN_SOCIETES, EXPLOITATION_ENTITY_ID, FONCIERE_ENTITY_ID } from "@/types/project";
 import { computeEconomicOwnership } from "@/lib/ownershipGraph";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
