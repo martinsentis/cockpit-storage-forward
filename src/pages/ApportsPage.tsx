@@ -49,10 +49,10 @@ export default function ApportsPage() {
     return a.type === "PHYSIQUE" ? `${a.prenom ? a.prenom + " " : ""}${a.nom}` : a.nom;
   }
 
-  // Get valid apporteurs: all associes (persons + sociétés)
+  // Get valid apporteurs: all associes + built-in sociétés
   // But société → personne is forbidden, so we validate in save
   function getApporteurs(): Associe[] {
-    return associes;
+    return [...BUILT_IN_SOCIETES, ...associes];
   }
 
   // Get valid beneficiaires: only sociétés (personnes morales)
