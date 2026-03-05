@@ -1,68 +1,48 @@
 
 
-## Plan : Corriger le simulateur waterfall et clarifier le mode Percentage
+## Plan : Implémenter le Cockpit V1 complet
 
-### Fichier impacté : `src/pages/GouvernancePage.tsx`
+### Contexte
+Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
 
----
+### Fichiers à créer
 
-### Changement 1 — Corriger le calcul waterfall (lignes 89-103)
+**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
 
-Le mode `RATIO` applique actuellement le pourcentage sur `cashDistribuable` (montant initial). Il doit s'appliquer sur `remaining` (montant restant à l'étape).
+**2. `src/types/project.ts`** — Types et defaults :
+- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
+- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
+  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
+  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
+  - `revenueParams` (surface, prixM2, tauxRemplissage)
+  - `services` ([] par défaut)
+  - `opexPercentOfRevenue`
+  - `debts`, `sciDebts` ([] par défaut)
+  - `sciChargesCash`, `sciAmortization` (0 par défaut)
+  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
+  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
+- Constantes `DEFAULT_*` exportées pour chaque section
 
-```ts
-// Avant (ligne 94)
-allocated = Math.min(remaining, cashDistribuable * (step.ratio / 100));
+**3. `src/contexts/ProjectContext.tsx`** :
+- State initialisé avec les defaults
+- `validated` flags (5 booleans, tous false)
+- `updateSection()`, `validateSection()`, `isProjectComplete()`
+- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
 
-// Après
-allocated = remaining * (step.ratio / 100);
-```
+**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
 
-Le reste de la logique (`UNTIL_TARGET`, `UNTIL_ZERO`) est déjà correct.
+**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
 
-### Changement 2 — Stocker le montant "avant" dans le résultat waterfall (ligne 91-102)
+**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
+- Formulaires pré-remplis depuis le Context
+- Bouton "Enregistrer" → updateSection + validateSection
+- Champs par page alignés sur les inputs API
 
-Ajouter `remainingBefore` au résultat de chaque step pour pouvoir l'afficher :
+**7. `src/pages/DashboardPage.tsx`** :
+- Liste les sections manquantes si projet incomplet
+- Bouton "Lancer la simulation" désactivé si incomplet
+- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
+- Affiche réponse JSON ou erreur dans `<pre>`
 
-```ts
-return globalRule.allocationOrder.map((step) => {
-  const remainingBefore = remaining;
-  let allocated = 0;
-  // ... calcul selon mode ...
-  remaining = Math.max(0, remaining - allocated);
-  return { ...step, allocated, remaining, remainingBefore };
-});
-```
-
-### Changement 3 — Affichage détaillé de chaque étape waterfall (lignes 217-231)
-
-Remplacer l'affichage actuel par 3 lignes par step :
-
-- **Avant** : `{fmt(step.remainingBefore)} €`
-- **Prélèvement** : selon le mode, afficher le détail (ex: `80 % de {remainingBefore} = {allocated} €`)
-- **Reste** : `{fmt(step.remaining)} €`
-
-Les barres de progression conservent le calcul `step.allocated / cashDistribuable * 100` (proportion du total initial).
-
-### Changement 4 — Texte d'aide sous le sélecteur de mode (WaterfallEditor, ligne 309)
-
-Après le `</Select>` du mode, ajouter conditionnellement :
-
-```tsx
-{step.mode === "RATIO" && (
-  <p className="text-xs text-muted-foreground mt-1">
-    Le pourcentage s'applique au montant restant au moment de l'étape.
-  </p>
-)}
-```
-
-Placer ce texte sous le bloc `pl-9` (après les inputs de chaque step, vers ligne 335).
-
-### Résumé des modifications
-
-| Zone | Changement |
-|---|---|
-| Lignes 89-103 | RATIO appliqué sur `remaining` + ajout `remainingBefore` |
-| Lignes 217-231 | Affichage Avant / Prélèvement / Reste par step |
-| Lignes 309-335 | Texte d'aide sous mode Percentage dans WaterfallEditor |
+**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
 

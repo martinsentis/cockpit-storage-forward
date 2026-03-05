@@ -89,9 +89,10 @@ function GouvernanceSimulator({ globalRule }: { globalRule: GlobalGouvernanceRul
   const waterfallResult = useMemo(() => {
     let remaining = cashDistribuable;
     return globalRule.allocationOrder.map((step) => {
+      const remainingBefore = remaining;
       let allocated = 0;
       if (step.mode === "RATIO") {
-        allocated = Math.min(remaining, cashDistribuable * (step.ratio / 100));
+        allocated = remaining * (step.ratio / 100);
       } else if (step.mode === "UNTIL_TARGET") {
         allocated = Math.min(remaining, step.target ?? 0);
       } else {
@@ -99,7 +100,7 @@ function GouvernanceSimulator({ globalRule }: { globalRule: GlobalGouvernanceRul
       }
       allocated = Math.max(0, Math.round(allocated));
       remaining = Math.max(0, remaining - allocated);
-      return { ...step, allocated, remaining };
+      return { ...step, allocated, remaining, remainingBefore };
     });
   }, [cashDistribuable, globalRule.allocationOrder]);
 
@@ -217,6 +218,7 @@ function GouvernanceSimulator({ globalRule }: { globalRule: GlobalGouvernanceRul
               {waterfallResult.map((step, idx) => {
                 const colors = STEP_COLORS[step.type];
                 const pct = cashDistribuable > 0 ? (step.allocated / cashDistribuable) * 100 : 0;
+                const modeLabel = step.mode === "RATIO" ? `${step.ratio} %` : step.mode === "UNTIL_TARGET" ? `cible ${fmt(step.target ?? 0)} €` : "tout";
                 return (
                   <div key={step.id} className={`rounded-lg border p-3 space-y-2 ${colors.border} ${colors.bg}`}>
                     <div className="flex justify-between items-center">
@@ -226,7 +228,11 @@ function GouvernanceSimulator({ globalRule }: { globalRule: GlobalGouvernanceRul
                     <div className="h-2 rounded-full bg-muted overflow-hidden">
                       <div className={`h-full rounded-full ${colors.progress} transition-all`} style={{ width: `${pct}%` }} />
                     </div>
-                    <p className="text-xs text-muted-foreground">Reste : {fmt(step.remaining)} €</p>
+                    <div className="text-xs text-muted-foreground space-y-0.5">
+                      <p>Avant : {fmt(Math.round(step.remainingBefore))} €</p>
+                      <p>Prélèvement ({modeLabel}) : {fmt(step.allocated)} €</p>
+                      <p>Reste : {fmt(step.remaining)} €</p>
+                    </div>
                   </div>
                 );
               })}
@@ -310,14 +316,17 @@ function WaterfallEditor({
                 </div>
 
                 {step.mode === "RATIO" && (
-                  <div className="flex items-center gap-2">
-                    <Label className="text-sm whitespace-nowrap">Part :</Label>
-                    <Input
-                      type="number" className="h-8 w-20" min={0} max={100} step={1}
-                      value={step.ratio}
-                      onChange={(e) => updateStep(idx, { ratio: Number(e.target.value) })}
-                    />
-                    <span className="text-sm text-muted-foreground">%</span>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm whitespace-nowrap">Part :</Label>
+                      <Input
+                        type="number" className="h-8 w-20" min={0} max={100} step={1}
+                        value={step.ratio}
+                        onChange={(e) => updateStep(idx, { ratio: Number(e.target.value) })}
+                      />
+                      <span className="text-sm text-muted-foreground">%</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Le pourcentage s'applique au montant restant au moment de l'étape.</p>
                   </div>
                 )}
 
