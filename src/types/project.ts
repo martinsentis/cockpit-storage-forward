@@ -145,9 +145,46 @@ export interface Typologie {
 
 // ── Capacity Phase (replaces old Phase + Capacite) ──
 
+export type CapacityPhaseStatus = "DRAFT" | "ACTIVE";
+
+export interface PhaseCapexEstimate {
+  equipementProductifM2: number;
+  amenagement: number;
+  taxeAmenagement: number;
+  honoraires: number;
+  divers: number;
+}
+
+export type PhaseFinancingSource = "TRESORERIE" | "CCA" | "CAPITAL" | "DETTE_BANCAIRE" | "CREDIT_BAIL";
+
+export const FINANCING_SOURCE_LABELS: Record<PhaseFinancingSource, string> = {
+  TRESORERIE: "Trésorerie",
+  CCA: "Compte courant d'associé",
+  CAPITAL: "Apport en capital",
+  DETTE_BANCAIRE: "Dette bancaire",
+  CREDIT_BAIL: "Crédit-bail",
+};
+
+export interface PhaseFinancingLine {
+  id: string;
+  source: PhaseFinancingSource;
+  montant: number;
+  percent?: number;
+}
+
+export interface PhaseDraft {
+  currentStep: number;
+  capexEstimate: PhaseCapexEstimate;
+  financing: PhaseFinancingLine[];
+  entityPorteuse: "SCI" | "EXPLOITATION";
+  amortissable: boolean;
+  dureeAmortissement: number;
+}
+
 export interface CapacityPhase {
   id: string;
   nom: string;
+  status: CapacityPhaseStatus;
   surface: number;
   modeBox: BoxMode;
   // Macro
@@ -162,6 +199,8 @@ export interface CapacityPhase {
   targetOccupancy: number;
   rampUpMonths: number;
   rampCurve: RampCurve;
+  // Draft wizard data
+  draft?: PhaseDraft;
 }
 
 // ── Exploitation types ──
@@ -391,6 +430,7 @@ export function createDefaultPhase(id?: string, nom?: string, defaultVatRate = 0
   return {
     id: id ?? crypto.randomUUID(),
     nom: nom ?? "Phase 1",
+    status: "ACTIVE",
     surface: 500,
     modeBox: "MACRO",
     prixM2: 15,
@@ -401,6 +441,17 @@ export function createDefaultPhase(id?: string, nom?: string, defaultVatRate = 0
     targetOccupancy: 0.85,
     rampUpMonths: 12,
     rampCurve: "LINEAR",
+  };
+}
+
+export function createDefaultPhaseDraft(): PhaseDraft {
+  return {
+    currentStep: 0,
+    capexEstimate: { equipementProductifM2: 0, amenagement: 0, taxeAmenagement: 0, honoraires: 0, divers: 0 },
+    financing: [],
+    entityPorteuse: "SCI",
+    amortissable: true,
+    dureeAmortissement: 10,
   };
 }
 
