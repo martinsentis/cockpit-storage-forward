@@ -264,17 +264,15 @@ export interface LoyerDynamiqueData {
 
 // ── Gouvernance ──
 
-export interface CashAllocationRule {
-  entityId: string;             // société ID from Associés module
-  distributableCashRate: number; // % of cash that is distributable
-  allocationOrder: CashAllocationStep[];
-}
-
 export type CashAllocationStepType = "CCA_REPAYMENT" | "RESERVE" | "DIVIDENDS";
+export type AllocationStepMode = "RATIO" | "UNTIL_ZERO" | "UNTIL_TARGET";
 
 export interface CashAllocationStep {
+  id: string;                    // stable key for reorder UI
   type: CashAllocationStepType;
-  ratio: number;               // % of distributable cash allocated to this step
+  mode: AllocationStepMode;
+  ratio: number;                 // % (0-100) of distributable cash allocated to this step
+  target?: number;               // used when mode = UNTIL_TARGET
   label?: string;
 }
 
@@ -284,16 +282,66 @@ export const CASH_ALLOCATION_STEP_LABELS: Record<CashAllocationStepType, string>
   DIVIDENDS: "Distribution de dividendes",
 };
 
+export const ALLOCATION_MODE_LABELS: Record<AllocationStepMode, string> = {
+  RATIO: "Pourcentage",
+  UNTIL_ZERO: "Jusqu'à épuisement",
+  UNTIL_TARGET: "Jusqu'à un montant cible",
+};
+
+export interface GlobalGouvernanceRule {
+  distributableCashRate: number;
+  reserveStrategicRatio: number;
+  minCashReserve: number;
+  dscrConstraintEnabled: boolean;
+  dividendFlatTaxRate: number;
+  allocationOrder: CashAllocationStep[];
+}
+
+/**
+ * Règle de gouvernance spécifique à une entité.
+ *
+ * `entityId` peut référencer :
+ * - `"__exploitation__"` — Société d'exploitation système (SAS)
+ * - `"__fonciere__"` — Société foncière système (SCI)
+ * - Un `Associe.id` de type `MORALE` — Holding ou société utilisateur
+ *
+ * Si `transparentDistribution = true`, `inheritGlobalRule` est forcé à `true`
+ * (une entité transparente ne peut pas avoir de règle propre).
+ */
+export interface EntityGouvernanceRule {
+  entityId: string;
+  inheritGlobalRule: boolean;
+  transparentDistribution: boolean;
+  distributionOverrideEnabled: boolean;
+  distributionOverrideAmount: number | null;
+  dividendFlatTaxRate: number;
+  distributableCashRate: number;
+  reserveStrategicRatio: number;
+  minCashReserve: number;
+  dscrConstraintEnabled: boolean;
+  allocationOrder: CashAllocationStep[];
+}
+
+export interface DistributionEvent {
+  id: string;
+  entityId: string;
+  date: string;
+  amount: number;
+  type: CashAllocationStepType;
+  commentaire?: string;
+}
+
 export interface GouvernanceData {
   structureJuridique: string;
-  // Legacy flat fields (still used by engine for now)
+  globalRule: GlobalGouvernanceRule;
+  entityRules: EntityGouvernanceRule[];
+  distributionHistory: DistributionEvent[];
+  // Legacy flat fields (kept for engine compatibility)
   ccaBalance: number;
   distributableCashRate: number;
   ccaPriorityRatio: number;
   reserveStrategicRatio: number;
   reserveAfterCcaFullyRepaid: number;
-  // Per-entity allocation rules (optional, for future engine)
-  entityRules: CashAllocationRule[];
 }
 
 // ── Defaults ──
