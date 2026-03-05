@@ -1,48 +1,82 @@
 
 
-## Plan : Implémenter le Cockpit V1 complet
+## Plan : Restructuration Gouvernance en 3 blocs + Auto-validation
 
-### Contexte
-Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
+### Changement 1 — Auto-validation dans `src/contexts/ProjectContext.tsx`
 
-### Fichiers à créer
+**Ligne 400** : ajouter `validated: { ...entry.validated, [section]: true }` dans le callback `updateSection`.
 
-**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
+Avant :
+```
+state: { ...entry.state, [section]: { ...entry.state[section], ...data } },
+```
 
-**2. `src/types/project.ts`** — Types et defaults :
-- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
-- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
-  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
-  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
-  - `revenueParams` (surface, prixM2, tauxRemplissage)
-  - `services` ([] par défaut)
-  - `opexPercentOfRevenue`
-  - `debts`, `sciDebts` ([] par défaut)
-  - `sciChargesCash`, `sciAmortization` (0 par défaut)
-  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
-  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
-- Constantes `DEFAULT_*` exportées pour chaque section
+Après :
+```
+state: { ...entry.state, [section]: { ...entry.state[section], ...data } },
+validated: { ...entry.validated, [section]: true },
+```
 
-**3. `src/contexts/ProjectContext.tsx`** :
-- State initialisé avec les defaults
-- `validated` flags (5 booleans, tous false)
-- `updateSection()`, `validateSection()`, `isProjectComplete()`
-- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
+Toute sauvegarde marque automatiquement la section comme validée.
 
-**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
+---
 
-**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
+### Changement 2 — Restructuration de `src/pages/GouvernancePage.tsx`
 
-**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
-- Formulaires pré-remplis depuis le Context
-- Bouton "Enregistrer" → updateSection + validateSection
-- Champs par page alignés sur les inputs API
+#### Onglet "Règle globale" — remplacer les 2 cartes actuelles par 3 cartes :
 
-**7. `src/pages/DashboardPage.tsx`** :
-- Liste les sections manquantes si projet incomplet
-- Bouton "Lancer la simulation" désactivé si incomplet
-- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
-- Affiche réponse JSON ou erreur dans `<pre>`
+**Bloc A — Contraintes de prudence** (Card)
+- `distributableCashRate` (%) — ratio max de cash distribuable
+- `minCashReserve` (€) — trésorerie plancher
+- `dscrConstraintEnabled` (switch)
+- Note explicative : "Formule : `cash_distribuable = min(cash × taux, cash − réserve)`"
+- **Retirer** `reserveStrategicRatio` (déjà dans step RESERVE de la waterfall)
+- **Retirer** `dividendFlatTaxRate` (déplacé vers Bloc C)
 
-**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
+**Bloc B — Waterfall de distribution** (Card — inchangé)
+- Texte introductif : "Séquence d'allocation du cash distribuable calculé par les contraintes ci-dessus"
+- `WaterfallEditor` existant
+- Chaque step possède bien `type: CashAllocationStepType` (`CCA_REPAYMENT | RESERVE | DIVIDENDS`) — vérifié dans le code
+
+**Bloc C — Fiscalité des dividendes** (Card — nouvelle)
+- `dividendFlatTaxRate` (%) — PFU
+- Note : "Appliqué au niveau de la personne physique. Distingue dividendes bruts et dividendes nets."
+
+#### `EntityRuleCard` — quand `inheritGlobalRule = false` :
+
+Restructurer le grid actuel (lignes 208-280) en 3 sections :
+
+**Section A** — Contraintes de prudence :
+- `distributableCashRate`, `minCashReserve`, `dscrConstraintEnabled`
+- **Retirer** `reserveStrategicRatio`
+
+**Section B** — Waterfall :
+- `WaterfallEditor` (déjà présent, inchangé)
+
+**Section C** — Fiscalité :
+- `dividendFlatTaxRate`
+
++ Override de distribution (section existante, conservée telle quelle)
+
+#### Fonction `save()` :
+
+Retirer la synchro `reserveStrategicRatio` (ligne 328) car ce champ n'est plus exposé hors waterfall.
+
+---
+
+### Vérification du champ `type` sur les waterfall steps
+
+Confirmé dans le code existant :
+- `CashAllocationStep` a `type: CashAllocationStepType`
+- `CashAllocationStepType = "CCA_REPAYMENT" | "RESERVE" | "DIVIDENDS"`
+- `createDefaultAllocationOrder()` crée 3 steps avec les bons types
+- `WaterfallEditor` utilise `CASH_ALLOCATION_STEP_LABELS[step.type]` et `STEP_COLORS[step.type]`
+- Aucun changement de modèle nécessaire
+
+### Fichiers impactés
+
+| Fichier | Changement |
+|---|---|
+| `src/contexts/ProjectContext.tsx` | 1 ligne ajoutée dans `updateSection` |
+| `src/pages/GouvernancePage.tsx` | Restructuration UI en 3 blocs (global + entity) |
 
