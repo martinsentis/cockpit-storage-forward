@@ -420,6 +420,32 @@ export const DEFAULT_ASSOCIES: AssociesData = {
   associes: [],
 };
 
+// ── Built-in structural entities ──
+
+export const EXPLOITATION_ENTITY_ID = "__exploitation__";
+export const FONCIERE_ENTITY_ID = "__fonciere__";
+
+export const BUILT_IN_SOCIETES: Associe[] = [
+  {
+    id: EXPLOITATION_ENTITY_ID,
+    type: "MORALE",
+    nom: "Société d'exploitation",
+    societeType: "OPERATIONNELLE",
+    partExploitation: 0,
+    partFonciere: 0,
+    participationsIndirectes: [],
+  },
+  {
+    id: FONCIERE_ENTITY_ID,
+    type: "MORALE",
+    nom: "Société foncière (SCI)",
+    societeType: "SCI",
+    partExploitation: 0,
+    partFonciere: 0,
+    participationsIndirectes: [],
+  },
+];
+
 // ── Apports Associés ──
 
 export type ApportType = "CAPITAL" | "CCA";

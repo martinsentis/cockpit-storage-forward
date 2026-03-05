@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useProject } from "@/contexts/ProjectContext";
 import type { ApportItem, ApportType, ApportStatut, Associe } from "@/types/project";
-import { APPORT_TYPE_LABELS, APPORT_STATUT_LABELS } from "@/types/project";
+import { APPORT_TYPE_LABELS, APPORT_STATUT_LABELS, BUILT_IN_SOCIETES, EXPLOITATION_ENTITY_ID, FONCIERE_ENTITY_ID } from "@/types/project";
 import { computeEconomicOwnership } from "@/lib/ownershipGraph";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,22 +34,25 @@ export default function ApportsPage() {
   const [formStatut, setFormStatut] = useState<ApportStatut>("PREVU");
   const [formCommentaire, setFormCommentaire] = useState("");
 
-  // All entities: sociétés (morales) are potential beneficiaires
-  const societes = associes.filter(a => a.type === "MORALE");
+  // All entities: sociétés (morales) are potential beneficiaires (built-in + user-created)
+  const societes = [...BUILT_IN_SOCIETES, ...associes.filter(a => a.type === "MORALE")];
 
   // Ownership for consolidation
   const ownership = useMemo(() => computeEconomicOwnership(associes), [associes]);
 
   function resolveNom(id: string): string {
+    // Check built-in entities first
+    const builtIn = BUILT_IN_SOCIETES.find(x => x.id === id);
+    if (builtIn) return builtIn.nom;
     const a = associes.find(x => x.id === id);
     if (!a) return "Inconnu";
     return a.type === "PHYSIQUE" ? `${a.prenom ? a.prenom + " " : ""}${a.nom}` : a.nom;
   }
 
-  // Get valid apporteurs: all associes (persons + sociétés)
+  // Get valid apporteurs: all associes + built-in sociétés
   // But société → personne is forbidden, so we validate in save
   function getApporteurs(): Associe[] {
-    return associes;
+    return [...BUILT_IN_SOCIETES, ...associes];
   }
 
   // Get valid beneficiaires: only sociétés (personnes morales)
@@ -59,8 +62,8 @@ export default function ApportsPage() {
 
   // Validate: société → personne is forbidden
   function isValidFlow(apporteurId: string, beneficiaireId: string): boolean {
-    const apporteur = associes.find(a => a.id === apporteurId);
-    const beneficiaire = associes.find(a => a.id === beneficiaireId);
+    const apporteur = [...BUILT_IN_SOCIETES, ...associes].find(a => a.id === apporteurId);
+    const beneficiaire = [...BUILT_IN_SOCIETES, ...associes].find(a => a.id === beneficiaireId);
     if (!apporteur || !beneficiaire) return false;
     // société → personne is forbidden
     if (beneficiaire.type === "PHYSIQUE") return false;
@@ -213,11 +216,11 @@ export default function ApportsPage() {
         </div>
       </div>
 
-      {societes.length === 0 && (
+      {societes.length === 0 && associes.length === 0 && (
         <Alert>
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            Aucune société définie. Créez des sociétés (personnes morales) dans le module "Associés & Sociétés" pour pouvoir enregistrer des apports.
+            Aucun associé défini. Créez des associés dans le module "Associés & Sociétés" pour pouvoir enregistrer des apports.
           </AlertDescription>
         </Alert>
       )}
@@ -234,7 +237,7 @@ export default function ApportsPage() {
         <TabsContent value="tableau" className="space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-semibold text-foreground">Liste des apports</h2>
-            <Button size="sm" onClick={openCreate} disabled={associes.length === 0 || societes.length === 0}>
+            <Button size="sm" onClick={openCreate} disabled={associes.length === 0}>
               <Plus className="h-4 w-4 mr-1" /> Créer un apport
             </Button>
           </div>
