@@ -422,14 +422,49 @@ export const DEFAULT_LOYER_DYNAMIQUE: LoyerDynamiqueData = {
   manualOverride: null,
 };
 
+export function createDefaultAllocationOrder(): CashAllocationStep[] {
+  return [
+    { id: crypto.randomUUID(), type: "CCA_REPAYMENT", mode: "UNTIL_ZERO", ratio: 100, label: "Remboursement CCA" },
+    { id: crypto.randomUUID(), type: "RESERVE", mode: "RATIO", ratio: 20, label: "Réserve stratégique" },
+    { id: crypto.randomUUID(), type: "DIVIDENDS", mode: "RATIO", ratio: 80, label: "Distribution dividendes" },
+  ];
+}
+
+export const DEFAULT_GLOBAL_RULE: GlobalGouvernanceRule = {
+  distributableCashRate: 0.5,
+  reserveStrategicRatio: 0.1,
+  minCashReserve: 0,
+  dscrConstraintEnabled: false,
+  dividendFlatTaxRate: 0.30,
+  allocationOrder: createDefaultAllocationOrder(),
+};
+
+export function createDefaultEntityRule(entityId: string): EntityGouvernanceRule {
+  return {
+    entityId,
+    inheritGlobalRule: true,
+    transparentDistribution: false,
+    distributionOverrideEnabled: false,
+    distributionOverrideAmount: null,
+    dividendFlatTaxRate: 0.30,
+    distributableCashRate: 0.5,
+    reserveStrategicRatio: 0.1,
+    minCashReserve: 0,
+    dscrConstraintEnabled: false,
+    allocationOrder: createDefaultAllocationOrder(),
+  };
+}
+
 export const DEFAULT_GOUVERNANCE: GouvernanceData = {
   structureJuridique: "SCI + SAS",
+  globalRule: { ...DEFAULT_GLOBAL_RULE, allocationOrder: createDefaultAllocationOrder() },
+  entityRules: [],
+  distributionHistory: [],
   ccaBalance: 0,
   distributableCashRate: 0.5,
   ccaPriorityRatio: 0.7,
   reserveStrategicRatio: 0.1,
   reserveAfterCcaFullyRepaid: 0.3,
-  entityRules: [],
 };
 
 // ── Associés & Sociétés ──
