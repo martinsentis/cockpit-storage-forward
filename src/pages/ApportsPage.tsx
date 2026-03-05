@@ -237,7 +237,7 @@ export default function ApportsPage() {
         <TabsContent value="tableau" className="space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-semibold text-foreground">Liste des apports</h2>
-            <Button size="sm" onClick={openCreate} disabled={associes.length === 0 || societes.length === 0}>
+            <Button size="sm" onClick={openCreate} disabled={associes.length === 0}>
               <Plus className="h-4 w-4 mr-1" /> Créer un apport
             </Button>
           </div>
