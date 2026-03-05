@@ -216,11 +216,11 @@ export default function ApportsPage() {
         </div>
       </div>
 
-      {societes.length === 0 && (
+      {societes.length === 0 && associes.length === 0 && (
         <Alert>
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            Aucune société définie. Créez des sociétés (personnes morales) dans le module "Associés & Sociétés" pour pouvoir enregistrer des apports.
+            Aucun associé défini. Créez des associés dans le module "Associés & Sociétés" pour pouvoir enregistrer des apports.
           </AlertDescription>
         </Alert>
       )}
