@@ -34,8 +34,8 @@ export default function ApportsPage() {
   const [formStatut, setFormStatut] = useState<ApportStatut>("PREVU");
   const [formCommentaire, setFormCommentaire] = useState("");
 
-  // All entities: sociétés (morales) are potential beneficiaires
-  const societes = associes.filter(a => a.type === "MORALE");
+  // All entities: sociétés (morales) are potential beneficiaires (built-in + user-created)
+  const societes = [...BUILT_IN_SOCIETES, ...associes.filter(a => a.type === "MORALE")];
 
   // Ownership for consolidation
   const ownership = useMemo(() => computeEconomicOwnership(associes), [associes]);
