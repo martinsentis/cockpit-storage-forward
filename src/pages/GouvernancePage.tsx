@@ -24,6 +24,8 @@ import {
   CASH_ALLOCATION_STEP_LABELS,
   ALLOCATION_MODE_LABELS,
   BUILT_IN_SOCIETES,
+  EXPLOITATION_ENTITY_ID,
+  FONCIERE_ENTITY_ID,
   createDefaultEntityRule,
 } from "@/types/project";
 
