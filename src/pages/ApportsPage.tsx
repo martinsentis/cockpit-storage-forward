@@ -446,7 +446,7 @@ export default function ApportsPage() {
               {/* Summary table */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Exposition CCA consolidée</CardTitle>
+                  <CardTitle className="text-base">Exposition consolidée (Capital + CCA)</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
                   <Table>
@@ -472,12 +472,14 @@ export default function ApportsPage() {
                                     <TooltipTrigger asChild>
                                       <span className="cursor-help inline-flex items-center gap-1">
                                         {fmt(expo.total)}
-                                        {expo.ccaIndirect > 0 && <Info className="h-3 w-3 text-muted-foreground" />}
+                                        {(expo.capitalIndirect > 0 || expo.ccaIndirect > 0) && <Info className="h-3 w-3 text-muted-foreground" />}
                                       </span>
                                     </TooltipTrigger>
                                     <TooltipContent className="text-xs">
-                                      <p>Direct : {fmt(expo.ccaDirect)}</p>
-                                      {expo.ccaIndirect > 0 && <p>Indirect : {fmt(expo.ccaIndirect)}</p>}
+                                      <p>Capital direct : {fmt(expo.capitalDirect)}</p>
+                                      {expo.capitalIndirect > 0 && <p>Capital indirect : {fmt(expo.capitalIndirect)}</p>}
+                                      <p>CCA direct : {fmt(expo.ccaDirect)}</p>
+                                      {expo.ccaIndirect > 0 && <p>CCA indirect : {fmt(expo.ccaIndirect)}</p>}
                                     </TooltipContent>
                                   </Tooltip>
                                 ) : "—"}
