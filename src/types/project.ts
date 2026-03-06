@@ -111,12 +111,19 @@ export interface BuildData {
   capexEvents: CapexEvent[];
 }
 
+export type DebtType = "BANK_LOAN" | "LEASE";
+export type FinancingStatus = "A_CONFIGURER" | "CONFIGURE";
+
 export interface DebtItem {
+  id?: string;
   label: string;
+  type?: DebtType;
+  phaseId?: string;
   amount: number;
   annualRate: number;
   durationMonths: number;
   deferralMonths: number;
+  status?: FinancingStatus;
 }
 
 export interface FinancementData {
@@ -606,6 +613,8 @@ export interface ApportItem {
   date: string;
   statut: ApportStatut;
   commentaire?: string;
+  phaseId?: string;
+  status?: FinancingStatus;
 }
 
 export interface ApportsData {
