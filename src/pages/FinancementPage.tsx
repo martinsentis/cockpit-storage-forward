@@ -11,9 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import type { DebtItem, DebtType, DeferralType } from "@/types/project";
+import type { DebtItem, DebtType, DeferralType, CapacityPhase } from "@/types/project";
 import { DEBT_TYPE_LABELS, createEmptyDebtItem, BUILT_IN_SOCIETES, EXPLOITATION_ENTITY_ID, FONCIERE_ENTITY_ID } from "@/types/project";
-import { Plus, Landmark, FileText, Pencil, CheckCircle, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { formatMonthIndex } from "@/lib/monthUtils";
+import { Plus, Landmark, FileText, Pencil, CheckCircle, AlertTriangle, Info } from "lucide-react";
 
 function fmt(n: number) { return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(n); }
 function fmtCurrency(n: number) { return n.toLocaleString("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }); }
