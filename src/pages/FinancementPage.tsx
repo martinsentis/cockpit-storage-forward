@@ -429,6 +429,8 @@ export default function FinancementPage() {
         <FinancingWizard
           item={editingItem}
           entities={entities}
+          phases={state.exploitation.capacityPhases}
+          projectStartDate={state.projet.projectStartDate}
           onSave={handleSave}
           onClose={() => setEditingItem(null)}
         />
