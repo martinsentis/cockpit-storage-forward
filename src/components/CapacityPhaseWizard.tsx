@@ -561,19 +561,43 @@ export default function CapacityPhaseWizard({
               )}
 
               {(() => {
-                const externalFinancingTotal = draft.financing
-                  .filter(f => f.source === "DETTE_BANCAIRE" || f.source === "CREDIT_BAIL")
-                  .reduce((s, f) => s + f.montant, 0);
-                return externalFinancingTotal > 0 ? (
+                const itemsToCreate = draft.financing.filter(f => f.source !== "TRESORERIE");
+                if (itemsToCreate.length === 0) return null;
+                const labelMap: Record<string, string> = {
+                  DETTE_BANCAIRE: "Crédit bancaire",
+                  CREDIT_BAIL: "Crédit-bail",
+                  CCA: "Apport CCA",
+                  CAPITAL: "Apport capital",
+                };
+                const moduleMap: Record<string, { label: string; path: string }> = {
+                  DETTE_BANCAIRE: { label: "Module Financement", path: "/financement" },
+                  CREDIT_BAIL: { label: "Module Financement", path: "/financement" },
+                  CCA: { label: "Module Apports associés", path: "/apports" },
+                  CAPITAL: { label: "Module Apports associés", path: "/apports" },
+                };
+                return (
                   <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950 p-4 space-y-2">
-                    <h4 className="font-semibold text-amber-800 dark:text-amber-200">Financement à compléter</h4>
+                    <h4 className="font-semibold text-amber-800 dark:text-amber-200">Financements à compléter</h4>
                     <p className="text-sm text-amber-700 dark:text-amber-300">
-                      Cette phase crée un besoin de financement externe de {fmt(externalFinancingTotal)} €.
-                      Un objet de financement a été créé dans le module Financement avec le statut : <strong>À configurer</strong>.
-                      Les paramètres du financement (taux, durée, différé, assurance…) devront être complétés dans ce module.
+                      Les objets suivants seront créés avec le statut <strong>À configurer</strong> :
+                    </p>
+                    <ul className="text-sm space-y-1">
+                      {itemsToCreate.map(f => (
+                        <li key={f.id} className="flex items-center justify-between py-1 border-b border-amber-200 dark:border-amber-800 last:border-0">
+                          <span className="text-amber-800 dark:text-amber-200">
+                            {labelMap[f.source] ?? f.source} — <strong>{fmt(f.montant)} €</strong>
+                          </span>
+                          <span className="text-xs text-amber-600 dark:text-amber-400">
+                            → {moduleMap[f.source]?.label ?? "Module"}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                      Les paramètres détaillés devront être complétés dans les modules dédiés.
                     </p>
                   </div>
-                ) : null;
+                );
               })()}
             </div>
           )}
