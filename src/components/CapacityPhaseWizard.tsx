@@ -80,22 +80,23 @@ export default function CapacityPhaseWizard({
     return capex.equipementProductifM2 + capex.amenagement + capex.taxeAmenagement + capex.honoraires + capex.divers;
   }, [capex]);
 
-  // Reference €/m² from previous phases
-  const referenceEquipM2 = useMemo(() => {
+  // Reference from previous phases (€/m²)
+  const phaseReferences = useMemo(() => {
     const activePhasesWithCapex = existingPhases.filter(p => {
       const ce = p.capexEstimate ?? p.draft?.capexEstimate;
       const surf = p.modeBox === "MACRO" ? p.surface : p.typologies.reduce((s, t) => s + t.surfaceParBox * t.nombreDeBox, 0);
-      return p.status === "ACTIVE" && ce?.equipementProductifM2 && surf > 0;
+      return p.status === "ACTIVE" && ce && surf > 0;
     });
-    if (activePhasesWithCapex.length === 0) return null;
-    const totalEquip = activePhasesWithCapex.reduce((s, p) => {
-      const ce = p.capexEstimate ?? p.draft?.capexEstimate;
-      return s + (ce?.equipementProductifM2 ?? 0);
-    }, 0);
+    if (activePhasesWithCapex.length === 0) return { equipM2: null, taxeM2: null };
     const totalSurf = activePhasesWithCapex.reduce((s, p) => {
       return s + (p.modeBox === "MACRO" ? p.surface : p.typologies.reduce((ss, t) => ss + t.surfaceParBox * t.nombreDeBox, 0));
     }, 0);
-    return totalSurf > 0 ? totalEquip / totalSurf : null;
+    const totalEquip = activePhasesWithCapex.reduce((s, p) => s + ((p.capexEstimate ?? p.draft?.capexEstimate)?.equipementProductifM2 ?? 0), 0);
+    const totalTaxe = activePhasesWithCapex.reduce((s, p) => s + ((p.capexEstimate ?? p.draft?.capexEstimate)?.taxeAmenagement ?? 0), 0);
+    return {
+      equipM2: totalEquip > 0 && totalSurf > 0 ? totalEquip / totalSurf : null,
+      taxeM2: totalTaxe > 0 && totalSurf > 0 ? totalTaxe / totalSurf : null,
+    };
   }, [existingPhases]);
 
   const financingTotal = draft.financing.reduce((s, f) => s + f.montant, 0);
@@ -361,9 +362,9 @@ export default function CapacityPhaseWizard({
                   <Label>Équipement productif (montant HT)</Label>
                   <Input type="number" value={capex.equipementProductifM2 || ""} placeholder="Montant brut en €" onChange={e => updateCapex({ equipementProductifM2: Number(e.target.value) })} />
                   <div className="text-xs text-muted-foreground space-y-1">
-                    {referenceEquipM2 !== null ? (
+                    {phaseReferences.equipM2 !== null ? (
                       <p>
-                        Prix moyen observé sur les phases précédentes : <strong>{fmt(referenceEquipM2)} €/m²</strong> — soit {fmt(referenceEquipM2 * totalSurface)} € HT pour {fmt(totalSurface)} m² de cette phase
+                        Prix moyen observé sur les phases précédentes : <strong>{fmt(phaseReferences.equipM2)} €/m²</strong> — soit {fmt(phaseReferences.equipM2 * totalSurface)} € HT pour {fmt(totalSurface)} m² de cette phase
                       </p>
                     ) : (
                       <p>Aucune référence disponible (première phase avec CAPEX).</p>
@@ -384,9 +385,20 @@ export default function CapacityPhaseWizard({
                 <div className="space-y-2">
                   <Label>Taxe d'aménagement</Label>
                   <Input type="number" value={capex.taxeAmenagement || ""} onChange={e => updateCapex({ taxeAmenagement: Number(e.target.value) })} />
-                  <p className="text-xs text-muted-foreground">
-                    Estimation basée sur la surface : {fmt(totalSurface * 5)} €
-                  </p>
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    {phaseReferences.taxeM2 !== null ? (
+                      <p>
+                        Référence phases précédentes : <strong>{fmt(phaseReferences.taxeM2)} €/m²</strong> — soit {fmt(phaseReferences.taxeM2 * totalSurface)} € HT pour {fmt(totalSurface)} m²
+                      </p>
+                    ) : (
+                      <p>Aucune référence disponible (première phase avec taxe d'aménagement).</p>
+                    )}
+                    {totalSurface > 0 && capex.taxeAmenagement > 0 && (
+                      <p className="font-medium">
+                        Cette phase : <strong>{fmt(capex.taxeAmenagement / totalSurface)} €/m²</strong> pour {fmt(totalSurface)} m²
+                      </p>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Honoraires (HT)</Label>
