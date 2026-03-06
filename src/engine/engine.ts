@@ -241,7 +241,8 @@ function computeFonciere(inputs: EngineInputs, loyerMensuelHT: number): Fonciere
 
   const totalRevenusMensuelHT = loyerMensuelHT + totalOtherRevenuesMensuellesHT;
 
-  const interetsMensuels = inputs.financement.sciDebts.reduce(
+  const allSciDebts = getAllFonciereDebts(inputs);
+  const interetsMensuels = allSciDebts.reduce(
     (t, d) => t + d.amount * (d.annualRate / 100 / 12), 0
   );
 

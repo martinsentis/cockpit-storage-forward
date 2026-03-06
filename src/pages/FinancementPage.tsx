@@ -251,6 +251,71 @@ function FinancingWizard({ item, entities, phases, projectStartDate, onSave, onC
                 </div>
               ))}
             </div>
+
+            {/* ── Mini tableau d'amortissement (crédit bancaire uniquement) ── */}
+            {!isLease && form.amount > 0 && form.durationMonths > 0 && form.annualRate > 0 && (() => {
+              const capital = form.amount;
+              const rate = form.annualRate / 100;
+              const monthlyRate = rate / 12;
+              const deferralMonths = form.deferralType !== "NONE" ? form.deferralMonths : 0;
+              const amortMonths = form.durationMonths - deferralMonths;
+              const capitalAfterDeferral = form.deferralType === "TOTAL"
+                ? capital * Math.pow(1 + monthlyRate, deferralMonths)
+                : capital;
+              const monthlyCapital = amortMonths > 0 ? capitalAfterDeferral / amortMonths : 0;
+              const interestFirstMonth = capitalAfterDeferral * monthlyRate;
+              const interestLastMonth = monthlyCapital * monthlyRate;
+              const avgInterest = (interestFirstMonth + interestLastMonth) / 2;
+              const deferralInterest = capital * monthlyRate;
+              const deferralPayment = (form.deferralType === "PARTIAL" ? deferralInterest : 0) + form.insuranceMonthly;
+              const avgAmortPayment = monthlyCapital + avgInterest + form.insuranceMonthly;
+
+              return (
+                <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+                  <h4 className="text-sm font-semibold">Aperçu du tableau d'amortissement</h4>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-1.5 text-muted-foreground font-medium">Période</th>
+                        <th className="text-right py-1.5 text-muted-foreground font-medium">Capital</th>
+                        <th className="text-right py-1.5 text-muted-foreground font-medium">Intérêts</th>
+                        <th className="text-right py-1.5 text-muted-foreground font-medium">Mensualité</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {deferralMonths > 0 && (
+                        <tr className="border-b border-border">
+                          <td className="py-1.5">Différé ({deferralMonths} mois)</td>
+                          <td className="text-right">{form.deferralType === "TOTAL" ? "Capitalisé" : "0 €"}</td>
+                          <td className="text-right">{fmt(deferralInterest)} €</td>
+                          <td className="text-right font-medium">{fmt(deferralPayment)} €</td>
+                        </tr>
+                      )}
+                      {amortMonths > 0 && (
+                        <tr className="border-b border-border">
+                          <td className="py-1.5">Amortissement ({amortMonths} mois)</td>
+                          <td className="text-right">{fmt(monthlyCapital)} €</td>
+                          <td className="text-right">{fmt(avgInterest)} € <span className="text-xs text-muted-foreground">(moy.)</span></td>
+                          <td className="text-right font-medium">{fmt(avgAmortPayment)} € <span className="text-xs text-muted-foreground">(moy.)</span></td>
+                        </tr>
+                      )}
+                      <tr className="font-semibold">
+                        <td className="py-1.5">Coût total estimé</td>
+                        <td colSpan={3} className="text-right">
+                          {fmtCurrency(
+                            (deferralMonths * deferralPayment) + (amortMonths * avgAmortPayment)
+                          )}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <p className="text-xs text-muted-foreground">
+                    Estimation indicative (amortissement linéaire, intérêts moyennés).
+                  </p>
+                </div>
+              );
+            })()}
+
             {dateExceeded && (
               <Alert variant="destructive" className="py-2 px-3">
                 <AlertTriangle className="h-4 w-4" />

@@ -648,7 +648,11 @@ export default function CapacityPhaseWizard({
               Suivant <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           ) : (
-            <Button onClick={onFinalize}>
+            <Button onClick={() => {
+              const finalPhase = getFlushedPhase();
+              flushPending();
+              onFinalize(finalPhase);
+            }}>
               <Check className="h-4 w-4 mr-1" /> Créer cette phase capacitaire
             </Button>
           )}
