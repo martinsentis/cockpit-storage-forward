@@ -1,40 +1,48 @@
 
 
-## Diagnostic
+## Plan : Implémenter le Cockpit V1 complet
 
-Two root causes identified in the `onFinalize` handler (`ExploitationPage.tsx`, lines 1137-1205):
+### Contexte
+Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
 
-### Problem 1 — Crédits SCI invisibles dans Foncière
-The wizard puts **all** debts into `state.financement.debts`, regardless of entity. But `FoncierePage.tsx` reads exclusively from `state.financement.sciDebts` (line 151/164). When a phase targets entity `__fonciere__`, the created debt goes to the wrong array.
+### Fichiers à créer
 
-**Fix**: In `onFinalize`, split debt creation: debts with `entityId === "__fonciere__"` go into `sciDebts`, others go into `debts`.
+**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
 
-### Problem 2 — Actifs immobilisés absents dans Foncière
-The wizard stores CAPEX data as `capexEstimate` on the phase object (surface cost breakdown), but **never creates entries** in `state.build.capexEvents`. `FoncierePage.tsx` line 38 reads assets from `state.build.capexEvents[*].assets` — so the section is always empty after wizard finalization.
+**2. `src/types/project.ts`** — Types et defaults :
+- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
+- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
+  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
+  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
+  - `revenueParams` (surface, prixM2, tauxRemplissage)
+  - `services` ([] par défaut)
+  - `opexPercentOfRevenue`
+  - `debts`, `sciDebts` ([] par défaut)
+  - `sciChargesCash`, `sciAmortization` (0 par défaut)
+  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
+  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
+- Constantes `DEFAULT_*` exportées pour chaque section
 
-**Fix**: In `onFinalize`, when the phase targets `__fonciere__`, create a `CapexEvent` in `state.build.capexEvents` with budget lines derived from the phase's `capexEstimate` and corresponding amortizable assets.
+**3. `src/contexts/ProjectContext.tsx`** :
+- State initialisé avec les defaults
+- `validated` flags (5 booleans, tous false)
+- `updateSection()`, `validateSection()`, `isProjectComplete()`
+- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
 
-### Implementation — `src/pages/ExploitationPage.tsx`
+**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
 
-**Debt routing (lines 1142-1169)**:
-```
-// Split by entity
-const foncDebts = newDebts.filter(d => d.entityId === "__fonciere__");
-const exploDebts = newDebts.filter(d => d.entityId !== "__fonciere__");
-if (foncDebts.length > 0) updateSection("financement", { sciDebts: [...state.financement.sciDebts, ...foncDebts] });
-if (exploDebts.length > 0) updateSection("financement", { debts: [...state.financement.debts, ...exploDebts] });
-```
+**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
 
-**CAPEX/Asset creation (new block after debt handling)**:
-When entity is `__fonciere__`, create a `CapexEvent` from `capexEstimate`:
-- Map non-zero estimate fields to budget lines (Équipement productif → EQUIPEMENTS_PRODUCTIFS, Aménagement → VRD, Honoraires → HONORAIRES, Divers → DIVERS)
-- Create matching amortizable assets for eligible categories (EQUIPEMENTS_PRODUCTIFS, VRD)
-- Set `startMonth` from phase data
-- Push event into `state.build.capexEvents` via `updateSection("build", ...)`
+**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
+- Formulaires pré-remplis depuis le Context
+- Bouton "Enregistrer" → updateSection + validateSection
+- Champs par page alignés sur les inputs API
 
-### Files modified
+**7. `src/pages/DashboardPage.tsx`** :
+- Liste les sections manquantes si projet incomplet
+- Bouton "Lancer la simulation" désactivé si incomplet
+- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
+- Affiche réponse JSON ou erreur dans `<pre>`
 
-| File | Change |
-|---|---|
-| `src/pages/ExploitationPage.tsx` | Route SCI debts to `sciDebts`; generate `CapexEvent` + assets from `capexEstimate` |
+**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
 
