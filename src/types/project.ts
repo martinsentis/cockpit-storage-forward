@@ -113,17 +113,56 @@ export interface BuildData {
 
 export type DebtType = "BANK_LOAN" | "LEASE";
 export type FinancingStatus = "A_CONFIGURER" | "CONFIGURE";
+export type DeferralType = "NONE" | "PARTIAL" | "TOTAL";
 
 export interface DebtItem {
-  id?: string;
+  id: string;
   label: string;
-  type?: DebtType;
+  type: DebtType;
+  entityId: string;
   phaseId?: string;
   amount: number;
+  startDate: string; // "YYYY-MM"
+  status: FinancingStatus;
+  // Bank loan fields
   annualRate: number;
   durationMonths: number;
+  deferralType: DeferralType;
   deferralMonths: number;
-  status?: FinancingStatus;
+  insuranceMonthly: number;
+  suspensionEnabled: boolean;
+  suspensionMonthsPerYear: number;
+  // Lease fields
+  firstPayment: number;
+  monthlyPayment: number;
+  purchaseOption: number;
+}
+
+export const DEBT_TYPE_LABELS: Record<DebtType, string> = {
+  BANK_LOAN: "Crédit bancaire",
+  LEASE: "Crédit-bail",
+};
+
+export function createEmptyDebtItem(type: DebtType = "BANK_LOAN"): DebtItem {
+  return {
+    id: crypto.randomUUID(),
+    label: "",
+    type,
+    entityId: "__fonciere__",
+    amount: 0,
+    startDate: "",
+    status: "A_CONFIGURER",
+    annualRate: 0,
+    durationMonths: type === "BANK_LOAN" ? 240 : 60,
+    deferralType: "NONE",
+    deferralMonths: 0,
+    insuranceMonthly: 0,
+    suspensionEnabled: false,
+    suspensionMonthsPerYear: 0,
+    firstPayment: 0,
+    monthlyPayment: 0,
+    purchaseOption: 0,
+  };
 }
 
 export interface FinancementData {
