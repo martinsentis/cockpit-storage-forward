@@ -402,7 +402,7 @@ export default function FoncierePage() {
                   <TableCell className="text-right font-medium">−{fmt(sci.totalChargesMensuellesHT * 12)} €</TableCell>
                 </TableRow>
                 <TableRow className="border-t-2 font-semibold">
-                  <TableCell>= Résultat d'exploitation SCI</TableCell>
+                  <TableCell>= Résultat d'exploitation Foncière</TableCell>
                   <TableCell className={`text-right ${sci.resultatExploitationSCI >= 0 ? "text-green-600" : "text-destructive"}`}>{fmt(sci.resultatExploitationSCI)} €</TableCell>
                   <TableCell className={`text-right ${sci.resultatExploitationSCI >= 0 ? "text-green-600" : "text-destructive"}`}>{fmt(sci.resultatExploitationSCI * 12)} €</TableCell>
                 </TableRow>
