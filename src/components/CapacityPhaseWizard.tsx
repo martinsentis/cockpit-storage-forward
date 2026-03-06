@@ -43,7 +43,7 @@ interface Props {
   phase: CapacityPhase;
   existingPhases: CapacityPhase[];
   onUpdate: (patch: Partial<CapacityPhase>) => void;
-  onFinalize: () => void;
+  onFinalize: (finalPhase: CapacityPhase) => void;
   onClose: () => void;
   defaultVatRate: number;
   projectStartDate: string;
@@ -54,11 +54,44 @@ export default function CapacityPhaseWizard({
 }: Props) {
   const [step, setStep] = useState(phase.draft?.currentStep ?? 0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingPatchRef = useRef<Partial<CapacityPhase> | null>(null);
 
   const debouncedUpdate = useCallback((patch: Partial<CapacityPhase>) => {
+    pendingPatchRef.current = { ...(pendingPatchRef.current ?? {}), ...patch };
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => onUpdate(patch), 300);
+    debounceRef.current = setTimeout(() => {
+      if (pendingPatchRef.current) {
+        onUpdate(pendingPatchRef.current);
+        pendingPatchRef.current = null;
+      }
+    }, 300);
   }, [onUpdate]);
+
+  /** Flush any pending debounced update immediately */
+  const flushPending = useCallback(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    if (pendingPatchRef.current) {
+      onUpdate(pendingPatchRef.current);
+      pendingPatchRef.current = null;
+    }
+  }, [onUpdate]);
+
+  /** Get the phase with any unflushed patches merged */
+  const getFlushedPhase = useCallback((): CapacityPhase => {
+    if (!pendingPatchRef.current) return phase;
+    const merged = { ...phase, ...pendingPatchRef.current };
+    // Deep merge draft if present in both
+    if (pendingPatchRef.current.draft && phase.draft) {
+      merged.draft = { ...phase.draft, ...pendingPatchRef.current.draft };
+      if (pendingPatchRef.current.draft.capexEstimate) {
+        merged.draft.capexEstimate = { ...phase.draft.capexEstimate, ...pendingPatchRef.current.draft.capexEstimate };
+      }
+    }
+    return merged as CapacityPhase;
+  }, [phase]);
 
   const draft = phase.draft!;
   const capex = draft.capexEstimate;
