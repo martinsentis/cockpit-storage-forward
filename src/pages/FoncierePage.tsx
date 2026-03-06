@@ -363,10 +363,10 @@ export default function FoncierePage() {
           </AccordionContent>
         </AccordionItem>
 
-        {/* ═══ SECTION 5 — Synthèse financière SCI ═══ */}
+        {/* ═══ SECTION 5 — Synthèse financière Foncière ═══ */}
         <AccordionItem value="synthese" className="border rounded-lg px-4">
           <AccordionTrigger className="hover:no-underline">
-            <span className="font-semibold text-lg">5. Synthèse financière SCI</span>
+            <span className="font-semibold text-lg">5. Synthèse financière Foncière</span>
           </AccordionTrigger>
           <AccordionContent className="pt-2">
             <p className="text-xs text-muted-foreground mb-3">
