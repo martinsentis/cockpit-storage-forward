@@ -40,7 +40,12 @@ function DebtTable({ title, debts, onChange, projectStartDate }: DebtTableProps)
       {debts.map((d, idx) => (
         <div key={idx} className="rounded-lg border bg-muted/30 p-3 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Dette {idx + 1}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground">Dette {idx + 1}</span>
+              {d.status === "A_CONFIGURER" && (
+                <Badge variant="destructive" className="text-[10px] px-1.5 py-0">À configurer</Badge>
+              )}
+            </div>
             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => remove(idx)}>
               <Trash2 className="h-3.5 w-3.5" />
             </Button>

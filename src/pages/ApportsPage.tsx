@@ -281,7 +281,12 @@ export default function ApportsPage() {
                       <TableCell className="font-medium">{resolveNom(a.apporteurId)}</TableCell>
                       <TableCell>{resolveNom(a.beneficiaireId)}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{APPORT_TYPE_LABELS[a.type]}</Badge>
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant="outline">{APPORT_TYPE_LABELS[a.type]}</Badge>
+                          {a.status === "A_CONFIGURER" && (
+                            <Badge variant="destructive" className="text-[10px] px-1.5 py-0">À configurer</Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right font-medium">{fmt(a.montant)}</TableCell>
                       <TableCell>
