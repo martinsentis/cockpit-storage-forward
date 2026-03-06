@@ -199,6 +199,8 @@ export interface CapacityPhase {
   targetOccupancy: number;
   rampUpMonths: number;
   rampCurve: RampCurve;
+  // CAPEX (persisted after finalization)
+  capexEstimate?: PhaseCapexEstimate;
   // Draft wizard data
   draft?: PhaseDraft;
 }
