@@ -1,48 +1,108 @@
 
 
-## Plan : Implémenter le Cockpit V1 complet
+## Plan : Création automatique complète des objets de financement depuis le wizard
 
-### Contexte
-Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
+### Constat actuel
+- Le `onFinalize` dans `ExploitationPage.tsx` ne crée des `DebtItem` que pour `DETTE_BANCAIRE` et `CREDIT_BAIL`
+- Les sources `CCA` et `CAPITAL` ne créent rien dans le module Apports
+- L'encart synthèse (step 6) ne couvre que les dettes bancaires
+- `DebtItem` n'a pas de champs `id`, `type`, `phaseId`, `status` — il faut les ajouter
+- `ApportItem` a déjà un `id`, `type`, `montant`, `statut` mais pas de `phaseId`
 
-### Fichiers à créer
+### Modifications
 
-**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
+#### 1. `src/types/project.ts` — Enrichir les types
 
-**2. `src/types/project.ts`** — Types et defaults :
-- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
-- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
-  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
-  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
-  - `revenueParams` (surface, prixM2, tauxRemplissage)
-  - `services` ([] par défaut)
-  - `opexPercentOfRevenue`
-  - `debts`, `sciDebts` ([] par défaut)
-  - `sciChargesCash`, `sciAmortization` (0 par défaut)
-  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
-  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
-- Constantes `DEFAULT_*` exportées pour chaque section
+**DebtItem** — ajouter des champs optionnels pour tracer l'origine phase et le statut :
+```ts
+export interface DebtItem {
+  id?: string;
+  label: string;
+  type?: "BANK_LOAN" | "LEASE";    // nouveau
+  phaseId?: string;                 // nouveau
+  amount: number;
+  annualRate: number;
+  durationMonths: number;
+  deferralMonths: number;
+  status?: "A_CONFIGURER" | "CONFIGURE";  // nouveau
+}
+```
 
-**3. `src/contexts/ProjectContext.tsx`** :
-- State initialisé avec les defaults
-- `validated` flags (5 booleans, tous false)
-- `updateSection()`, `validateSection()`, `isProjectComplete()`
-- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
+**ApportItem** — ajouter `phaseId` et `status` optionnels :
+```ts
+export interface ApportItem {
+  // champs existants...
+  phaseId?: string;                 // nouveau
+  status?: "A_CONFIGURER" | "CONFIGURE";  // nouveau
+}
+```
 
-**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
+#### 2. `src/pages/ExploitationPage.tsx` — `onFinalize` étendu
 
-**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
+Remplacer la logique actuelle (lignes 1137-1155) pour couvrir les 4 sources :
 
-**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
-- Formulaires pré-remplis depuis le Context
-- Bouton "Enregistrer" → updateSection + validateSection
-- Champs par page alignés sur les inputs API
+- **DETTE_BANCAIRE** → créer `DebtItem` avec `type: "BANK_LOAN"`, `label: "Crédit – Phase {nom}"`, `status: "A_CONFIGURER"` dans `financement.debts`
+- **CREDIT_BAIL** → créer `DebtItem` avec `type: "LEASE"`, `label: "Crédit-bail – Phase {nom}"`, `status: "A_CONFIGURER"` dans `financement.debts`
+- **CCA** → créer `ApportItem` avec `type: "CCA"`, `commentaire: "CCA – Phase {nom}"`, `status: "A_CONFIGURER"` dans `apports.apports`
+- **CAPITAL** → créer `ApportItem` avec `type: "CAPITAL"`, `commentaire: "Apport capital – Phase {nom}"`, `status: "A_CONFIGURER"` dans `apports.apports`
 
-**7. `src/pages/DashboardPage.tsx`** :
-- Liste les sections manquantes si projet incomplet
-- Bouton "Lancer la simulation" désactivé si incomplet
-- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
-- Affiche réponse JSON ou erreur dans `<pre>`
+Pour les `ApportItem`, utiliser `apporteurId: ""` et `beneficiaireId` basé sur `draft.entityPorteuse` (`__fonciere__` ou `__exploitation__`).
 
-**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
+#### 3. `src/components/CapacityPhaseWizard.tsx` — Synthèse enrichie
+
+Remplacer l'encart actuel (lignes 563-577) par un bloc qui liste **toutes** les sources non-trésorerie :
+
+```tsx
+{(() => {
+  const itemsToCreate = draft.financing.filter(f => f.source !== "TRESORERIE");
+  if (itemsToCreate.length === 0) return null;
+  const labelMap = {
+    DETTE_BANCAIRE: "Crédit bancaire",
+    CREDIT_BAIL: "Crédit-bail",
+    CCA: "Apport CCA",
+    CAPITAL: "Apport capital",
+  };
+  const moduleMap = {
+    DETTE_BANCAIRE: { label: "Module Financement", path: "/financement" },
+    CREDIT_BAIL: { label: "Module Financement", path: "/financement" },
+    CCA: { label: "Module Apports associés", path: "/apports" },
+    CAPITAL: { label: "Module Apports associés", path: "/apports" },
+  };
+  return (
+    <div className="rounded-md border border-amber-300 bg-amber-50 ...">
+      <h4>Financements à compléter</h4>
+      <ul>
+        {itemsToCreate.map(f => (
+          <li key={f.id}>
+            {labelMap[f.source]} — {fmt(f.montant)} € → <Link to={moduleMap[f.source].path}>...</Link>
+          </li>
+        ))}
+      </ul>
+      <p>Les paramètres détaillés devront être complétés dans les modules dédiés.</p>
+    </div>
+  );
+})()}
+```
+
+Passer `useNavigate` via une nouvelle prop `onNavigate?: (path: string) => void` pour que les liens de la synthèse puissent rediriger.
+
+#### 4. `src/pages/FinancementPage.tsx` — Badge "À configurer"
+
+Sur chaque `DebtItem` qui a `status === "A_CONFIGURER"` :
+- Afficher un `<Badge variant="destructive">À configurer</Badge>` à côté du libellé
+
+#### 5. `src/pages/ApportsPage.tsx` — Badge "À configurer"
+
+Sur chaque `ApportItem` qui a `status === "A_CONFIGURER"` :
+- Afficher un `<Badge variant="destructive">À configurer</Badge>` dans le tableau
+
+### Résumé des fichiers modifiés
+
+| Fichier | Changement |
+|---|---|
+| `src/types/project.ts` | Champs `id`, `type`, `phaseId`, `status` sur `DebtItem` ; `phaseId`, `status` sur `ApportItem` |
+| `src/pages/ExploitationPage.tsx` | `onFinalize` crée des objets pour les 4 sources |
+| `src/components/CapacityPhaseWizard.tsx` | Synthèse liste toutes les sources avec liens vers modules |
+| `src/pages/FinancementPage.tsx` | Badge "À configurer" sur les dettes auto-créées |
+| `src/pages/ApportsPage.tsx` | Badge "À configurer" sur les apports auto-créés |
 
