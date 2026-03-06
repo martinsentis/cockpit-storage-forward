@@ -361,18 +361,17 @@ export default function CapacityPhaseWizard({
                   <Label>Équipement productif (montant HT)</Label>
                   <Input type="number" value={capex.equipementProductifM2 || ""} placeholder="Montant brut en €" onChange={e => updateCapex({ equipementProductifM2: Number(e.target.value) })} />
                   <div className="text-xs text-muted-foreground space-y-1">
-                    {referenceEquipM2 !== null && (
+                    {referenceEquipM2 !== null ? (
                       <p>
-                        Référence phases précédentes : {fmt(referenceEquipM2)} €/m² — soit {fmt(referenceEquipM2 * totalSurface)} € HT pour {fmt(totalSurface)} m²
+                        Prix moyen observé sur les phases précédentes : <strong>{fmt(referenceEquipM2)} €/m²</strong> — soit {fmt(referenceEquipM2 * totalSurface)} € HT pour {fmt(totalSurface)} m² de cette phase
                       </p>
+                    ) : (
+                      <p>Aucune référence disponible (première phase avec CAPEX).</p>
                     )}
                     {totalSurface > 0 && capex.equipementProductifM2 > 0 && (
                       <p className="font-medium">
-                        Cette phase : {fmt(capex.equipementProductifM2 / totalSurface)} €/m² pour {fmt(totalSurface)} m²
+                        Cette phase : <strong>{fmt(capex.equipementProductifM2 / totalSurface)} €/m²</strong> pour {fmt(totalSurface)} m²
                       </p>
-                    )}
-                    {totalSurface === 0 && (
-                      <p>Surface non définie — retournez à l'étape 2 pour la renseigner.</p>
                     )}
                   </div>
                 </div>
