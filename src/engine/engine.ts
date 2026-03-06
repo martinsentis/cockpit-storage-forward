@@ -90,18 +90,27 @@ function revenueMonthlyHT(r: SCIRevenueItem): number {
 // LOYER DYNAMIQUE COMPUTATION
 // ══════════════════════════════════════════════════════════════
 
+/** Aggregate all debts belonging to the foncière entity */
+function getAllFonciereDebts(inputs: EngineInputs) {
+  return [
+    ...inputs.financement.sciDebts,
+    ...(inputs.financement.debts ?? []).filter(d => d.entityId === "__fonciere__"),
+  ];
+}
+
 function computeLoyerDynamique(inputs: EngineInputs): LoyerDynamiqueEngineOutputs {
   const ld = inputs.loyerDynamique;
+  const allSciDebts = getAllFonciereDebts(inputs);
 
   const sciCharges = inputs.fonciere.charges
     .filter(c => c.isActive)
     .reduce((t, c) => t + chargeMonthlyHT(c), 0);
 
-  const interets = inputs.financement.sciDebts.reduce(
+  const interets = allSciDebts.reduce(
     (t, d) => t + d.amount * (d.annualRate / 100 / 12), 0
   );
 
-  const principal = inputs.financement.sciDebts.reduce(
+  const principal = allSciDebts.reduce(
     (t, d) => d.durationMonths > 0 ? t + d.amount / d.durationMonths : t, 0
   );
 
@@ -232,7 +241,8 @@ function computeFonciere(inputs: EngineInputs, loyerMensuelHT: number): Fonciere
 
   const totalRevenusMensuelHT = loyerMensuelHT + totalOtherRevenuesMensuellesHT;
 
-  const interetsMensuels = inputs.financement.sciDebts.reduce(
+  const allSciDebts = getAllFonciereDebts(inputs);
+  const interetsMensuels = allSciDebts.reduce(
     (t, d) => t + d.amount * (d.annualRate / 100 / 12), 0
   );
 

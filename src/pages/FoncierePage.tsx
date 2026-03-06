@@ -363,10 +363,10 @@ export default function FoncierePage() {
           </AccordionContent>
         </AccordionItem>
 
-        {/* ═══ SECTION 5 — Synthèse financière SCI ═══ */}
+        {/* ═══ SECTION 5 — Synthèse financière Foncière ═══ */}
         <AccordionItem value="synthese" className="border rounded-lg px-4">
           <AccordionTrigger className="hover:no-underline">
-            <span className="font-semibold text-lg">5. Synthèse financière SCI</span>
+            <span className="font-semibold text-lg">5. Synthèse financière Foncière</span>
           </AccordionTrigger>
           <AccordionContent className="pt-2">
             <p className="text-xs text-muted-foreground mb-3">
@@ -402,7 +402,7 @@ export default function FoncierePage() {
                   <TableCell className="text-right font-medium">−{fmt(sci.totalChargesMensuellesHT * 12)} €</TableCell>
                 </TableRow>
                 <TableRow className="border-t-2 font-semibold">
-                  <TableCell>= Résultat d'exploitation SCI</TableCell>
+                  <TableCell>= Résultat d'exploitation Foncière</TableCell>
                   <TableCell className={`text-right ${sci.resultatExploitationSCI >= 0 ? "text-green-600" : "text-destructive"}`}>{fmt(sci.resultatExploitationSCI)} €</TableCell>
                   <TableCell className={`text-right ${sci.resultatExploitationSCI >= 0 ? "text-green-600" : "text-destructive"}`}>{fmt(sci.resultatExploitationSCI * 12)} €</TableCell>
                 </TableRow>
@@ -422,7 +422,7 @@ export default function FoncierePage() {
                   <TableCell className="text-right font-medium">−{fmt(sci.amortissementAnnuel)} €</TableCell>
                 </TableRow>
                 <TableRow className="border-t-2 font-bold">
-                  <TableCell>= Résultat fiscal SCI</TableCell>
+                  <TableCell>= Résultat fiscal Foncière</TableCell>
                   <TableCell className={`text-right ${sci.resultatFiscal >= 0 ? "text-green-600" : "text-destructive"}`}>{fmt(sci.resultatFiscal)} €</TableCell>
                   <TableCell className={`text-right ${sci.resultatFiscal >= 0 ? "text-green-600" : "text-destructive"}`}>{fmt(sci.resultatFiscal * 12)} €</TableCell>
                 </TableRow>
