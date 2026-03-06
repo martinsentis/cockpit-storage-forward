@@ -25,11 +25,13 @@ function fmtCurrency(n: number) { return n.toLocaleString("fr-FR", { style: "cur
 interface FinancingWizardProps {
   item: DebtItem;
   entities: { id: string; nom: string }[];
+  phases: CapacityPhase[];
+  projectStartDate: string;
   onSave: (item: DebtItem) => void;
   onClose: () => void;
 }
 
-function FinancingWizard({ item, entities, onSave, onClose }: FinancingWizardProps) {
+function FinancingWizard({ item, entities, phases, projectStartDate, onSave, onClose }: FinancingWizardProps) {
   const [form, setForm] = useState<DebtItem>({ ...item });
   const isLease = form.type === "LEASE";
   const tabs = isLease
