@@ -355,10 +355,22 @@ export default function CapacityPhaseWizard({
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Équipement productif (montant HT)</Label>
-                  <Input type="number" value={capex.equipementProductifM2 || ""} placeholder="€/m²" onChange={e => updateCapex({ equipementProductifM2: Number(e.target.value) })} />
-                  <p className="text-xs text-muted-foreground">
-                    Estimation basée sur la surface productive : {fmt(capex.equipementProductifM2)} €/m² × {fmt(totalSurface)} m² = {fmt(capex.equipementProductifM2 * totalSurface)} € HT
-                  </p>
+                  <Input type="number" value={capex.equipementProductifM2 || ""} placeholder="Montant brut en €" onChange={e => updateCapex({ equipementProductifM2: Number(e.target.value) })} />
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    {referenceEquipM2 !== null && (
+                      <p>
+                        Référence phases précédentes : {fmt(referenceEquipM2)} €/m² — soit {fmt(referenceEquipM2 * totalSurface)} € HT pour {fmt(totalSurface)} m²
+                      </p>
+                    )}
+                    {totalSurface > 0 && capex.equipementProductifM2 > 0 && (
+                      <p className="font-medium">
+                        Cette phase : {fmt(capex.equipementProductifM2 / totalSurface)} €/m² pour {fmt(totalSurface)} m²
+                      </p>
+                    )}
+                    {totalSurface === 0 && (
+                      <p>Surface non définie — retournez à l'étape 2 pour la renseigner.</p>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Aménagement / travaux (HT)</Label>
