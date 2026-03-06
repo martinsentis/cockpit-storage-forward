@@ -148,30 +148,37 @@ export default function FoncierePage() {
             <span className="font-semibold text-lg">2. Crédits immobiliers</span>
           </AccordionTrigger>
           <AccordionContent className="space-y-4 pt-2">
-            {state.financement.sciDebts.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Aucun crédit SCI défini dans le module Financement.</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Libellé</TableHead>
-                    <TableHead className="text-right">Montant initial</TableHead>
-                    <TableHead className="text-right">Taux</TableHead>
-                    <TableHead className="text-right">Durée (mois)</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {state.financement.sciDebts.map((d, i) => (
-                    <TableRow key={i}>
-                      <TableCell>{d.label || `Crédit ${i + 1}`}</TableCell>
-                      <TableCell className="text-right">{fmt(d.amount)} €</TableCell>
-                      <TableCell className="text-right">{d.annualRate} %</TableCell>
-                      <TableCell className="text-right">{d.durationMonths}</TableCell>
+            {(() => {
+              const foncDebts = [
+                ...state.financement.sciDebts,
+                ...(state.financement.debts ?? []).filter(d => d.entityId === "__fonciere__"),
+              ];
+              if (foncDebts.length === 0) {
+                return <p className="text-sm text-muted-foreground">Aucun crédit SCI défini dans le module Financement.</p>;
+              }
+              return (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Libellé</TableHead>
+                      <TableHead className="text-right">Montant initial</TableHead>
+                      <TableHead className="text-right">Taux</TableHead>
+                      <TableHead className="text-right">Durée (mois)</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
+                  </TableHeader>
+                  <TableBody>
+                    {foncDebts.map((d, i) => (
+                      <TableRow key={d.id ?? i}>
+                        <TableCell>{d.label || `Crédit ${i + 1}`}</TableCell>
+                        <TableCell className="text-right">{fmt(d.amount)} €</TableCell>
+                        <TableCell className="text-right">{d.annualRate} %</TableCell>
+                        <TableCell className="text-right">{d.durationMonths}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              );
+            })()}
             <p className="text-xs text-muted-foreground">
               Les intérêts et mensualités sont calculés par le moteur financier.
             </p>
