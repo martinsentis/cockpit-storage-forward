@@ -81,6 +81,7 @@ export default function CapacityPhaseWizard({
   }, [capex]);
 
   // Reference €/m² from previous phases
+  console.log("[DEBUG] existingPhases for reference:", existingPhases.map(p => ({ id: p.id, nom: p.nom, status: p.status, capexEstimate: p.capexEstimate, draftCapex: p.draft?.capexEstimate, surface: p.surface, modeBox: p.modeBox })));
   const referenceEquipM2 = useMemo(() => {
     const activePhasesWithCapex = existingPhases.filter(p => {
       const ce = p.capexEstimate ?? p.draft?.capexEstimate;
