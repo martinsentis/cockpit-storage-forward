@@ -275,10 +275,32 @@ function migrateSingleProjectState(parsed: any): { state: ProjectState; validate
     entityDisplayNames: rawProjet.entityDisplayNames ?? {},
   };
 
+  // Migrate old DebtItem format to new format
+  const migrateDebt = (d: any): import("@/types/project").DebtItem => ({
+    id: d.id ?? crypto.randomUUID(),
+    label: d.label ?? "",
+    type: d.type ?? "BANK_LOAN",
+    entityId: d.entityId ?? "__exploitation__",
+    phaseId: d.phaseId,
+    amount: d.amount ?? 0,
+    startDate: d.startDate ?? "",
+    status: d.status ?? "CONFIGURE",
+    annualRate: d.annualRate ?? 0,
+    durationMonths: d.durationMonths ?? 0,
+    deferralType: d.deferralType ?? (d.deferralMonths > 0 ? "PARTIAL" : "NONE"),
+    deferralMonths: d.deferralMonths ?? 0,
+    insuranceMonthly: d.insuranceMonthly ?? 0,
+    suspensionEnabled: d.suspensionEnabled ?? false,
+    suspensionMonthsPerYear: d.suspensionMonthsPerYear ?? 0,
+    firstPayment: d.firstPayment ?? 0,
+    monthlyPayment: d.monthlyPayment ?? 0,
+    purchaseOption: d.purchaseOption ?? 0,
+  });
+
   const financement: FinancementData = {
     apportFondsPropres: rawFinancement.apportFondsPropres ?? DEFAULT_FINANCEMENT.apportFondsPropres,
-    debts: rawFinancement.debts ?? [],
-    sciDebts: rawFinancement.sciDebts ?? [],
+    debts: (rawFinancement.debts ?? []).map(migrateDebt),
+    sciDebts: (rawFinancement.sciDebts ?? []).map((d: any) => migrateDebt({ ...d, entityId: d.entityId ?? "__fonciere__" })),
     sciChargesCash: rawFinancement.sciChargesCash ?? DEFAULT_FINANCEMENT.sciChargesCash,
     sciAmortization: rawFinancement.sciAmortization ?? DEFAULT_FINANCEMENT.sciAmortization,
     initialCash,
