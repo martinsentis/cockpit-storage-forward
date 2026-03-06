@@ -251,7 +251,15 @@ function FinancingWizard({ item, entities, phases, projectStartDate, onSave, onC
                 </div>
               ))}
             </div>
-            <Button className="w-full" onClick={handleSave}>
+            {dateExceeded && (
+              <Alert variant="destructive" className="py-2 px-3">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  La date de début dépasse le lancement de l'exploitation. Corrigez-la dans l'onglet Général.
+                </AlertDescription>
+              </Alert>
+            )}
+            <Button className="w-full" onClick={handleSave} disabled={dateExceeded}>
               <CheckCircle className="h-4 w-4 mr-2" />
               {isLease ? "Créer le crédit-bail" : "Créer le crédit"}
             </Button>
