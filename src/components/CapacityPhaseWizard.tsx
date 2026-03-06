@@ -302,7 +302,12 @@ export default function CapacityPhaseWizard({
                     {Math.round(computedTargetOccupancy * 100)} %
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Moyenne des phases précédentes (ou 90 % par défaut)
+                    Moyenne observée sur les phases précédentes (ou 90 % par défaut).
+                    <br /><br />
+                    Cette valeur est indicative.
+                    Le remplissage réel du parc est piloté globalement par les hypothèses de projection.
+                    <br /><br />
+                    Dans les projections, la cible de surface louée s'applique à l'ensemble du parc de stockage et non à chaque phase individuellement.
                   </p>
                 </div>
               </div>
