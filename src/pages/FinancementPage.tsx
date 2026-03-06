@@ -11,9 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import type { DebtItem, DebtType, DeferralType } from "@/types/project";
+import type { DebtItem, DebtType, DeferralType, CapacityPhase } from "@/types/project";
 import { DEBT_TYPE_LABELS, createEmptyDebtItem, BUILT_IN_SOCIETES, EXPLOITATION_ENTITY_ID, FONCIERE_ENTITY_ID } from "@/types/project";
-import { Plus, Landmark, FileText, Pencil, CheckCircle, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { formatMonthIndex } from "@/lib/monthUtils";
+import { Plus, Landmark, FileText, Pencil, CheckCircle, AlertTriangle, Info } from "lucide-react";
 
 function fmt(n: number) { return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(n); }
 function fmtCurrency(n: number) { return n.toLocaleString("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }); }
@@ -23,11 +25,13 @@ function fmtCurrency(n: number) { return n.toLocaleString("fr-FR", { style: "cur
 interface FinancingWizardProps {
   item: DebtItem;
   entities: { id: string; nom: string }[];
+  phases: CapacityPhase[];
+  projectStartDate: string;
   onSave: (item: DebtItem) => void;
   onClose: () => void;
 }
 
-function FinancingWizard({ item, entities, onSave, onClose }: FinancingWizardProps) {
+function FinancingWizard({ item, entities, phases, projectStartDate, onSave, onClose }: FinancingWizardProps) {
   const [form, setForm] = useState<DebtItem>({ ...item });
   const isLease = form.type === "LEASE";
   const tabs = isLease
@@ -43,6 +47,19 @@ function FinancingWizard({ item, entities, onSave, onClose }: FinancingWizardPro
     setForm(prev => ({ ...prev, [k]: v }));
 
   const durationYears = form.durationMonths > 0 ? (form.durationMonths / 12) : 0;
+
+  // ── Phase date constraint ──
+  const linkedPhase = form.phaseId ? phases.find(p => p.id === form.phaseId) : null;
+  const maxStartDate = useMemo(() => {
+    if (!linkedPhase || !projectStartDate) return null;
+    const [y, m] = projectStartDate.split("-").map(Number);
+    const d = new Date(y, m - 1 + linkedPhase.startMonth);
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    return `${d.getFullYear()}-${mm}`;
+  }, [linkedPhase, projectStartDate]);
+
+  const maxStartDateLabel = linkedPhase ? formatMonthIndex(linkedPhase.startMonth, projectStartDate) : null;
+  const dateExceeded = maxStartDate && form.startDate ? form.startDate > maxStartDate : false;
 
   const handleSave = () => {
     onSave({ ...form, status: "CONFIGURE" });
@@ -87,7 +104,18 @@ function FinancingWizard({ item, entities, onSave, onClose }: FinancingWizardPro
               </div>
               <div className="space-y-2">
                 <Label>Date de début</Label>
-                <Input type="month" value={form.startDate} onChange={e => set("startDate", e.target.value)} />
+                <Input type="month" value={form.startDate} onChange={e => set("startDate", e.target.value)} max={maxStartDate ?? undefined} />
+                {dateExceeded && (
+                  <p className="text-xs text-destructive font-medium">La date dépasse le lancement de l'exploitation ({maxStartDateLabel}).</p>
+                )}
+                {linkedPhase && maxStartDateLabel && !dateExceeded && (
+                  <Alert className="mt-2 py-2 px-3 border-primary/30 bg-primary/5">
+                    <Info className="h-4 w-4 text-primary" />
+                    <AlertDescription className="text-xs">
+                      Phase « {linkedPhase.nom} » — Lancement de l'exploitation prévu : <strong>{maxStartDateLabel}</strong>. La date de début du crédit ne peut pas être postérieure à cette date.
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
             </div>
             {!isLease && (
@@ -223,7 +251,15 @@ function FinancingWizard({ item, entities, onSave, onClose }: FinancingWizardPro
                 </div>
               ))}
             </div>
-            <Button className="w-full" onClick={handleSave}>
+            {dateExceeded && (
+              <Alert variant="destructive" className="py-2 px-3">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  La date de début dépasse le lancement de l'exploitation. Corrigez-la dans l'onglet Général.
+                </AlertDescription>
+              </Alert>
+            )}
+            <Button className="w-full" onClick={handleSave} disabled={dateExceeded}>
               <CheckCircle className="h-4 w-4 mr-2" />
               {isLease ? "Créer le crédit-bail" : "Créer le crédit"}
             </Button>
@@ -393,6 +429,8 @@ export default function FinancementPage() {
         <FinancingWizard
           item={editingItem}
           entities={entities}
+          phases={state.exploitation.capacityPhases}
+          projectStartDate={state.projet.projectStartDate}
           onSave={handleSave}
           onClose={() => setEditingItem(null)}
         />
