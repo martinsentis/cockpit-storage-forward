@@ -613,6 +613,8 @@ export interface ApportItem {
   date: string;
   statut: ApportStatut;
   commentaire?: string;
+  phaseId?: string;
+  status?: FinancingStatus;
 }
 
 export interface ApportsData {
