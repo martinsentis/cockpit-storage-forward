@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { Plus, Trash2, ChevronLeft, ChevronRight, Boxes, LayoutGrid, Check } from "lucide-react";
+import { formatMonthIndex } from "@/lib/monthUtils";
 import type {
   CapacityPhase, PhaseDraft, PhaseCapexEstimate, PhaseFinancingLine,
   PhaseFinancingSource, BoxMode, Typologie, RampCurve,
@@ -26,7 +27,7 @@ const STEPS = [
   { title: "Mode de création", desc: "Choisissez comment définir la capacité de stockage" },
   { title: "Paramétrage capacitaire", desc: "Définissez la surface et les prix" },
   { title: "Ramp-up", desc: "Planifiez la montée en occupation" },
-  { title: "CAPEX estimatif", desc: "Estimez les coûts d'investissement" },
+  { title: "CAPEX estimatif", desc: "Estimez les coûts d'investissement (montants HT)" },
   { title: "Financement du CAPEX", desc: "Répartissez les sources de financement" },
   { title: "Traitement comptable", desc: "Définissez l'amortissement" },
   { title: "Synthèse", desc: "Vérifiez et validez votre phase" },
@@ -49,7 +50,7 @@ interface Props {
 }
 
 export default function CapacityPhaseWizard({
-  phase, existingPhases, onUpdate, onFinalize, onClose, defaultVatRate,
+  phase, existingPhases, onUpdate, onFinalize, onClose, defaultVatRate, projectStartDate,
 }: Props) {
   const [step, setStep] = useState(phase.draft?.currentStep ?? 0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -83,31 +84,45 @@ export default function CapacityPhaseWizard({
   const financingTotal = draft.financing.reduce((s, f) => s + f.montant, 0);
   const financingDelta = financingTotal - capexTotal;
 
+  // Computed target occupancy: average of existing phases or 90%
+  const computedTargetOccupancy = existingPhases.length > 0
+    ? existingPhases.reduce((s, p) => s + p.targetOccupancy, 0) / existingPhases.length
+    : 0.9;
+
   // Pre-fill helpers
   const avgPrixM2 = existingPhases.length > 0
     ? existingPhases.reduce((s, p) => s + p.prixM2, 0) / existingPhases.length
     : undefined;
 
-  const avgEquipM2 = useMemo(() => {
-    const withCapex = existingPhases.filter(p => p.draft === undefined);
-    // No historical CAPEX data available yet (placeholder)
-    return undefined;
-  }, [existingPhases]);
+  // Step validation
+  const canGoNext = (): boolean => {
+    switch (step) {
+      case 0: return !!phase.modeBox;
+      case 1:
+        if (phase.modeBox === "MACRO") return !!phase.nom && phase.surface > 0 && phase.prixM2 > 0;
+        return !!phase.nom && phase.typologies.length > 0 && totalSurface > 0;
+      case 2: return phase.startMonth > 0 && phase.rampUpMonths > 0;
+      case 3: return capex.equipementProductifM2 > 0;
+      case 4: return capexTotal > 0 && Math.abs(financingDelta) < 0.01;
+      case 5: return true;
+      default: return true;
+    }
+  };
 
   const goNext = () => {
     const next = Math.min(step + 1, 6);
+    // When leaving step 2, write the computed target occupancy
+    if (step === 2) {
+      onUpdate({ targetOccupancy: computedTargetOccupancy, draft: { ...draft, currentStep: next } });
+    } else {
+      onUpdate({ draft: { ...draft, currentStep: next } });
+    }
     setStep(next);
-    onUpdate({ draft: { ...draft, currentStep: next } });
   };
   const goPrev = () => {
     const prev = Math.max(step - 1, 0);
     setStep(prev);
     onUpdate({ draft: { ...draft, currentStep: prev } });
-  };
-
-  const canGoNext = (): boolean => {
-    if (step === 4) return Math.abs(financingDelta) < 0.01 || capexTotal === 0;
-    return true;
   };
 
   // Financing helpers
@@ -275,11 +290,20 @@ export default function CapacityPhaseWizard({
                 <div className="space-y-2">
                   <Label>Mois de début d'exploitation</Label>
                   <Input type="number" min={0} value={phase.startMonth || ""} placeholder="Ex: 6" onChange={e => debouncedUpdate({ startMonth: Number(e.target.value) })} />
-                  <p className="text-xs text-muted-foreground">Mois après le début du projet</p>
+                  {phase.startMonth > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {formatMonthIndex(phase.startMonth, projectStartDate)}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Taux d'occupation cible (%)</Label>
-                  <Input type="number" min={0} max={100} value={phase.targetOccupancy ? Math.round(phase.targetOccupancy * 100) : ""} placeholder="Ex: 85" onChange={e => debouncedUpdate({ targetOccupancy: Number(e.target.value) / 100 })} />
+                  <Label>Pourcentage de surface louée cible</Label>
+                  <div className="rounded-md bg-muted p-3 text-sm font-medium">
+                    {Math.round(computedTargetOccupancy * 100)} %
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Moyenne des phases précédentes (ou 90 % par défaut)
+                  </p>
                 </div>
               </div>
               <div className="space-y-2">
@@ -297,6 +321,13 @@ export default function CapacityPhaseWizard({
                   ))}
                 </RadioGroup>
               </div>
+
+              {phase.startMonth > 0 && phase.rampUpMonths > 0 && (
+                <div className="rounded-md bg-muted p-3 text-sm">
+                  Atteinte du régime cible :&nbsp;
+                  <strong>{formatMonthIndex(phase.startMonth + phase.rampUpMonths, projectStartDate)}</strong>
+                </div>
+              )}
             </div>
           )}
 
@@ -305,32 +336,37 @@ export default function CapacityPhaseWizard({
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Équipement productif (€/m²)</Label>
+                  <Label>Équipement productif (montant HT)</Label>
                   <Input type="number" value={capex.equipementProductifM2 || ""} placeholder="€/m²" onChange={e => updateCapex({ equipementProductifM2: Number(e.target.value) })} />
-                  <p className="text-xs text-muted-foreground">Surface : {fmt(totalSurface)} m² → {fmt(capex.equipementProductifM2 * totalSurface)} €</p>
+                  <p className="text-xs text-muted-foreground">
+                    Estimation basée sur la surface productive : {fmt(capex.equipementProductifM2)} €/m² × {fmt(totalSurface)} m² = {fmt(capex.equipementProductifM2 * totalSurface)} € HT
+                  </p>
                 </div>
                 <div className="space-y-2">
-                  <Label>Aménagement / travaux (€)</Label>
+                  <Label>Aménagement / travaux (HT)</Label>
                   <Input type="number" value={capex.amenagement || ""} onChange={e => updateCapex({ amenagement: Number(e.target.value) })} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Taxe d'aménagement (€)</Label>
+                  <Label>Taxe d'aménagement</Label>
                   <Input type="number" value={capex.taxeAmenagement || ""} onChange={e => updateCapex({ taxeAmenagement: Number(e.target.value) })} />
+                  <p className="text-xs text-muted-foreground">
+                    Estimation basée sur la surface : {fmt(totalSurface * 5)} €
+                  </p>
                 </div>
                 <div className="space-y-2">
-                  <Label>Honoraires (€)</Label>
+                  <Label>Honoraires (HT)</Label>
                   <Input type="number" value={capex.honoraires || ""} onChange={e => updateCapex({ honoraires: Number(e.target.value) })} />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Divers / imprévus (€)</Label>
+                <Label>Divers / imprévus (HT)</Label>
                 <Input type="number" value={capex.divers || ""} onChange={e => updateCapex({ divers: Number(e.target.value) })} />
               </div>
               <Separator />
               <div className="rounded-md bg-muted p-4 flex justify-between items-center">
-                <span className="font-semibold">CAPEX total estimé</span>
+                <span className="font-semibold">CAPEX total estimé (HT)</span>
                 <span className="text-lg font-bold">{fmt(capexTotal)} €</span>
               </div>
             </div>
@@ -450,9 +486,10 @@ export default function CapacityPhaseWizard({
                   { label: "Mode", value: phase.modeBox === "MACRO" ? "Macro" : "Typologie" },
                   { label: "Surface", value: `${fmt(totalSurface)} m²` },
                   { label: "CAPEX total", value: `${fmt(capexTotal)} €` },
-                  { label: "Début exploitation", value: `Mois ${phase.startMonth}` },
-                  { label: "Occupation cible", value: `${Math.round(phase.targetOccupancy * 100)} %` },
+                  { label: "Début exploitation", value: formatMonthIndex(phase.startMonth, projectStartDate) },
+                  { label: "Surface louée cible", value: `${Math.round(computedTargetOccupancy * 100)} %` },
                   { label: "Durée ramp-up", value: `${phase.rampUpMonths} mois` },
+                  { label: "Atteinte régime cible", value: formatMonthIndex(phase.startMonth + phase.rampUpMonths, projectStartDate) },
                   { label: "Courbe", value: RAMP_LABELS[phase.rampCurve] },
                   { label: "Entité porteuse", value: draft.entityPorteuse === "SCI" ? "SCI" : "Exploitation" },
                   { label: "Amortissement", value: draft.amortissable ? `${draft.dureeAmortissement} ans` : "Non amortissable" },
