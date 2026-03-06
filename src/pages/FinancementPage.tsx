@@ -48,6 +48,19 @@ function FinancingWizard({ item, entities, phases, projectStartDate, onSave, onC
 
   const durationYears = form.durationMonths > 0 ? (form.durationMonths / 12) : 0;
 
+  // ── Phase date constraint ──
+  const linkedPhase = form.phaseId ? phases.find(p => p.id === form.phaseId) : null;
+  const maxStartDate = useMemo(() => {
+    if (!linkedPhase || !projectStartDate) return null;
+    const [y, m] = projectStartDate.split("-").map(Number);
+    const d = new Date(y, m - 1 + linkedPhase.startMonth);
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    return `${d.getFullYear()}-${mm}`;
+  }, [linkedPhase, projectStartDate]);
+
+  const maxStartDateLabel = linkedPhase ? formatMonthIndex(linkedPhase.startMonth, projectStartDate) : null;
+  const dateExceeded = maxStartDate && form.startDate ? form.startDate > maxStartDate : false;
+
   const handleSave = () => {
     onSave({ ...form, status: "CONFIGURE" });
     toast.success(`${DEBT_TYPE_LABELS[form.type]} enregistré`);
