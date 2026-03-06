@@ -161,6 +161,7 @@ export default function CapacityPhaseWizard({
   };
 
   const goNext = () => {
+    flushPending();
     const next = Math.min(step + 1, 6);
     // When leaving step 2, write the computed target occupancy
     if (step === 2) {
@@ -171,6 +172,7 @@ export default function CapacityPhaseWizard({
     setStep(next);
   };
   const goPrev = () => {
+    flushPending();
     const prev = Math.max(step - 1, 0);
     setStep(prev);
     onUpdate({ draft: { ...draft, currentStep: prev } });
