@@ -77,9 +77,22 @@ export default function CapacityPhaseWizard({
     : phase.surface;
 
   const capexTotal = useMemo(() => {
-    const equip = capex.equipementProductifM2 * totalSurface;
-    return equip + capex.amenagement + capex.taxeAmenagement + capex.honoraires + capex.divers;
-  }, [capex, totalSurface]);
+    return capex.equipementProductifM2 + capex.amenagement + capex.taxeAmenagement + capex.honoraires + capex.divers;
+  }, [capex]);
+
+  // Reference €/m² from previous phases
+  const referenceEquipM2 = useMemo(() => {
+    const activePhasesWithCapex = existingPhases.filter(p => {
+      const surf = p.modeBox === "MACRO" ? p.surface : p.typologies.reduce((s, t) => s + t.surface * t.quantity, 0);
+      return p.status === "ACTIVE" && p.draft?.capexEstimate?.equipementProductifM2 && surf > 0;
+    });
+    if (activePhasesWithCapex.length === 0) return null;
+    const totalEquip = activePhasesWithCapex.reduce((s, p) => s + (p.draft?.capexEstimate?.equipementProductifM2 ?? 0), 0);
+    const totalSurf = activePhasesWithCapex.reduce((s, p) => {
+      return s + (p.modeBox === "MACRO" ? p.surface : p.typologies.reduce((ss, t) => ss + t.surface * t.quantity, 0));
+    }, 0);
+    return totalSurf > 0 ? totalEquip / totalSurf : null;
+  }, [existingPhases]);
 
   const financingTotal = draft.financing.reduce((s, f) => s + f.montant, 0);
   const financingDelta = financingTotal - capexTotal;
