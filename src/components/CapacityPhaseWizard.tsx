@@ -302,7 +302,12 @@ export default function CapacityPhaseWizard({
                     {Math.round(computedTargetOccupancy * 100)} %
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Moyenne des phases précédentes (ou 90 % par défaut)
+                    Moyenne observée sur les phases précédentes (ou 90 % par défaut).
+                    <br /><br />
+                    Cette valeur est indicative.
+                    Le remplissage réel du parc est piloté globalement par les hypothèses de projection.
+                    <br /><br />
+                    Dans les projections, la cible de surface louée s'applique à l'ensemble du parc de stockage et non à chaque phase individuellement.
                   </p>
                 </div>
               </div>
@@ -514,6 +519,22 @@ export default function CapacityPhaseWizard({
                   </div>
                 </>
               )}
+
+              {(() => {
+                const externalFinancingTotal = draft.financing
+                  .filter(f => f.source === "DETTE_BANCAIRE" || f.source === "CREDIT_BAIL")
+                  .reduce((s, f) => s + f.montant, 0);
+                return externalFinancingTotal > 0 ? (
+                  <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950 p-4 space-y-2">
+                    <h4 className="font-semibold text-amber-800 dark:text-amber-200">Financement à compléter</h4>
+                    <p className="text-sm text-amber-700 dark:text-amber-300">
+                      Cette phase crée un besoin de financement externe de {fmt(externalFinancingTotal)} €.
+                      Un objet de financement a été créé dans le module Financement avec le statut : <strong>À configurer</strong>.
+                      Les paramètres du financement (taux, durée, différé, assurance…) devront être complétés dans ce module.
+                    </p>
+                  </div>
+                ) : null;
+              })()}
             </div>
           )}
         </div>
