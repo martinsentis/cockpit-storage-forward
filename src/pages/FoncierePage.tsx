@@ -148,9 +148,15 @@ export default function FoncierePage() {
             <span className="font-semibold text-lg">2. Crédits immobiliers</span>
           </AccordionTrigger>
           <AccordionContent className="space-y-4 pt-2">
-            {state.financement.sciDebts.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Aucun crédit SCI défini dans le module Financement.</p>
-            ) : (
+            {(() => {
+              // Collect all foncière debts from both arrays
+              const foncDebts = [
+                ...state.financement.sciDebts,
+                ...(state.financement.debts ?? []).filter(d => d.entityId === "__fonciere__"),
+              ];
+              return foncDebts.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Aucun crédit SCI défini dans le module Financement.</p>
+              ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
