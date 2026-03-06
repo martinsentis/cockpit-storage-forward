@@ -1,48 +1,41 @@
 
 
-## Plan : Implémenter le Cockpit V1 complet
+## Plan : Contrainte de date de début de crédit liée à la phase capacitaire
 
-### Contexte
-Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
+### Problème
+Quand un crédit bancaire est issu d'une phase capacitaire, rien n'empêche l'utilisateur de saisir une date de début postérieure au lancement de l'exploitation. C'est incohérent : le crédit doit être décaissé avant ou au moment du lancement.
 
-### Fichiers à créer
+### Modifications
 
-**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
+#### `src/pages/FinancementPage.tsx`
 
-**2. `src/types/project.ts`** — Types et defaults :
-- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
-- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
-  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
-  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
-  - `revenueParams` (surface, prixM2, tauxRemplissage)
-  - `services` ([] par défaut)
-  - `opexPercentOfRevenue`
-  - `debts`, `sciDebts` ([] par défaut)
-  - `sciChargesCash`, `sciAmortization` (0 par défaut)
-  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
-  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
-- Constantes `DEFAULT_*` exportées pour chaque section
+**1. Passer les données de phases au wizard**
 
-**3. `src/contexts/ProjectContext.tsx`** :
-- State initialisé avec les defaults
-- `validated` flags (5 booleans, tous false)
-- `updateSection()`, `validateSection()`, `isProjectComplete()`
-- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
+Le `FinancingWizard` reçoit une nouvelle prop `phases: CapacityPhase[]` (provenant de `state.exploitation.capacityPhases`) ainsi que `projectStartDate: string`.
 
-**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
+**2. Calculer la date limite**
 
-**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
+Si `form.phaseId` existe, retrouver la phase correspondante et convertir `phase.startMonth` en date calendaire "YYYY-MM" à partir de `projectStartDate`. Cette date constitue la borne maximale pour `startDate`.
 
-**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
-- Formulaires pré-remplis depuis le Context
-- Bouton "Enregistrer" → updateSection + validateSection
-- Champs par page alignés sur les inputs API
+**3. Afficher un rappel informatif (onglet Général)**
 
-**7. `src/pages/DashboardPage.tsx`** :
-- Liste les sections manquantes si projet incomplet
-- Bouton "Lancer la simulation" désactivé si incomplet
-- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
-- Affiche réponse JSON ou erreur dans `<pre>`
+Au-dessus ou en dessous du champ "Date de début", afficher un encart informatif :
 
-**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
+```
+ℹ️ Phase « {nom} » — Lancement de l'exploitation prévu : {mois année}
+   La date de début du crédit ne peut pas être postérieure à cette date.
+```
+
+Cet encart n'apparaît que pour les crédits liés à une phase (`phaseId` renseigné).
+
+**4. Bloquer la saisie**
+
+- Ajouter un attribut `max` sur l'`<input type="month">` pour empêcher la sélection d'une date postérieure.
+- Si l'utilisateur modifie manuellement et dépasse la limite, afficher un message d'erreur rouge et désactiver le bouton "Créer le crédit" dans l'onglet Résumé.
+
+### Fichiers modifiés
+
+| Fichier | Changement |
+|---|---|
+| `src/pages/FinancementPage.tsx` | Ajout prop `phases` + `projectStartDate` au wizard, calcul date max, encart info, validation |
 
