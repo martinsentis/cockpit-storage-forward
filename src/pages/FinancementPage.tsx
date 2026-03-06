@@ -104,7 +104,18 @@ function FinancingWizard({ item, entities, phases, projectStartDate, onSave, onC
               </div>
               <div className="space-y-2">
                 <Label>Date de début</Label>
-                <Input type="month" value={form.startDate} onChange={e => set("startDate", e.target.value)} />
+                <Input type="month" value={form.startDate} onChange={e => set("startDate", e.target.value)} max={maxStartDate ?? undefined} />
+                {dateExceeded && (
+                  <p className="text-xs text-destructive font-medium">La date dépasse le lancement de l'exploitation ({maxStartDateLabel}).</p>
+                )}
+                {linkedPhase && maxStartDateLabel && !dateExceeded && (
+                  <Alert className="mt-2 py-2 px-3 border-primary/30 bg-primary/5">
+                    <Info className="h-4 w-4 text-primary" />
+                    <AlertDescription className="text-xs">
+                      Phase « {linkedPhase.nom} » — Lancement de l'exploitation prévu : <strong>{maxStartDateLabel}</strong>. La date de début du crédit ne peut pas être postérieure à cette date.
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
             </div>
             {!isLease && (
