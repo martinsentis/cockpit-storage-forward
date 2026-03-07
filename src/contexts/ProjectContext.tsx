@@ -204,7 +204,40 @@ function migrateBuild(b: any): BuildData {
   return { capexEvents: [event] };
 }
 
-function migrateGouvernance(g: any): GouvernanceData {
+function migrateLoyerDynamique(ld: any): LoyerDynamiqueData {
+  // Already new format
+  if (ld?.rentPlan && Array.isArray(ld.rentPlan) && ld.rentPlan.length > 0) {
+    return { rentPlan: ld.rentPlan };
+  }
+  // Legacy format migration
+  if (ld?.mode || ld?.manualOverride != null) {
+    const modeMap: Record<string, string> = {
+      AUTONOMIE_SCI: "SCI_AUTONOMY",
+      DESENDETTEMENT_SCI: "DEBT_PAYDOWN",
+      OPTIMISATION_FISCALE: "OPTIMIZATION",
+      MIX: "MIX",
+    };
+    let phase: RentPlanPhase;
+    if (ld.manualOverride != null && ld.manualOverride > 0) {
+      phase = {
+        id: crypto.randomUUID(),
+        startMonth: 0,
+        strategy: { mode: "FIXED_AMOUNT", parameters: { fixed_rent_amount: ld.manualOverride } },
+      };
+    } else {
+      const mapped = (modeMap[ld.mode] ?? "SCI_AUTONOMY") as RentPlanPhase["strategy"]["mode"];
+      phase = {
+        id: crypto.randomUUID(),
+        startMonth: 0,
+        strategy: { mode: mapped, parameters: {} },
+      };
+    }
+    return { rentPlan: [phase] };
+  }
+  return { ...DEFAULT_LOYER_DYNAMIQUE };
+}
+
+
   const globalRule = g?.globalRule ?? {
     distributableCashRate: g?.distributableCashRate ?? DEFAULT_GLOBAL_RULE.distributableCashRate,
     reserveStrategicRatio: g?.reserveStrategicRatio ?? DEFAULT_GLOBAL_RULE.reserveStrategicRatio,
