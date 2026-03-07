@@ -1,48 +1,91 @@
 
 
-## Plan : Implémenter le Cockpit V1 complet
+## Plan : Réorganisation sidebar + ScenarioContext séparé
 
-### Contexte
-Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
+### 1. Sidebar — `src/components/AppSidebar.tsx`
 
-### Fichiers à créer
+Remplacer le groupe unique "Cockpit" par 3 `SidebarGroup` avec l'ordre demandé :
 
-**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
+**Configuration du projet** (avec icônes de validation) :
+Projet, Associés & Sociétés, Apports associés, Build, Financement, Exploitation, Foncière, Loyer dynamique, Fiscalité, Gouvernance, Événements de trésorerie (`/evenements`)
 
-**2. `src/types/project.ts`** — Types et defaults :
-- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
-- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
-  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
-  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
-  - `revenueParams` (surface, prixM2, tauxRemplissage)
-  - `services` ([] par défaut)
-  - `opexPercentOfRevenue`
-  - `debts`, `sciDebts` ([] par défaut)
-  - `sciChargesCash`, `sciAmortization` (0 par défaut)
-  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
-  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
-- Constantes `DEFAULT_*` exportées pour chaque section
+**Projections** (sans validation) :
+Projection sociétés (`/projection-societes`), Projection associés (`/projection-associes`)
 
-**3. `src/contexts/ProjectContext.tsx`** :
-- State initialisé avec les defaults
-- `validated` flags (5 booleans, tous false)
-- `updateSection()`, `validateSection()`, `isProjectComplete()`
-- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
+**Pilotage** (sans validation) :
+Dashboard (`/dashboard`)
 
-**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
+Ajouter les imports d'icônes manquants (`CalendarClock`, `LineChart`, `UserCheck`).
 
-**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
+### 2. Types scénario — `src/types/scenario.ts` (nouveau)
 
-**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
-- Formulaires pré-remplis depuis le Context
-- Bouton "Enregistrer" → updateSection + validateSection
-- Champs par page alignés sur les inputs API
+Créer le fichier avec `ExitHypotheses`, `ScenarioState`, `DEFAULT_SCENARIO_STATE` exactement comme spécifié.
 
-**7. `src/pages/DashboardPage.tsx`** :
-- Liste les sections manquantes si projet incomplet
-- Bouton "Lancer la simulation" désactivé si incomplet
-- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
-- Affiche réponse JSON ou erreur dans `<pre>`
+### 3. ScenarioContext — `src/contexts/ScenarioContext.tsx` (nouveau)
 
-**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
+- `scenarioState` / `setScenarioState`
+- `updateScenarioField(field, value)` — mise à jour atomique d'un champ
+- `updateExitHypotheses(partial)` — merge partiel sur `exitHypotheses`
+- State local (pas de localStorage pour l'instant — compatible futur versioning)
+
+### 4. App.tsx
+
+- Ajouter `ScenarioProvider` autour du `BrowserRouter` (après `ProjectProvider`)
+- Ajouter les 3 nouvelles routes : `/evenements`, `/projection-societes`, `/projection-associes`
+- Imports des nouvelles pages
+
+### 5. useEngine — `src/hooks/useEngine.ts`
+
+- Ajouter `useScenario()` import
+- `useEngine()` reste inchangé (config pages utilisent le moteur sans scénario)
+- Ajouter `useEngineWithScenario()` qui lit `ScenarioContext` et injecte les overrides pertinents (ex: `targetOccupancy` override sur les phases d'exploitation si défini dans le scénario). Le moteur existant `computeEngine` est appelé sans modification — les overrides sont appliqués sur les inputs avant appel.
+
+### 6. ScenarioHypothesesPanel — `src/components/ScenarioHypothesesPanel.tsx` (nouveau)
+
+Panneau éditable "Hypothèses structurantes du scénario" :
+- Taux de remplissage cible → `updateScenarioField("targetOccupancy", v)`
+- Durée de ramp-up → `updateScenarioField("rampUpMonths", v)`
+- Taux d'indexation annuel → `updateScenarioField("indexationRate", v)`
+- Horizon de projection → `updateScenarioField("horizonMonths", v)`
+
+Lit/écrit uniquement dans `ScenarioContext`. Ne touche pas `ProjectState`.
+
+### 7. ExitHypothesesPanel — `src/components/ExitHypothesesPanel.tsx` (nouveau)
+
+Panneau "Hypothèses de sortie / exit" :
+- Valorisation foncière, Multiple EBE, Remboursement dettes/CCA avant dividendes
+- Utilise `updateExitHypotheses()`
+
+### 8. Pages placeholder (nouveaux fichiers)
+
+**`src/pages/EvenementsPage.tsx`** — Page "À venir" avec titre et description.
+
+**`src/pages/ProjectionSocietesPage.tsx`** :
+- `ScenarioHypothesesPanel` en haut
+- Onglets Exploitation / Foncière affichant les outputs de `useEngineWithScenario()`
+- Compte de résultat, cash-flow, ratios (données du moteur local)
+
+**`src/pages/ProjectionAssociesPage.tsx`** :
+- `ScenarioHypothesesPanel` en haut
+- `ExitHypothesesPanel` en dessous
+- Placeholder pour flux distribués, TRI (calculs backend futurs)
+
+### 9. Supprimer `projectionHypotheses` de ProjectState
+
+Pas nécessaire — l'audit confirme qu'aucun `projectionHypotheses` n'existe dans le code actuel. Aucune modification de `ProjectState` ou `ProjectContext` requise.
+
+### Fichiers
+
+| Fichier | Action |
+|---|---|
+| `src/types/scenario.ts` | Nouveau |
+| `src/contexts/ScenarioContext.tsx` | Nouveau |
+| `src/components/ScenarioHypothesesPanel.tsx` | Nouveau |
+| `src/components/ExitHypothesesPanel.tsx` | Nouveau |
+| `src/pages/EvenementsPage.tsx` | Nouveau |
+| `src/pages/ProjectionSocietesPage.tsx` | Nouveau |
+| `src/pages/ProjectionAssociesPage.tsx` | Nouveau |
+| `src/components/AppSidebar.tsx` | Réorganiser en 3 groupes, nouvel ordre |
+| `src/hooks/useEngine.ts` | Ajouter `useEngineWithScenario()` |
+| `src/App.tsx` | ScenarioProvider + 3 routes |
 
