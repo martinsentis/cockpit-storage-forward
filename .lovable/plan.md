@@ -1,54 +1,48 @@
 
 
-## Plan : UX Financement — Synthèse wizard, agrégats et échéancier
+## Plan : Implémenter le Cockpit V1 complet
 
-### 1. Wizard — Décomposition des mensualités (lignes 255-316)
+### Contexte
+Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
 
-Modifier le mini tableau d'amortissement dans l'onglet "Résumé" du `FinancingWizard` pour afficher 4 colonnes au lieu de 3 : **Capital**, **Intérêts**, **Assurance**, **Mensualité totale**.
+### Fichiers à créer
 
-- Période différé : afficher `0 €` ou `Capitalisé` pour capital, intérêts du différé, assurance mensuelle, total
-- Période amortissement : capital moyen, intérêts moyens, assurance, mensualité totale moyenne
+**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
 
-### 2. Agrégats en haut de page
+**2. `src/types/project.ts`** — Types et defaults :
+- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
+- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
+  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
+  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
+  - `revenueParams` (surface, prixM2, tauxRemplissage)
+  - `services` ([] par défaut)
+  - `opexPercentOfRevenue`
+  - `debts`, `sciDebts` ([] par défaut)
+  - `sciChargesCash`, `sciAmortization` (0 par défaut)
+  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
+  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
+- Constantes `DEFAULT_*` exportées pour chaque section
 
-Ajouter un bloc de KPIs au-dessus de la liste des crédits dans `FinancementPage` :
+**3. `src/contexts/ProjectContext.tsx`** :
+- State initialisé avec les defaults
+- `validated` flags (5 booleans, tous false)
+- `updateSection()`, `validateSection()`, `isProjectComplete()`
+- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
 
-- **Encours total** : `sum(d.amount)` pour tous les crédits
-- **Mensualité totale** : calculée à partir des paramètres de chaque crédit (capital/durée + intérêts moyens + assurance)
-- **Intérêts restants estimés** : somme des intérêts totaux estimés sur la durée restante
-- **Date de fin** : max des dates de fin calculées (startDate + durationMonths)
-- **Nombre de crédits actifs** : `allDebts.filter(d => d.status === "CONFIGURE").length`
+**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
 
-Visuellement : 5 cartes en grille horizontale avec icônes et valeurs.
+**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
 
-### 3. Cartes crédit enrichies
+**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
+- Formulaires pré-remplis depuis le Context
+- Bouton "Enregistrer" → updateSection + validateSection
+- Champs par page alignés sur les inputs API
 
-Remplacer les cartes crédit actuelles (lignes 488-523) par des cartes plus riches :
+**7. `src/pages/DashboardPage.tsx`** :
+- Liste les sections manquantes si projet incomplet
+- Bouton "Lancer la simulation" désactivé si incomplet
+- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
+- Affiche réponse JSON ou erreur dans `<pre>`
 
-- **Jauge** du capital restant dû (Progress bar, ratio CRD/montant initial — approximé linéairement si pas de date courante, sinon basé sur mois écoulés)
-- **Prochaine mensualité** : calculée (si en différé → mensualité différé, sinon → mensualité pleine)
-- **Fin du différé** : si `deferralType !== "NONE"`, afficher la date de fin du différé
-- **Mensualité en période pleine** : capital + intérêts moyens + assurance
-
-### 4. Échéancier détaillé par crédit
-
-Ajouter un bouton "Voir l'échéancier" sur chaque carte crédit qui ouvre un `Dialog` avec un tableau mois par mois :
-
-| Mois | Capital amorti | Intérêts | Assurance | Mensualité | CRD |
-|------|---------------|----------|-----------|------------|-----|
-
-Calcul autonome (pas de dépendance au moteur) :
-- Amortissement linéaire : capital constant = montant / nbMoisAmort
-- Intérêts dégressifs : CRD × taux mensuel
-- Différé partiel : intérêts seuls + assurance
-- Différé total : intérêts capitalisés (CRD augmente)
-
-Extraire une fonction utilitaire `computeAmortizationSchedule(debt: DebtItem)` retournant un tableau de lignes pour réutilisation dans le wizard et l'échéancier.
-
-### Fichiers modifiés
-
-| Fichier | Changement |
-|---|---|
-| `src/lib/amortization.ts` | **Nouveau** — `computeAmortizationSchedule(debt): AmortizationRow[]` |
-| `src/pages/FinancementPage.tsx` | Agrégats KPI, cartes enrichies (jauge, mensualité, différé), dialog échéancier, refactor wizard summary pour utiliser la fonction partagée |
+**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
 

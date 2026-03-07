@@ -10,15 +10,69 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { toast } from "sonner";
 import type { DebtItem, DebtType, DeferralType, CapacityPhase } from "@/types/project";
 import { DEBT_TYPE_LABELS, createEmptyDebtItem, BUILT_IN_SOCIETES, EXPLOITATION_ENTITY_ID, FONCIERE_ENTITY_ID } from "@/types/project";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { formatMonthIndex } from "@/lib/monthUtils";
-import { Plus, Landmark, FileText, Pencil, CheckCircle, AlertTriangle, Info } from "lucide-react";
+import { computeAmortizationSchedule, computeAmortizationSummary, estimateRemainingBalance, computeNextPayment } from "@/lib/amortization";
+import { Plus, Landmark, FileText, Pencil, CheckCircle, AlertTriangle, Info, TrendingDown, Calendar, CreditCard, Hash, Eye } from "lucide-react";
 
 function fmt(n: number) { return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(n); }
 function fmtCurrency(n: number) { return n.toLocaleString("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }); }
+
+// ─── Schedule Dialog ───
+
+function ScheduleDialog({ debt, projectStartDate, onClose }: { debt: DebtItem; projectStartDate: string; onClose: () => void }) {
+  const rows = useMemo(() => computeAmortizationSchedule(debt), [debt]);
+
+  return (
+    <Dialog open onOpenChange={() => onClose()}>
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Échéancier — {debt.label || DEBT_TYPE_LABELS[debt.type]}</DialogTitle>
+        </DialogHeader>
+        {rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">
+            Échéancier indisponible (paramètres incomplets).
+          </p>
+        ) : (
+          <div className="rounded-lg border overflow-auto max-h-[60vh]">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="sticky top-0 bg-background">Mois</TableHead>
+                  <TableHead className="sticky top-0 bg-background text-right">Capital amorti</TableHead>
+                  <TableHead className="sticky top-0 bg-background text-right">Intérêts</TableHead>
+                  <TableHead className="sticky top-0 bg-background text-right">Assurance</TableHead>
+                  <TableHead className="sticky top-0 bg-background text-right">Mensualité</TableHead>
+                  <TableHead className="sticky top-0 bg-background text-right">CRD</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map(r => (
+                  <TableRow key={r.month} className={r.isDeferral ? "bg-muted/30" : ""}>
+                    <TableCell>
+                      {formatMonthIndex(r.month, projectStartDate)}
+                      {r.isDeferral && <span className="ml-1 text-xs text-muted-foreground">(différé)</span>}
+                    </TableCell>
+                    <TableCell className="text-right">{fmt(r.capitalRepaid)} €</TableCell>
+                    <TableCell className="text-right">{fmt(r.interest)} €</TableCell>
+                    <TableCell className="text-right">{fmt(r.insurance)} €</TableCell>
+                    <TableCell className="text-right font-medium">{fmt(r.totalPayment)} €</TableCell>
+                    <TableCell className="text-right">{fmt(r.remainingBalance)} €</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 // ─── Financing Wizard ───
 
@@ -60,6 +114,8 @@ function FinancingWizard({ item, entities, phases, projectStartDate, onSave, onC
 
   const maxStartDateLabel = linkedPhase ? formatMonthIndex(linkedPhase.startMonth, projectStartDate) : null;
   const dateExceeded = maxStartDate && form.startDate ? form.startDate > maxStartDate : false;
+
+  const summary = useMemo(() => computeAmortizationSummary(form), [form]);
 
   const handleSave = () => {
     onSave({ ...form, status: "CONFIGURE" });
@@ -252,69 +308,52 @@ function FinancingWizard({ item, entities, phases, projectStartDate, onSave, onC
               ))}
             </div>
 
-            {/* ── Mini tableau d'amortissement (crédit bancaire uniquement) ── */}
-            {!isLease && form.amount > 0 && form.durationMonths > 0 && form.annualRate > 0 && (() => {
-              const capital = form.amount;
-              const rate = form.annualRate / 100;
-              const monthlyRate = rate / 12;
-              const deferralMonths = form.deferralType !== "NONE" ? form.deferralMonths : 0;
-              const amortMonths = form.durationMonths - deferralMonths;
-              const capitalAfterDeferral = form.deferralType === "TOTAL"
-                ? capital * Math.pow(1 + monthlyRate, deferralMonths)
-                : capital;
-              const monthlyCapital = amortMonths > 0 ? capitalAfterDeferral / amortMonths : 0;
-              const interestFirstMonth = capitalAfterDeferral * monthlyRate;
-              const interestLastMonth = monthlyCapital * monthlyRate;
-              const avgInterest = (interestFirstMonth + interestLastMonth) / 2;
-              const deferralInterest = capital * monthlyRate;
-              const deferralPayment = (form.deferralType === "PARTIAL" ? deferralInterest : 0) + form.insuranceMonthly;
-              const avgAmortPayment = monthlyCapital + avgInterest + form.insuranceMonthly;
-
-              return (
-                <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
-                  <h4 className="text-sm font-semibold">Aperçu du tableau d'amortissement</h4>
-                  <table className="w-full text-sm">
-                    <thead>
+            {/* ── Mini tableau d'amortissement avec 4 colonnes ── */}
+            {!isLease && summary && (
+              <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+                <h4 className="text-sm font-semibold">Aperçu du tableau d'amortissement</h4>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-1.5 text-muted-foreground font-medium">Période</th>
+                      <th className="text-right py-1.5 text-muted-foreground font-medium">Capital</th>
+                      <th className="text-right py-1.5 text-muted-foreground font-medium">Intérêts</th>
+                      <th className="text-right py-1.5 text-muted-foreground font-medium">Assurance</th>
+                      <th className="text-right py-1.5 text-muted-foreground font-medium">Mensualité</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {summary.deferralMonths > 0 && (
                       <tr className="border-b border-border">
-                        <th className="text-left py-1.5 text-muted-foreground font-medium">Période</th>
-                        <th className="text-right py-1.5 text-muted-foreground font-medium">Capital</th>
-                        <th className="text-right py-1.5 text-muted-foreground font-medium">Intérêts</th>
-                        <th className="text-right py-1.5 text-muted-foreground font-medium">Mensualité</th>
+                        <td className="py-1.5">Différé ({summary.deferralMonths} mois)</td>
+                        <td className="text-right">{form.deferralType === "TOTAL" ? "Capitalisé" : "0 €"}</td>
+                        <td className="text-right">{fmt(summary.deferralInterest)} €</td>
+                        <td className="text-right">{fmt(summary.deferralInsurance)} €</td>
+                        <td className="text-right font-medium">{fmt(summary.deferralPayment)} €</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {deferralMonths > 0 && (
-                        <tr className="border-b border-border">
-                          <td className="py-1.5">Différé ({deferralMonths} mois)</td>
-                          <td className="text-right">{form.deferralType === "TOTAL" ? "Capitalisé" : "0 €"}</td>
-                          <td className="text-right">{fmt(deferralInterest)} €</td>
-                          <td className="text-right font-medium">{fmt(deferralPayment)} €</td>
-                        </tr>
-                      )}
-                      {amortMonths > 0 && (
-                        <tr className="border-b border-border">
-                          <td className="py-1.5">Amortissement ({amortMonths} mois)</td>
-                          <td className="text-right">{fmt(monthlyCapital)} €</td>
-                          <td className="text-right">{fmt(avgInterest)} € <span className="text-xs text-muted-foreground">(moy.)</span></td>
-                          <td className="text-right font-medium">{fmt(avgAmortPayment)} € <span className="text-xs text-muted-foreground">(moy.)</span></td>
-                        </tr>
-                      )}
-                      <tr className="font-semibold">
-                        <td className="py-1.5">Coût total estimé</td>
-                        <td colSpan={3} className="text-right">
-                          {fmtCurrency(
-                            (deferralMonths * deferralPayment) + (amortMonths * avgAmortPayment)
-                          )}
-                        </td>
+                    )}
+                    {summary.amortMonths > 0 && (
+                      <tr className="border-b border-border">
+                        <td className="py-1.5">Amortissement ({summary.amortMonths} mois)</td>
+                        <td className="text-right">{fmt(summary.amortCapital)} €</td>
+                        <td className="text-right">{fmt(summary.amortAvgInterest)} € <span className="text-xs text-muted-foreground">(moy.)</span></td>
+                        <td className="text-right">{fmt(summary.amortInsurance)} €</td>
+                        <td className="text-right font-medium">{fmt(summary.amortPayment)} € <span className="text-xs text-muted-foreground">(moy.)</span></td>
                       </tr>
-                    </tbody>
-                  </table>
-                  <p className="text-xs text-muted-foreground">
-                    Estimation indicative (amortissement linéaire, intérêts moyennés).
-                  </p>
-                </div>
-              );
-            })()}
+                    )}
+                    <tr className="font-semibold">
+                      <td className="py-1.5">Coût total estimé</td>
+                      <td colSpan={4} className="text-right">
+                        {fmtCurrency(summary.totalCost)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <p className="text-xs text-muted-foreground">
+                  Estimation indicative (amortissement linéaire, intérêts moyennés).
+                </p>
+              </div>
+            )}
 
             {dateExceeded && (
               <Alert variant="destructive" className="py-2 px-3">
@@ -374,13 +413,200 @@ function TypeChoiceDialog({ open, onChoose, onClose }: TypeChoiceDialogProps) {
   );
 }
 
+// ─── KPI Aggregates ───
+
+function FinancingKPIs({ debts, projectStartDate }: { debts: DebtItem[]; projectStartDate: string }) {
+  const stats = useMemo(() => {
+    const configured = debts.filter(d => d.status === "CONFIGURE");
+    const activeCount = configured.length;
+    const totalOutstanding = debts.reduce((s, d) => s + d.amount, 0);
+
+    let totalMonthly = 0;
+    let totalInterest = 0;
+    let maxEndDate = "";
+
+    for (const d of debts) {
+      if (d.type === "BANK_LOAN") {
+        const summary = computeAmortizationSummary(d);
+        if (summary) {
+          totalMonthly += summary.amortPayment;
+          totalInterest += summary.totalInterest;
+        }
+      } else {
+        totalMonthly += d.monthlyPayment;
+      }
+
+      // Compute end date
+      if (d.startDate && d.durationMonths > 0) {
+        const [y, m] = d.startDate.split("-").map(Number);
+        const end = new Date(y, m - 1 + d.durationMonths);
+        const endStr = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}`;
+        if (endStr > maxEndDate) maxEndDate = endStr;
+      }
+    }
+
+    const endLabel = maxEndDate
+      ? new Date(Number(maxEndDate.split("-")[0]), Number(maxEndDate.split("-")[1]) - 1)
+          .toLocaleDateString("fr-FR", { month: "long", year: "numeric" })
+      : "—";
+
+    return { totalOutstanding, totalMonthly, totalInterest, endLabel, activeCount };
+  }, [debts]);
+
+  if (debts.length === 0) return null;
+
+  const kpis = [
+    { icon: CreditCard, label: "Encours total", value: fmtCurrency(stats.totalOutstanding) },
+    { icon: Calendar, label: "Mensualité totale", value: `${fmtCurrency(stats.totalMonthly)}/mois` },
+    { icon: TrendingDown, label: "Intérêts restants", value: fmtCurrency(stats.totalInterest) },
+    { icon: Calendar, label: "Date de fin", value: stats.endLabel },
+    { icon: Hash, label: "Crédits actifs", value: String(stats.activeCount) },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      {kpis.map(k => (
+        <Card key={k.label}>
+          <CardContent className="p-4 flex flex-col gap-1">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <k.icon className="h-4 w-4" />
+              <span className="text-xs font-medium">{k.label}</span>
+            </div>
+            <span className="text-lg font-bold text-foreground">{k.value}</span>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// ─── Enriched Debt Card ───
+
+function DebtCard({ debt, entityName, projectStartDate, onEdit, onDelete, onViewSchedule }: {
+  debt: DebtItem;
+  entityName: string;
+  projectStartDate: string;
+  onEdit: () => void;
+  onDelete: () => void;
+  onViewSchedule: () => void;
+}) {
+  const summary = useMemo(() => debt.type === "BANK_LOAN" ? computeAmortizationSummary(debt) : null, [debt]);
+
+  // Progress: approximate repaid ratio (use 0 elapsed months for now — static view)
+  const progressPercent = useMemo(() => {
+    if (debt.amount <= 0) return 0;
+    if (debt.type === "LEASE") return 0;
+    const remaining = estimateRemainingBalance(debt, 0);
+    return Math.max(0, Math.min(100, ((debt.amount - remaining) / debt.amount) * 100));
+  }, [debt]);
+
+  const nextPayment = useMemo(() => computeNextPayment(debt, 0), [debt]);
+
+  // Deferral end date
+  const deferralEndLabel = useMemo(() => {
+    if (debt.deferralType === "NONE" || !debt.startDate || !debt.deferralMonths) return null;
+    const [y, m] = debt.startDate.split("-").map(Number);
+    const d = new Date(y, m - 1 + debt.deferralMonths);
+    return d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+  }, [debt]);
+
+  return (
+    <Card className={`transition-colors ${debt.status === "A_CONFIGURER" ? "border-destructive/50" : ""}`}>
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-start justify-between">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              {debt.type === "BANK_LOAN" ? <Landmark className="h-4 w-4 text-primary" /> : <FileText className="h-4 w-4 text-primary" />}
+              <span className="font-semibold text-foreground">{debt.label || DEBT_TYPE_LABELS[debt.type]}</span>
+              <Badge variant="outline" className="text-[10px]">{DEBT_TYPE_LABELS[debt.type]}</Badge>
+              {debt.entityId === FONCIERE_ENTITY_ID && (
+                <Badge variant="secondary" className="text-[10px]">Foncière</Badge>
+              )}
+              {debt.status === "A_CONFIGURER" && (
+                <Badge variant="destructive" className="text-[10px] px-1.5 py-0">À configurer</Badge>
+              )}
+            </div>
+            <div className="flex gap-4 text-sm text-muted-foreground">
+              <span>{entityName}</span>
+              <span>{fmtCurrency(debt.amount)}</span>
+              {debt.type === "BANK_LOAN" && debt.annualRate > 0 && <span>{fmt(debt.annualRate)} %</span>}
+              {debt.durationMonths > 0 && <span>{debt.durationMonths} mois</span>}
+            </div>
+          </div>
+          <div className="flex gap-1">
+            {debt.type === "BANK_LOAN" && debt.status === "CONFIGURE" && (
+              <Button variant="ghost" size="sm" onClick={onViewSchedule} title="Voir l'échéancier">
+                <Eye className="h-4 w-4" />
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" onClick={onEdit}>
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onDelete} className="text-destructive hover:text-destructive">
+              ×
+            </Button>
+          </div>
+        </div>
+
+        {/* Enriched info for configured bank loans */}
+        {debt.type === "BANK_LOAN" && debt.status === "CONFIGURE" && summary && (
+          <div className="space-y-2 pt-1">
+            {/* Progress bar */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Capital restant dû</span>
+                <span>{fmtCurrency(debt.amount)} restant</span>
+              </div>
+              <Progress value={progressPercent} className="h-2" />
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-1 text-sm">
+              <div>
+                <span className="text-muted-foreground text-xs">Prochaine mensualité</span>
+                <p className="font-medium">{fmtCurrency(nextPayment)}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground text-xs">Mensualité pleine</span>
+                <p className="font-medium">{fmtCurrency(summary.amortPayment)}</p>
+              </div>
+              {deferralEndLabel && (
+                <div>
+                  <span className="text-muted-foreground text-xs">Fin du différé</span>
+                  <p className="font-medium">{deferralEndLabel}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Lease summary */}
+        {debt.type === "LEASE" && debt.status === "CONFIGURE" && (
+          <div className="grid grid-cols-3 gap-x-6 gap-y-1 text-sm pt-1">
+            <div>
+              <span className="text-muted-foreground text-xs">Loyer mensuel</span>
+              <p className="font-medium">{fmtCurrency(debt.monthlyPayment)}</p>
+            </div>
+            <div>
+              <span className="text-muted-foreground text-xs">Premier loyer</span>
+              <p className="font-medium">{fmtCurrency(debt.firstPayment)}</p>
+            </div>
+            <div>
+              <span className="text-muted-foreground text-xs">Option d'achat</span>
+              <p className="font-medium">{fmtCurrency(debt.purchaseOption)}</p>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Main Page ───
 
 export default function FinancementPage() {
   const { state, updateSection, validateSection, validated } = useProject();
   const associes = state.associes.associes;
 
-  // Merge debts + sciDebts for unified display
   const allDebts = useMemo(() => [
     ...state.financement.debts,
     ...state.financement.sciDebts,
@@ -388,6 +614,7 @@ export default function FinancementPage() {
 
   const [showTypeChoice, setShowTypeChoice] = useState(false);
   const [editingItem, setEditingItem] = useState<DebtItem | null>(null);
+  const [viewingSchedule, setViewingSchedule] = useState<DebtItem | null>(null);
 
   const entities = useMemo(() => {
     const builtIn = BUILT_IN_SOCIETES.map(s => ({ id: s.id, nom: s.nom }));
@@ -407,7 +634,6 @@ export default function FinancementPage() {
   };
 
   const handleSave = (incoming: DebtItem) => {
-    // ── Auto-detach: if capacity-generated item was manually modified ──
     let item = { ...incoming };
     const original = allDebts.find(d => d.id === item.id);
     if (original?.createdBy === "capacity_phase") {
@@ -417,11 +643,9 @@ export default function FinancementPage() {
         item = { ...item, phaseId: undefined, createdBy: "manual" };
       }
     }
-    // Route to correct array based on entityId
     const isFonciere = item.entityId === FONCIERE_ENTITY_ID;
     if (isFonciere) {
       const existing = state.financement.sciDebts.find(d => d.id === item.id);
-      // If it was previously in debts, remove it from there
       const cleanedDebts = state.financement.debts.filter(d => d.id !== item.id);
       const updatedSciDebts = existing
         ? state.financement.sciDebts.map(d => d.id === item.id ? item : d)
@@ -429,7 +653,6 @@ export default function FinancementPage() {
       updateSection("financement", { debts: cleanedDebts, sciDebts: updatedSciDebts });
     } else {
       const existing = state.financement.debts.find(d => d.id === item.id);
-      // If it was previously in sciDebts, remove it from there
       const cleanedSciDebts = state.financement.sciDebts.filter(d => d.id !== item.id);
       const updatedDebts = existing
         ? state.financement.debts.map(d => d.id === item.id ? item : d)
@@ -450,7 +673,7 @@ export default function FinancementPage() {
   const aConfigurerCount = allDebts.filter(d => d.status === "A_CONFIGURER").length;
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="max-w-4xl space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-foreground">Financement</h1>
@@ -463,7 +686,7 @@ export default function FinancementPage() {
         </div>
         <div className="flex gap-2">
           {validated.financement ? (
-            <Badge variant="outline" className="border-green-600 text-green-600">
+            <Badge variant="outline" className="border-primary text-primary">
               <CheckCircle className="h-3 w-3 mr-1" /> Validé
             </Badge>
           ) : (
@@ -474,6 +697,9 @@ export default function FinancementPage() {
           </Button>
         </div>
       </div>
+
+      {/* KPI Aggregates */}
+      <FinancingKPIs debts={allDebts} projectStartDate={state.projet.projectStartDate} />
 
       {allDebts.length === 0 && (
         <Card>
@@ -487,39 +713,15 @@ export default function FinancementPage() {
 
       <div className="grid gap-4">
         {allDebts.map(d => (
-          <Card key={d.id} className={`transition-colors ${d.status === "A_CONFIGURER" ? "border-destructive/50" : ""}`}>
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    {d.type === "BANK_LOAN" ? <Landmark className="h-4 w-4 text-primary" /> : <FileText className="h-4 w-4 text-primary" />}
-                    <span className="font-semibold text-foreground">{d.label || DEBT_TYPE_LABELS[d.type]}</span>
-                    <Badge variant="outline" className="text-[10px]">{DEBT_TYPE_LABELS[d.type]}</Badge>
-                    {d.entityId === FONCIERE_ENTITY_ID && (
-                      <Badge variant="secondary" className="text-[10px]">Foncière</Badge>
-                    )}
-                    {d.status === "A_CONFIGURER" && (
-                      <Badge variant="destructive" className="text-[10px] px-1.5 py-0">À configurer</Badge>
-                    )}
-                  </div>
-                  <div className="flex gap-4 text-sm text-muted-foreground">
-                    <span>{entityName(d.entityId)}</span>
-                    <span>{fmtCurrency(d.amount)}</span>
-                    {d.type === "BANK_LOAN" && d.annualRate > 0 && <span>{fmt(d.annualRate)} %</span>}
-                    {d.durationMonths > 0 && <span>{d.durationMonths} mois</span>}
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" onClick={() => setEditingItem({ ...d })}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleDelete(d.id)} className="text-destructive hover:text-destructive">
-                    ×
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <DebtCard
+            key={d.id}
+            debt={d}
+            entityName={entityName(d.entityId)}
+            projectStartDate={state.projet.projectStartDate}
+            onEdit={() => setEditingItem({ ...d })}
+            onDelete={() => handleDelete(d.id)}
+            onViewSchedule={() => setViewingSchedule(d)}
+          />
         ))}
       </div>
 
@@ -533,6 +735,13 @@ export default function FinancementPage() {
           projectStartDate={state.projet.projectStartDate}
           onSave={handleSave}
           onClose={() => setEditingItem(null)}
+        />
+      )}
+      {viewingSchedule && (
+        <ScheduleDialog
+          debt={viewingSchedule}
+          projectStartDate={state.projet.projectStartDate}
+          onClose={() => setViewingSchedule(null)}
         />
       )}
     </div>
