@@ -660,6 +660,7 @@ export interface ApportItem {
   commentaire?: string;
   phaseId?: string;
   status?: FinancingStatus;
+  createdBy?: string;
 }
 
 export interface ApportsData {
