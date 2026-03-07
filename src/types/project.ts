@@ -60,6 +60,7 @@ export interface CapexBudgetLine {
   prixType: "HT" | "TTC" | "NON_SOUMIS";
   vatRate: number;
   commentaire?: string;
+  createdBy?: string;
 }
 
 export interface BuildAsset {
