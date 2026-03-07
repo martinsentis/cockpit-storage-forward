@@ -323,7 +323,7 @@ function migrateSingleProjectState(parsed: any): { state: ProjectState; validate
       financement,
       exploitation: migrateExploitation(rawState?.exploitation),
       fonciere: { ...DEFAULT_FONCIERE, ...rawState?.fonciere },
-      loyerDynamique: { ...DEFAULT_LOYER_DYNAMIQUE, ...rawState?.loyerDynamique },
+      loyerDynamique: migrateLoyerDynamique(rawState?.loyerDynamique),
       gouvernance: migrateGouvernance(rawState?.gouvernance),
       associes: rawState?.associes ?? { ...DEFAULT_ASSOCIES },
       apports: migrateApports(rawState?.apports),
