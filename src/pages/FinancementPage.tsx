@@ -686,7 +686,7 @@ export default function FinancementPage() {
         </div>
         <div className="flex gap-2">
           {validated.financement ? (
-            <Badge variant="outline" className="border-green-600 text-green-600">
+            <Badge variant="outline" className="border-primary text-primary">
               <CheckCircle className="h-3 w-3 mr-1" /> Validé
             </Badge>
           ) : (
