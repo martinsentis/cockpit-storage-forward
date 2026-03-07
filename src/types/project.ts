@@ -108,6 +108,8 @@ export interface CapexEvent {
   assets: BuildAsset[];
   taxeAmenagement: TaxeAmenagementData;
   depenses: DepenseReelle[];
+  phaseId?: string;
+  createdBy?: string;
 }
 
 export interface BuildData {
