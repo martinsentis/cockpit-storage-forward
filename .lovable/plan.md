@@ -1,61 +1,48 @@
 
 
-## Plan : Robustesse du tunnel capacitaire — ajustements finaux
+## Plan : Implémenter le Cockpit V1 complet
 
-### 1. `src/types/project.ts` — Ajouter `startMonth` sur `DebtItem` et `ApportItem`
+### Contexte
+Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
 
-`DebtItem` : ajouter `startMonth?: number` (en plus de `startDate` existant).
-`ApportItem` : ajouter `startMonth?: number`.
+### Fichiers à créer
 
-`BuildAsset` a déjà `phaseId`, `createdBy`, et `commissioningMonth` (équivalent de startMonth). Rien à ajouter.
+**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
 
-### 2. `src/pages/ExploitationPage.tsx` — 3 changements
+**2. `src/types/project.ts`** — Types et defaults :
+- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
+- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
+  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
+  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
+  - `revenueParams` (surface, prixM2, tauxRemplissage)
+  - `services` ([] par défaut)
+  - `opexPercentOfRevenue`
+  - `debts`, `sciDebts` ([] par défaut)
+  - `sciChargesCash`, `sciAmortization` (0 par défaut)
+  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
+  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
+- Constantes `DEFAULT_*` exportées pour chaque section
 
-**a) Propager `startMonth` aux dettes et apports créés**
+**3. `src/contexts/ProjectContext.tsx`** :
+- State initialisé avec les defaults
+- `validated` flags (5 booleans, tous false)
+- `updateSection()`, `validateSection()`, `isProjectComplete()`
+- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
 
-Dans `onFinalize`, ajouter `startMonth: phaseData.startMonth` sur chaque `DebtItem` et `ApportItem` générés.
+**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
 
-**b) Modification = delete + recreate (filtre double condition)**
+**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
 
-Avant de générer les nouveaux objets, filtrer les collections existantes pour retirer les objets où `phaseId === phaseData.id && createdBy === "capacity_phase"` :
+**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
+- Formulaires pré-remplis depuis le Context
+- Bouton "Enregistrer" → updateSection + validateSection
+- Champs par page alignés sur les inputs API
 
-```typescript
-const cleanDebts = state.financement.debts.filter(d => !(d.phaseId === phaseData.id && d.createdBy === "capacity_phase"));
-const cleanSciDebts = state.financement.sciDebts.filter(d => !(d.phaseId === phaseData.id && d.createdBy === "capacity_phase"));
-const cleanApports = state.apports.apports.filter(a => !(a.phaseId === phaseData.id && a.createdBy === "capacity_phase"));
-const cleanCapex = state.build.capexEvents.filter(ev => !(ev.phaseId === phaseData.id && ev.createdBy === "capacity_phase"));
-```
+**7. `src/pages/DashboardPage.tsx`** :
+- Liste les sections manquantes si projet incomplet
+- Bouton "Lancer la simulation" désactivé si incomplet
+- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
+- Affiche réponse JSON ou erreur dans `<pre>`
 
-Puis utiliser ces listes nettoyées comme base pour les batchUpdates (au lieu de `state.financement.debts` directement). Cela rend la logique idempotente : création initiale et modification utilisent le même code.
-
-**c) Cascade delete : filtre double condition aussi**
-
-Dans `confirmCascadeDelete`, remplacer `d.phaseId !== id` par `!(d.phaseId === id && d.createdBy === "capacity_phase")`. Idem pour apports et capexEvents.
-
-### 3. `src/pages/FinancementPage.tsx` — Détachement automatique étendu
-
-Dans `handleSave`, détecter si l'item a `createdBy === "capacity_phase"` et si un champ significatif a changé. Ajouter `deferralType` et `deferralMonths` à la liste des champs déclencheurs (en plus de `amount`, `annualRate`, `durationMonths`, `entityId`).
-
-Si modification détectée : mettre `phaseId: undefined` et `createdBy: "manual"` sur l'item avant sauvegarde.
-
-Implémentation : comparer l'item entrant avec l'item original trouvé dans `allDebts` :
-
-```typescript
-const original = allDebts.find(d => d.id === item.id);
-if (original?.createdBy === "capacity_phase") {
-  const detachFields: (keyof DebtItem)[] = ["amount", "annualRate", "durationMonths", "entityId", "deferralType", "deferralMonths"];
-  const changed = detachFields.some(k => original[k] !== item[k]);
-  if (changed) {
-    item = { ...item, phaseId: undefined, createdBy: "manual" };
-  }
-}
-```
-
-### Fichiers modifiés
-
-| Fichier | Changement |
-|---|---|
-| `src/types/project.ts` | `startMonth?: number` sur `DebtItem` et `ApportItem` |
-| `src/pages/ExploitationPage.tsx` | Propager `startMonth` ; delete+recreate avec double filtre ; cascade avec double filtre |
-| `src/pages/FinancementPage.tsx` | Détachement auto étendu (+ deferralType/deferralMonths) |
+**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
 

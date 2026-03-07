@@ -406,7 +406,17 @@ export default function FinancementPage() {
     setEditingItem(item);
   };
 
-  const handleSave = (item: DebtItem) => {
+  const handleSave = (incoming: DebtItem) => {
+    // ── Auto-detach: if capacity-generated item was manually modified ──
+    let item = { ...incoming };
+    const original = allDebts.find(d => d.id === item.id);
+    if (original?.createdBy === "capacity_phase") {
+      const detachFields: (keyof DebtItem)[] = ["amount", "annualRate", "durationMonths", "entityId", "deferralType", "deferralMonths"];
+      const changed = detachFields.some(k => original[k] !== item[k]);
+      if (changed) {
+        item = { ...item, phaseId: undefined, createdBy: "manual" };
+      }
+    }
     // Route to correct array based on entityId
     const isFonciere = item.entityId === FONCIERE_ENTITY_ID;
     if (isFonciere) {

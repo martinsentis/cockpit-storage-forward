@@ -139,6 +139,8 @@ export interface DebtItem {
   suspensionMonthsPerYear: number;
   // Lease fields
   firstPayment: number;
+  // Timeline (set by capacity phase)
+  startMonth?: number;
   monthlyPayment: number;
   purchaseOption: number;
   createdBy?: string;
@@ -661,6 +663,7 @@ export interface ApportItem {
   phaseId?: string;
   status?: FinancingStatus;
   createdBy?: string;
+  startMonth?: number;
 }
 
 export interface ApportsData {
