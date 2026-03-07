@@ -7,6 +7,7 @@ import {
   GouvernanceData,
   FonciereData,
   LoyerDynamiqueData,
+  RentPlanPhase,
   AssociesData,
   ApportsData,
   FiscaliteData,
@@ -203,6 +204,39 @@ function migrateBuild(b: any): BuildData {
   return { capexEvents: [event] };
 }
 
+function migrateLoyerDynamique(ld: any): LoyerDynamiqueData {
+  // Already new format
+  if (ld?.rentPlan && Array.isArray(ld.rentPlan) && ld.rentPlan.length > 0) {
+    return { rentPlan: ld.rentPlan };
+  }
+  // Legacy format migration
+  if (ld?.mode || ld?.manualOverride != null) {
+    const modeMap: Record<string, string> = {
+      AUTONOMIE_SCI: "SCI_AUTONOMY",
+      DESENDETTEMENT_SCI: "DEBT_PAYDOWN",
+      OPTIMISATION_FISCALE: "OPTIMIZATION",
+      MIX: "MIX",
+    };
+    let phase: RentPlanPhase;
+    if (ld.manualOverride != null && ld.manualOverride > 0) {
+      phase = {
+        id: crypto.randomUUID(),
+        startMonth: 0,
+        strategy: { mode: "FIXED_AMOUNT", parameters: { fixed_rent_amount: ld.manualOverride } },
+      };
+    } else {
+      const mapped = (modeMap[ld.mode] ?? "SCI_AUTONOMY") as RentPlanPhase["strategy"]["mode"];
+      phase = {
+        id: crypto.randomUUID(),
+        startMonth: 0,
+        strategy: { mode: mapped, parameters: {} },
+      };
+    }
+    return { rentPlan: [phase] };
+  }
+  return { ...DEFAULT_LOYER_DYNAMIQUE };
+}
+
 function migrateGouvernance(g: any): GouvernanceData {
   const globalRule = g?.globalRule ?? {
     distributableCashRate: g?.distributableCashRate ?? DEFAULT_GLOBAL_RULE.distributableCashRate,
@@ -323,7 +357,7 @@ function migrateSingleProjectState(parsed: any): { state: ProjectState; validate
       financement,
       exploitation: migrateExploitation(rawState?.exploitation),
       fonciere: { ...DEFAULT_FONCIERE, ...rawState?.fonciere },
-      loyerDynamique: { ...DEFAULT_LOYER_DYNAMIQUE, ...rawState?.loyerDynamique },
+      loyerDynamique: migrateLoyerDynamique(rawState?.loyerDynamique),
       gouvernance: migrateGouvernance(rawState?.gouvernance),
       associes: rawState?.associes ?? { ...DEFAULT_ASSOCIES },
       apports: migrateApports(rawState?.apports),
@@ -582,10 +616,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ccaPriorityRatio: g.ccaPriorityRatio ?? DEFAULT_GOUVERNANCE.ccaPriorityRatio,
       reserveStrategicRatio: g.reserveStrategicRatio ?? DEFAULT_GOUVERNANCE.reserveStrategicRatio,
       reserveAfterCcaFullyRepaid: g.reserveAfterCcaFullyRepaid ?? DEFAULT_GOUVERNANCE.reserveAfterCcaFullyRepaid,
-      rentConstraints: {
-        mode: state.loyerDynamique.mode,
-        monthlyRent: loyer,
-      },
+      rentPlan: state.loyerDynamique.rentPlan,
     };
   }, [state]);
 

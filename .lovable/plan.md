@@ -1,76 +1,48 @@
 
 
-## Plan final : Refonte Loyer Dynamique — `rentPlan` multi-phases
+## Plan : Implémenter le Cockpit V1 complet
 
-### Audit des références legacy
+### Contexte
+Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
 
-Toutes les occurrences à migrer :
+### Fichiers à créer
 
-| Fichier | Ligne(s) | Référence legacy |
-|---|---|---|
-| `src/types/project.ts` | 3 | `RentMode` type |
-| `src/types/project.ts` | 365-369 | `LoyerDynamiqueData` avec `mode`, `targetExploitationResult`, `manualOverride` |
-| `src/types/project.ts` | 526-530 | `DEFAULT_LOYER_DYNAMIQUE` |
-| `src/types/project.ts` | 737-740 | `rentConstraints` dans `ProjectionInputs` |
-| `src/engine/engine.ts` | 101-135 | `ld.mode`, `ld.manualOverride`, switch sur anciennes valeurs |
-| `src/contexts/ProjectContext.tsx` | 585-588 | `rentConstraints` dans `buildProjectionInputs` |
-| `src/pages/FoncierePage.tsx` | 203 | `state.loyerDynamique.mode.replace(...)` |
-| `src/pages/LoyerDynamiquePage.tsx` | 10, 16, 23, 33, 70, 73, 87, 90, 152 | `RentMode`, `form.mode`, `form.manualOverride` |
+**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
 
-`ExploitationPage.tsx` — aucune référence directe au mode loyer.
+**2. `src/types/project.ts`** — Types et defaults :
+- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
+- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
+  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
+  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
+  - `revenueParams` (surface, prixM2, tauxRemplissage)
+  - `services` ([] par défaut)
+  - `opexPercentOfRevenue`
+  - `debts`, `sciDebts` ([] par défaut)
+  - `sciChargesCash`, `sciAmortization` (0 par défaut)
+  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
+  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
+- Constantes `DEFAULT_*` exportées pour chaque section
 
-### Modifications par fichier
+**3. `src/contexts/ProjectContext.tsx`** :
+- State initialisé avec les defaults
+- `validated` flags (5 booleans, tous false)
+- `updateSection()`, `validateSection()`, `isProjectComplete()`
+- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
 
-**1. `src/types/project.ts`**
+**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
 
-- Supprimer `RentMode` (l.3), ancien `LoyerDynamiqueData` (l.365-369), `DEFAULT_LOYER_DYNAMIQUE` (l.526-530), `rentConstraints` dans `ProjectionInputs` (l.737-740)
-- Ajouter les nouveaux types et le nouveau default tel que validé dans le plan précédent
-- Dans `ProjectionInputs`, remplacer `rentConstraints` par `rentPlan: RentPlanPhase[]`
+**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
 
-**2. `src/pages/LoyerDynamiquePage.tsx`** — réécriture complète
+**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
+- Formulaires pré-remplis depuis le Context
+- Bouton "Enregistrer" → updateSection + validateSection
+- Champs par page alignés sur les inputs API
 
-- Indicateurs informatifs (charges SCI, intérêts, principal) depuis le moteur local, avec badge "Informatif"
-- Liste des phases `rentPlan` :
-  - Card par phase : `startMonth` (≥ 0), select mode, paramètres conditionnels
-  - OPTIMIZATION : `rn_exploitation_floor_ratio`, checkbox `use_market_rent_cap`, `market_rent_cap` conditionnel
-  - Bouton supprimer désactivé si 1 seule phase
-- Ajouter une phase : `startMonth` = dernier + 1
-- Validation au save : tri auto par `startMonth` croissant, puis vérification absence de doublons (toast erreur si doublons), ratios 0-1, fixed_rent_amount ≥ 0
-- Enregistrer : `updateSection` + `validateSection`
+**7. `src/pages/DashboardPage.tsx`** :
+- Liste les sections manquantes si projet incomplet
+- Bouton "Lancer la simulation" désactivé si incomplet
+- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
+- Affiche réponse JSON ou erreur dans `<pre>`
 
-**3. `src/engine/engine.ts`** — adapter `computeLoyerDynamique`
-
-- Lire la dernière phase : `const phase = ld.rentPlan[ld.rentPlan.length - 1]`
-- Ajouter un commentaire explicite :
-```typescript
-// NOTE: Using the last phase as a display-only approximation.
-// The real temporal logic is handled by the backend engine.
-// Do NOT reuse this as a general business rule.
-```
-- Mapping :
-  - `SCI_AUTONOMY` → charges + intérêts
-  - `DEBT_PAYDOWN` → charges + intérêts + principal
-  - `OPTIMIZATION` → charges + intérêts
-  - `MIX` → charges + intérêts
-  - `FIXED_AMOUNT` → `parameters.fixed_rent_amount ?? 0`
-
-**4. `src/contexts/ProjectContext.tsx`**
-
-- Mettre à jour le default `loyerDynamique`
-- Migration localStorage : si `loyerDynamique.mode` existe sans `rentPlan`, convertir avec mapping ancien→nouveau. Si `manualOverride` → phase `FIXED_AMOUNT`
-- `buildProjectionInputs` : remplacer `rentConstraints` par `rentPlan: state.loyerDynamique.rentPlan`
-
-**5. `src/pages/FoncierePage.tsx`** (l.203)
-
-- Remplacer `state.loyerDynamique.mode.replace(/_/g, " ")` par un label mappé depuis `rentPlan[rentPlan.length - 1]?.strategy.mode`
-
-### Fichiers modifiés
-
-| Fichier | Changement |
-|---|---|
-| `src/types/project.ts` | Nouveaux types, suppression legacy, ProjectionInputs |
-| `src/pages/LoyerDynamiquePage.tsx` | Réécriture complète |
-| `src/engine/engine.ts` | Adapter computeLoyerDynamique + commentaire proxy |
-| `src/contexts/ProjectContext.tsx` | Migration, default, buildProjectionInputs |
-| `src/pages/FoncierePage.tsx` | Adapter affichage mode |
+**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
 

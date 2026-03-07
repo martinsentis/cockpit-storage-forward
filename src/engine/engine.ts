@@ -121,17 +121,22 @@ function computeLoyerDynamique(inputs: EngineInputs): LoyerDynamiqueEngineOutput
       (t, a) => a.depreciationYears > 0 ? t + a.amount / a.depreciationYears : t, 0
     ) / 12;
 
+  // NOTE: Using the last phase as a display-only approximation.
+  // The real temporal logic is handled by the backend engine.
+  // Do NOT reuse this as a general business rule.
+  const phase = ld.rentPlan[ld.rentPlan.length - 1];
+  const mode = phase?.strategy.mode ?? "SCI_AUTONOMY";
+
   let loyerCalcule: number;
-  if (ld.manualOverride != null && ld.manualOverride > 0) {
-    loyerCalcule = ld.manualOverride;
-  } else {
-    switch (ld.mode) {
-      case "AUTONOMIE_SCI": loyerCalcule = sciCharges + interets; break;
-      case "DESENDETTEMENT_SCI": loyerCalcule = sciCharges + interets + principal; break;
-      case "OPTIMISATION_FISCALE": loyerCalcule = sciCharges + interets + amortissement; break;
-      case "MIX": loyerCalcule = sciCharges + interets + principal; break;
-      default: loyerCalcule = sciCharges + interets;
-    }
+  switch (mode) {
+    case "DEBT_PAYDOWN": loyerCalcule = sciCharges + interets + principal; break;
+    case "FIXED_AMOUNT": loyerCalcule = phase?.strategy.parameters.fixed_rent_amount ?? 0; break;
+    case "SCI_AUTONOMY":
+    case "OPTIMIZATION":
+    case "MIX":
+    default:
+      loyerCalcule = sciCharges + interets;
+      break;
   }
 
   return {
