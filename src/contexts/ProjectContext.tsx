@@ -7,6 +7,7 @@ import {
   GouvernanceData,
   FonciereData,
   LoyerDynamiqueData,
+  RentPlanPhase,
   AssociesData,
   ApportsData,
   FiscaliteData,
