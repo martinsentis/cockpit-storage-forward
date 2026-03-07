@@ -276,7 +276,7 @@ export default function FoncierePage() {
         {/* ═══ SECTION 4 — Charges SCI ═══ */}
         <AccordionItem value="charges" className="border rounded-lg px-4">
           <AccordionTrigger className="hover:no-underline">
-            <span className="font-semibold text-lg">4. Charges SCI</span>
+            <span className="font-semibold text-lg">4. Charges Foncière</span>
           </AccordionTrigger>
           <AccordionContent className="space-y-4 pt-2">
             <div className="space-y-2">
