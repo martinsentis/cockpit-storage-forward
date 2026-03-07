@@ -154,7 +154,7 @@ export default function FoncierePage() {
                 ...(state.financement.debts ?? []).filter(d => d.entityId === "__fonciere__"),
               ];
               if (foncDebts.length === 0) {
-                return <p className="text-sm text-muted-foreground">Aucun crédit SCI défini dans le module Financement.</p>;
+                return <p className="text-sm text-muted-foreground">Aucun crédit foncier défini dans le module Financement.</p>;
               }
               return (
                 <Table>
@@ -276,7 +276,7 @@ export default function FoncierePage() {
         {/* ═══ SECTION 4 — Charges SCI ═══ */}
         <AccordionItem value="charges" className="border rounded-lg px-4">
           <AccordionTrigger className="hover:no-underline">
-            <span className="font-semibold text-lg">4. Charges SCI</span>
+            <span className="font-semibold text-lg">4. Charges Foncière</span>
           </AccordionTrigger>
           <AccordionContent className="space-y-4 pt-2">
             <div className="space-y-2">

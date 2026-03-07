@@ -69,6 +69,7 @@ interface ProjectContextValue {
   activeProjectId: string | null;
   activeProjectMeta: ProjectMeta | null;
   updateSection: <K extends keyof ProjectState>(section: K, data: Partial<ProjectState[K]>) => void;
+  batchUpdateSections: (updates: Partial<{ [K in keyof ProjectState]: Partial<ProjectState[K]> }>) => void;
   validateSection: (section: SectionName) => void;
   isProjectComplete: () => boolean;
   buildProjectionInputs: () => ProjectionInputs;
@@ -427,6 +428,28 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   }, []);
 
+  const batchUpdateSections = useCallback((updates: Partial<{ [K in keyof ProjectState]: Partial<ProjectState[K]> }>) => {
+    setMultiState(prev => {
+      const id = prev.activeProjectId;
+      if (!id || !prev.projects[id]) return prev;
+      const entry = prev.projects[id];
+      const newState = { ...entry.state };
+      const newValidated = { ...entry.validated };
+      for (const [section, patch] of Object.entries(updates)) {
+        const key = section as keyof ProjectState;
+        newState[key] = { ...newState[key], ...patch } as any;
+        newValidated[key as keyof ValidatedFlags] = true;
+      }
+      return {
+        ...prev,
+        projects: {
+          ...prev.projects,
+          [id]: { ...entry, state: newState, validated: newValidated },
+        },
+      };
+    });
+  }, []);
+
   const validateSection = useCallback((section: SectionName) => {
     setMultiState(prev => {
       const id = prev.activeProjectId;
@@ -569,7 +592,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       value={{
         state, validated, activeProjectId: multiState.activeProjectId,
         activeProjectMeta: activeEntry?.meta ?? null,
-        updateSection, validateSection, isProjectComplete, buildProjectionInputs,
+        updateSection, batchUpdateSections, validateSection, isProjectComplete, buildProjectionInputs,
         projectList, createProject, switchProject, deleteProject, updateProjectMeta,
         hasActiveProject,
       }}

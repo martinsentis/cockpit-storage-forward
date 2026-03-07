@@ -378,8 +378,13 @@ function TypeChoiceDialog({ open, onChoose, onClose }: TypeChoiceDialogProps) {
 
 export default function FinancementPage() {
   const { state, updateSection, validateSection, validated } = useProject();
-  const debts = state.financement.debts;
   const associes = state.associes.associes;
+
+  // Merge debts + sciDebts for unified display
+  const allDebts = useMemo(() => [
+    ...state.financement.debts,
+    ...state.financement.sciDebts,
+  ], [state.financement.debts, state.financement.sciDebts]);
 
   const [showTypeChoice, setShowTypeChoice] = useState(false);
   const [editingItem, setEditingItem] = useState<DebtItem | null>(null);
@@ -402,20 +407,37 @@ export default function FinancementPage() {
   };
 
   const handleSave = (item: DebtItem) => {
-    const existing = debts.find(d => d.id === item.id);
-    const updated = existing
-      ? debts.map(d => d.id === item.id ? item : d)
-      : [...debts, item];
-    updateSection("financement", { debts: updated });
+    // Route to correct array based on entityId
+    const isFonciere = item.entityId === FONCIERE_ENTITY_ID;
+    if (isFonciere) {
+      const existing = state.financement.sciDebts.find(d => d.id === item.id);
+      // If it was previously in debts, remove it from there
+      const cleanedDebts = state.financement.debts.filter(d => d.id !== item.id);
+      const updatedSciDebts = existing
+        ? state.financement.sciDebts.map(d => d.id === item.id ? item : d)
+        : [...state.financement.sciDebts, item];
+      updateSection("financement", { debts: cleanedDebts, sciDebts: updatedSciDebts });
+    } else {
+      const existing = state.financement.debts.find(d => d.id === item.id);
+      // If it was previously in sciDebts, remove it from there
+      const cleanedSciDebts = state.financement.sciDebts.filter(d => d.id !== item.id);
+      const updatedDebts = existing
+        ? state.financement.debts.map(d => d.id === item.id ? item : d)
+        : [...state.financement.debts, item];
+      updateSection("financement", { debts: updatedDebts, sciDebts: cleanedSciDebts });
+    }
     validateSection("financement");
     setEditingItem(null);
   };
 
   const handleDelete = (id: string) => {
-    updateSection("financement", { debts: debts.filter(d => d.id !== id) });
+    updateSection("financement", {
+      debts: state.financement.debts.filter(d => d.id !== id),
+      sciDebts: state.financement.sciDebts.filter(d => d.id !== id),
+    });
   };
 
-  const aConfigurerCount = debts.filter(d => d.status === "A_CONFIGURER").length;
+  const aConfigurerCount = allDebts.filter(d => d.status === "A_CONFIGURER").length;
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -443,7 +465,7 @@ export default function FinancementPage() {
         </div>
       </div>
 
-      {debts.length === 0 && (
+      {allDebts.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center">
             <Landmark className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
@@ -454,7 +476,7 @@ export default function FinancementPage() {
       )}
 
       <div className="grid gap-4">
-        {debts.map(d => (
+        {allDebts.map(d => (
           <Card key={d.id} className={`transition-colors ${d.status === "A_CONFIGURER" ? "border-destructive/50" : ""}`}>
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
@@ -463,6 +485,9 @@ export default function FinancementPage() {
                     {d.type === "BANK_LOAN" ? <Landmark className="h-4 w-4 text-primary" /> : <FileText className="h-4 w-4 text-primary" />}
                     <span className="font-semibold text-foreground">{d.label || DEBT_TYPE_LABELS[d.type]}</span>
                     <Badge variant="outline" className="text-[10px]">{DEBT_TYPE_LABELS[d.type]}</Badge>
+                    {d.entityId === FONCIERE_ENTITY_ID && (
+                      <Badge variant="secondary" className="text-[10px]">Foncière</Badge>
+                    )}
                     {d.status === "A_CONFIGURER" && (
                       <Badge variant="destructive" className="text-[10px] px-1.5 py-0">À configurer</Badge>
                     )}

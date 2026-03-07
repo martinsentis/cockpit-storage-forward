@@ -60,6 +60,7 @@ export interface CapexBudgetLine {
   prixType: "HT" | "TTC" | "NON_SOUMIS";
   vatRate: number;
   commentaire?: string;
+  createdBy?: string;
 }
 
 export interface BuildAsset {
@@ -71,6 +72,8 @@ export interface BuildAsset {
   depreciationYears: number;
   commissioningMonth: number;
   commentaire?: string;
+  phaseId?: string;
+  createdBy?: string;
 }
 
 export type TaxePaymentMode = "AUTO" | "MANUEL";
@@ -105,6 +108,8 @@ export interface CapexEvent {
   assets: BuildAsset[];
   taxeAmenagement: TaxeAmenagementData;
   depenses: DepenseReelle[];
+  phaseId?: string;
+  createdBy?: string;
 }
 
 export interface BuildData {
@@ -136,6 +141,7 @@ export interface DebtItem {
   firstPayment: number;
   monthlyPayment: number;
   purchaseOption: number;
+  createdBy?: string;
 }
 
 export const DEBT_TYPE_LABELS: Record<DebtType, string> = {
@@ -654,6 +660,7 @@ export interface ApportItem {
   commentaire?: string;
   phaseId?: string;
   status?: FinancingStatus;
+  createdBy?: string;
 }
 
 export interface ApportsData {

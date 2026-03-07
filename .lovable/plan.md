@@ -1,64 +1,48 @@
 
 
-## Plan : Tunnel capacitaire atomique — compléments
+## Plan : Implémenter le Cockpit V1 complet
 
-Reprend le plan approuvé précédemment avec les 3 ajouts demandés.
+### Contexte
+Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
 
-### Modifications
+### Fichiers à créer
 
-#### 1. `src/types/project.ts`
+**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
 
-- Ajouter `phaseId?: string` sur `CapexEvent` (déjà prévu)
-- Ajouter `phaseId?: string` sur `BuildAsset`
-- Ajouter `createdBy?: string` sur `CapexEvent`, `BuildAsset`, `DebtItem`, `ApportItem`
+**2. `src/types/project.ts`** — Types et defaults :
+- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
+- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
+  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
+  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
+  - `revenueParams` (surface, prixM2, tauxRemplissage)
+  - `services` ([] par défaut)
+  - `opexPercentOfRevenue`
+  - `debts`, `sciDebts` ([] par défaut)
+  - `sciChargesCash`, `sciAmortization` (0 par défaut)
+  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
+  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
+- Constantes `DEFAULT_*` exportées pour chaque section
 
-#### 2. `src/contexts/ProjectContext.tsx` — Opération atomique `batchUpdateSections`
+**3. `src/contexts/ProjectContext.tsx`** :
+- State initialisé avec les defaults
+- `validated` flags (5 booleans, tous false)
+- `updateSection()`, `validateSection()`, `isProjectComplete()`
+- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
 
-Ajouter une nouvelle méthode au contexte :
+**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
 
-```typescript
-batchUpdateSections: (updates: Partial<{ [K in keyof ProjectState]: Partial<ProjectState[K]> }>) => void;
-```
+**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
 
-Cette méthode applique tous les patches en un seul `setState`, garantissant qu'aucun rendu intermédiaire ne produit un état incohérent (ex: dette sans CAPEX). L'implémentation fusionne chaque section dans un seul appel :
+**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
+- Formulaires pré-remplis depuis le Context
+- Bouton "Enregistrer" → updateSection + validateSection
+- Champs par page alignés sur les inputs API
 
-```typescript
-const batchUpdateSections = useCallback((updates) => {
-  setMultiState(prev => {
-    const entry = prev.projects[prev.activeProjectId!];
-    const newState = { ...entry.state };
-    for (const [section, patch] of Object.entries(updates)) {
-      newState[section] = { ...newState[section], ...patch };
-    }
-    return { ...prev, projects: { ...prev.projects, [prev.activeProjectId!]: { ...entry, state: newState } } };
-  });
-}, []);
-```
+**7. `src/pages/DashboardPage.tsx`** :
+- Liste les sections manquantes si projet incomplet
+- Bouton "Lancer la simulation" désactivé si incomplet
+- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
+- Affiche réponse JSON ou erreur dans `<pre>`
 
-#### 3. `src/pages/ExploitationPage.tsx` — Utiliser `batchUpdateSections` dans `onFinalize`
-
-Remplacer les 4 appels `updateSection` séparés par un seul appel `batchUpdateSections` qui regroupe :
-- `financement`: debts + sciDebts
-- `apports`: apports
-- `build`: capexEvents (avec `phaseId` et `createdBy: "capacity_phase"`)
-- `exploitation`: phases mises à jour
-
-Ajouter `createdBy: "capacity_phase"` sur tous les objets générés (debts, apports, assets, capexEvent).
-Ajouter `phaseId: phaseData.id` sur les `BuildAsset` et le `CapexEvent`.
-
-**Suppression cascade** : filtrer par `phaseId` sur toutes les collections (debts, sciDebts, apports, capexEvents et leurs assets internes). Utiliser `batchUpdateSections` pour la suppression aussi.
-
-#### 4. `src/pages/FinancementPage.tsx` — Fusionner debts + sciDebts
-
-Afficher les deux tableaux fusionnés. Router save/delete vers le bon tableau selon `entityId`.
-
-### Fichiers modifiés
-
-| Fichier | Changement |
-|---|---|
-| `src/types/project.ts` | `phaseId` sur `CapexEvent` + `BuildAsset` ; `createdBy` sur 4 interfaces |
-| `src/contexts/ProjectContext.tsx` | `batchUpdateSections` atomique |
-| `src/pages/ExploitationPage.tsx` | Création atomique via batch ; suppression cascade avec AlertDialog |
-| `src/pages/FinancementPage.tsx` | Fusionner debts + sciDebts ; router save/delete |
-| `src/pages/FoncierePage.tsx` | Renommer "SCI" → "Foncière" |
+**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
 
