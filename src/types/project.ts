@@ -141,6 +141,7 @@ export interface DebtItem {
   firstPayment: number;
   monthlyPayment: number;
   purchaseOption: number;
+  createdBy?: string;
 }
 
 export const DEBT_TYPE_LABELS: Record<DebtType, string> = {
