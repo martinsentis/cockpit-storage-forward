@@ -237,7 +237,7 @@ function migrateLoyerDynamique(ld: any): LoyerDynamiqueData {
   return { ...DEFAULT_LOYER_DYNAMIQUE };
 }
 
-
+function migrateGouvernance(g: any): GouvernanceData {
   const globalRule = g?.globalRule ?? {
     distributableCashRate: g?.distributableCashRate ?? DEFAULT_GLOBAL_RULE.distributableCashRate,
     reserveStrategicRatio: g?.reserveStrategicRatio ?? DEFAULT_GLOBAL_RULE.reserveStrategicRatio,
