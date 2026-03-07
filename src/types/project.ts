@@ -1,6 +1,28 @@
 // ── Section types ──
 
-export type RentMode = "AUTONOMIE_SCI" | "OPTIMISATION_FISCALE" | "DESENDETTEMENT_SCI" | "MIX";
+export type RentStrategyMode =
+  | "SCI_AUTONOMY"
+  | "OPTIMIZATION"
+  | "DEBT_PAYDOWN"
+  | "MIX"
+  | "FIXED_AMOUNT";
+
+export interface RentStrategyParameters {
+  rn_exploitation_floor_ratio?: number;  // décimal 0-1
+  use_market_rent_cap?: boolean;
+  market_rent_cap?: number;              // €/mois
+  target_sci_result_ratio?: number;      // décimal 0-1
+  fixed_rent_amount?: number;            // €/mois
+}
+
+export interface RentPlanPhase {
+  id: string;
+  startMonth: number;
+  strategy: {
+    mode: RentStrategyMode;
+    parameters: RentStrategyParameters;
+  };
+}
 export type BoxMode = "MACRO" | "TYPOLOGIE";
 export type ChargeCategory = "IMMOBILIER" | "ENERGIE" | "SECURITE" | "MARKETING" | "EXPLOITATION" | "ADMINISTRATIF" | "AUTRE";
 export type ChargeFrequency = "MENSUELLE" | "ANNUELLE";
