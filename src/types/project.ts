@@ -385,9 +385,7 @@ export interface FonciereData {
 // ── Loyer Dynamique ──
 
 export interface LoyerDynamiqueData {
-  mode: RentMode;
-  targetExploitationResult: number;
-  manualOverride: number | null;
+  rentPlan: RentPlanPhase[];
 }
 
 // ── Gouvernance ──
