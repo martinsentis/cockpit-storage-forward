@@ -582,10 +582,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ccaPriorityRatio: g.ccaPriorityRatio ?? DEFAULT_GOUVERNANCE.ccaPriorityRatio,
       reserveStrategicRatio: g.reserveStrategicRatio ?? DEFAULT_GOUVERNANCE.reserveStrategicRatio,
       reserveAfterCcaFullyRepaid: g.reserveAfterCcaFullyRepaid ?? DEFAULT_GOUVERNANCE.reserveAfterCcaFullyRepaid,
-      rentConstraints: {
-        mode: state.loyerDynamique.mode,
-        monthlyRent: loyer,
-      },
+      rentPlan: state.loyerDynamique.rentPlan,
     };
   }, [state]);
 

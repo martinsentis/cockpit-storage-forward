@@ -200,7 +200,7 @@ export default function FoncierePage() {
                   <div>
                     <p className="text-sm font-medium">Loyer dynamique (exploitation → SCI)</p>
                     <p className="text-2xl font-bold">{fmt(loyerMensuel)} € HT/mois</p>
-                    <p className="text-xs text-muted-foreground">Mode : {state.loyerDynamique.mode.replace(/_/g, " ")}</p>
+                    <p className="text-xs text-muted-foreground">Mode : {(() => { const labels: Record<string, string> = { SCI_AUTONOMY: "Autonomie SCI", DEBT_PAYDOWN: "Désendettement SCI", OPTIMIZATION: "Optimisation fiscale", MIX: "Mix", FIXED_AMOUNT: "Montant fixe" }; const m = state.loyerDynamique.rentPlan[state.loyerDynamique.rentPlan.length - 1]?.strategy.mode; return labels[m ?? ""] ?? m; })()}</p>
                   </div>
                   <Button variant="outline" size="sm" onClick={() => navigate("/loyer-dynamique")}>
                     <ExternalLink className="h-4 w-4 mr-1" /> Modifier
