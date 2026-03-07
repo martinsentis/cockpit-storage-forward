@@ -296,6 +296,8 @@ function migrateSingleProjectState(parsed: any): { state: ProjectState; validate
     firstPayment: d.firstPayment ?? 0,
     monthlyPayment: d.monthlyPayment ?? 0,
     purchaseOption: d.purchaseOption ?? 0,
+    createdBy: d.createdBy,
+    startMonth: d.startMonth,
   });
 
   const financement: FinancementData = {
