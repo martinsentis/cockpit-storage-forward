@@ -663,6 +663,7 @@ export interface ApportItem {
   phaseId?: string;
   status?: FinancingStatus;
   createdBy?: string;
+  startMonth?: number;
 }
 
 export interface ApportsData {
