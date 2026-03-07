@@ -544,9 +544,11 @@ export const DEFAULT_FONCIERE: FonciereData = {
 };
 
 export const DEFAULT_LOYER_DYNAMIQUE: LoyerDynamiqueData = {
-  mode: "AUTONOMIE_SCI",
-  targetExploitationResult: 0,
-  manualOverride: null,
+  rentPlan: [{
+    id: crypto.randomUUID(),
+    startMonth: 0,
+    strategy: { mode: "SCI_AUTONOMY", parameters: {} },
+  }],
 };
 
 export function createDefaultAllocationOrder(): CashAllocationStep[] {
