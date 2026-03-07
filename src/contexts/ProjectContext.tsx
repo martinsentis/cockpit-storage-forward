@@ -69,6 +69,7 @@ interface ProjectContextValue {
   activeProjectId: string | null;
   activeProjectMeta: ProjectMeta | null;
   updateSection: <K extends keyof ProjectState>(section: K, data: Partial<ProjectState[K]>) => void;
+  batchUpdateSections: (updates: Partial<{ [K in keyof ProjectState]: Partial<ProjectState[K]> }>) => void;
   validateSection: (section: SectionName) => void;
   isProjectComplete: () => boolean;
   buildProjectionInputs: () => ProjectionInputs;
