@@ -756,10 +756,7 @@ export interface ProjectionInputs {
   ccaPriorityRatio: number;
   reserveStrategicRatio: number;
   reserveAfterCcaFullyRepaid: number;
-  rentConstraints: {
-    mode: RentMode;
-    monthlyRent: number;
-  };
+  rentPlan: RentPlanPhase[];
 }
 
 // ── Validated flags ──
