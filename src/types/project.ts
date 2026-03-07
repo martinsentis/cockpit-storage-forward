@@ -72,6 +72,8 @@ export interface BuildAsset {
   depreciationYears: number;
   commissioningMonth: number;
   commentaire?: string;
+  phaseId?: string;
+  createdBy?: string;
 }
 
 export type TaxePaymentMode = "AUTO" | "MANUEL";
