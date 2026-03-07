@@ -154,7 +154,7 @@ export default function FoncierePage() {
                 ...(state.financement.debts ?? []).filter(d => d.entityId === "__fonciere__"),
               ];
               if (foncDebts.length === 0) {
-                return <p className="text-sm text-muted-foreground">Aucun crédit SCI défini dans le module Financement.</p>;
+                return <p className="text-sm text-muted-foreground">Aucun crédit foncier défini dans le module Financement.</p>;
               }
               return (
                 <Table>
