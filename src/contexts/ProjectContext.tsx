@@ -298,7 +298,6 @@ function migrateSingleProjectState(parsed: any): { state: ProjectState; validate
     purchaseOption: d.purchaseOption ?? 0,
     createdBy: d.createdBy,
     startMonth: d.startMonth,
-    phaseId: d.phaseId,
   });
 
   const financement: FinancementData = {
