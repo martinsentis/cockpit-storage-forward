@@ -47,7 +47,7 @@ export function useEngineWithOverrides(overrides: Partial<EngineInputs>): Engine
 
 /**
  * useEngineWithScenario — Merges ScenarioState overrides into EngineInputs.
- * Scenario overrides (targetOccupancy, rampUpMonths) are applied on top of
+ * Scenario overrides (targetOccupancy, phaseOverrides) are applied on top of
  * the project configuration before calling the engine.
  * The engine itself is NOT modified.
  */
@@ -56,18 +56,19 @@ export function useEngineWithScenario(): EngineOutputs {
   const { scenarioState } = useScenario();
 
   return useMemo(() => {
-    // Apply scenario overrides to exploitation phases if set
-    let exploitation = state.exploitation;
-    if (scenarioState.targetOccupancy !== undefined || scenarioState.rampUpMonths !== undefined) {
-      exploitation = {
-        ...exploitation,
-        capacityPhases: exploitation.capacityPhases.map((phase) => ({
+    // Apply scenario overrides to exploitation phases
+    const exploitation = {
+      ...state.exploitation,
+      capacityPhases: state.exploitation.capacityPhases.map((phase) => {
+        const override = scenarioState.phaseOverrides[phase.id];
+        return {
           ...phase,
-          ...(scenarioState.targetOccupancy !== undefined ? { targetOccupancy: scenarioState.targetOccupancy } : {}),
-          ...(scenarioState.rampUpMonths !== undefined ? { rampUpMonths: scenarioState.rampUpMonths } : {}),
-        })),
-      };
-    }
+          targetOccupancy: scenarioState.targetOccupancy,
+          ...(override?.rampUpMonths !== undefined ? { rampUpMonths: override.rampUpMonths } : {}),
+          ...(override?.rampCurve !== undefined ? { rampCurve: override.rampCurve } : {}),
+        };
+      }),
+    };
 
     const inputs: EngineInputs = {
       projet: {

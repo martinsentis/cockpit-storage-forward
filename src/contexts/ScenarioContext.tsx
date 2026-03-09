@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
-import type { ScenarioState, ExitHypotheses } from "@/types/scenario";
+import type { ScenarioState, ExitHypotheses, PhaseOverride } from "@/types/scenario";
 import { DEFAULT_SCENARIO_STATE } from "@/types/scenario";
 
 interface ScenarioContextValue {
@@ -7,6 +7,8 @@ interface ScenarioContextValue {
   setScenarioState: React.Dispatch<React.SetStateAction<ScenarioState>>;
   updateScenarioField: <K extends keyof ScenarioState>(field: K, value: ScenarioState[K]) => void;
   updateExitHypotheses: (partial: Partial<ExitHypotheses>) => void;
+  updatePhaseOverride: (phaseId: string, partial: Partial<PhaseOverride>) => void;
+  resetToDefaults: () => void;
 }
 
 const ScenarioContext = createContext<ScenarioContextValue | null>(null);
@@ -25,8 +27,34 @@ export function ScenarioProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
+  const updatePhaseOverride = useCallback((phaseId: string, partial: Partial<PhaseOverride>) => {
+    setScenarioState((prev) => ({
+      ...prev,
+      phaseOverrides: {
+        ...prev.phaseOverrides,
+        [phaseId]: {
+          ...prev.phaseOverrides[phaseId],
+          ...partial,
+        },
+      },
+    }));
+  }, []);
+
+  const resetToDefaults = useCallback(() => {
+    setScenarioState(DEFAULT_SCENARIO_STATE);
+  }, []);
+
   return (
-    <ScenarioContext.Provider value={{ scenarioState, setScenarioState, updateScenarioField, updateExitHypotheses }}>
+    <ScenarioContext.Provider
+      value={{
+        scenarioState,
+        setScenarioState,
+        updateScenarioField,
+        updateExitHypotheses,
+        updatePhaseOverride,
+        resetToDefaults,
+      }}
+    >
       {children}
     </ScenarioContext.Provider>
   );
