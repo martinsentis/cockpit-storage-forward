@@ -86,6 +86,7 @@ export default function EvenementsPage() {
       date: dateValue ? format(dateValue, "yyyy-MM-dd") : "",
       startDate: startDateValue ? format(startDateValue, "yyyy-MM-dd") : undefined,
       endDate: endDateValue ? format(endDateValue, "yyyy-MM-dd") : undefined,
+      createdAt: new Date().toISOString(),
     };
     updateSection("evenements" as any, { events: [...events, newEvent] });
     setForm(emptyEvent());
