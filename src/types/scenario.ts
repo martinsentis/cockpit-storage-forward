@@ -22,6 +22,9 @@ export interface PhaseOverride {
 }
 
 export interface ScenarioState {
+  // rentPreset modifie uniquement ScenarioState
+  // ne modifie jamais ProjectState
+  rentPreset: RentPreset;
   horizonMonths: number;
 
   // Indexations
