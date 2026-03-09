@@ -1,6 +1,6 @@
 import type { RampCurve } from "@/types/project";
 
-export type RentPreset = "FIXED" | "INDEXED" | "RN_TARGET" | "DSCR_TARGET";
+export type RentPreset = "SCI_AUTONOMY" | "DEBT_PAYDOWN" | "OPTIMIZATION" | "MIX" | "FIXED_AMOUNT";
 
 export interface ExitHypotheses {
   fonciereValuation: number;
