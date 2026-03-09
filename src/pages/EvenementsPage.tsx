@@ -71,11 +71,13 @@ export default function EvenementsPage() {
   const [startDateValue, setStartDateValue] = useState<Date | undefined>();
   const [endDateValue, setEndDateValue] = useState<Date | undefined>();
 
-  const filtered = events.filter((e) => {
-    if (filterEntity !== "all" && e.entity !== filterEntity) return false;
-    if (filterStatus !== "all" && e.statut !== filterStatus) return false;
-    return true;
-  });
+  const filtered = events
+    .filter((e) => {
+      if (filterEntity !== "all" && e.entity !== filterEntity) return false;
+      if (filterStatus !== "all" && e.statut !== filterStatus) return false;
+      return true;
+    })
+    .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
 
   const handleSave = () => {
     const newEvent: TreasuryEvent = {
