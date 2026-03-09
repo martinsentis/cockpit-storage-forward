@@ -26,7 +26,6 @@ export default function ProjectionSocietesPage() {
         <TabsList>
           <TabsTrigger value="exploitation">Exploitation (SAS)</TabsTrigger>
           <TabsTrigger value="fonciere">Foncière (SCI)</TabsTrigger>
-          <TabsTrigger value="moteur">Détail moteur</TabsTrigger>
         </TabsList>
 
         <TabsContent value="exploitation" className="space-y-4 mt-4">
