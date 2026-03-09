@@ -52,6 +52,7 @@ export interface ProjectState {
   associes: AssociesData;
   apports: ApportsData;
   fiscalite: FiscaliteData;
+  evenements: EvenementsData;
 }
 
 export interface ProjectEntry {
