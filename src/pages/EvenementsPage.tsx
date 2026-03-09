@@ -375,6 +375,12 @@ export default function EvenementsPage() {
                 <Input type="number" min={1} value={form.dureeAmortissement ?? ""} onChange={(e) => patch({ dureeAmortissement: Number(e.target.value) })} />
               </div>
             )}
+
+            {/* Notes */}
+            <div className="col-span-2 space-y-1">
+              <Label>Notes <span className="text-muted-foreground font-normal">(facultatif)</span></Label>
+              <Textarea value={form.notes ?? ""} onChange={(e) => patch({ notes: e.target.value })} placeholder="Contexte, référence facture, explication…" rows={3} />
+            </div>
           </div>
 
           <DialogFooter>

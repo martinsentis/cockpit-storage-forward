@@ -761,6 +761,8 @@ export interface TreasuryEvent {
   impact: TreasuryImpact;
   dureeAmortissement?: number;
   statut: TreasuryStatus;
+  createdAt: string;
+  notes?: string;
 }
 
 export interface EvenementsData {
