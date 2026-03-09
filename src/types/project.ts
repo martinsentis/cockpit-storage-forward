@@ -723,7 +723,7 @@ export const TREASURY_NATURE_LABELS: Record<TreasuryNature, string> = {
 };
 
 export const TREASURY_FREQUENCY_LABELS: Record<TreasuryFrequency, string> = {
-  JOURNALIER: "Journalier",
+  HEBDOMADAIRE: "Hebdomadaire",
   MENSUELLE: "Mensuelle",
   TRIMESTRIELLE: "Trimestrielle",
   ANNUELLE: "Annuelle",
