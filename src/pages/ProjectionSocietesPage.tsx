@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useProject } from "@/contexts/ProjectContext";
+import EngineInspector from "@/components/engine/EngineInspector";
 
 function fmt(n: number) {
   return n.toLocaleString("fr-FR", { maximumFractionDigits: 0 });
