@@ -24,7 +24,7 @@ import DetailMoteurPage from "@/pages/DetailMoteurPage";
 import DashboardPage from "@/pages/DashboardPage";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
