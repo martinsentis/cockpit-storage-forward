@@ -105,6 +105,7 @@ const defaultState: ProjectState = {
   associes: { ...DEFAULT_ASSOCIES },
   apports: { ...DEFAULT_APPORTS },
   fiscalite: { ...DEFAULT_FISCALITE },
+  evenements: { ...DEFAULT_EVENEMENTS },
 };
 
 const defaultValidated: ValidatedFlags = {
