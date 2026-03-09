@@ -694,6 +694,83 @@ export interface ApportsData {
 
 export const DEFAULT_APPORTS: ApportsData = { apports: [] };
 
+// ── Événements de trésorerie ──
+
+export type TreasuryEntity = "exploitation" | "fonciere";
+export type TreasuryFlowDirection = "ENTREE" | "SORTIE";
+export type TreasuryNature = "PONCTUEL" | "CHARGE_RECURRENTE_TEMP" | "PRODUIT_RECURRENT_TEMP" | "FINANCEMENT_APPORT" | "RETRAIT_EXCEPTIONNEL";
+export type TreasuryRecurrence = "PONCTUEL" | "RECURRENT";
+export type TreasuryFrequency = "JOURNALIER" | "MENSUELLE" | "TRIMESTRIELLE" | "ANNUELLE";
+export type TreasuryImpact = "AUCUN" | "PRODUIT_EXCEPTIONNEL" | "CHARGE_EXCEPTIONNELLE" | "IMMOBILISATION";
+export type TreasuryStatus = "PLANIFIE" | "CONFIRME" | "REALISE" | "ANNULE";
+
+export const TREASURY_ENTITY_LABELS: Record<TreasuryEntity, string> = {
+  exploitation: "Exploitation",
+  fonciere: "Foncière",
+};
+
+export const TREASURY_FLOW_LABELS: Record<TreasuryFlowDirection, string> = {
+  ENTREE: "Entrée de trésorerie",
+  SORTIE: "Sortie de trésorerie",
+};
+
+export const TREASURY_NATURE_LABELS: Record<TreasuryNature, string> = {
+  PONCTUEL: "Événement ponctuel",
+  CHARGE_RECURRENTE_TEMP: "Charge récurrente temporaire",
+  PRODUIT_RECURRENT_TEMP: "Produit récurrent temporaire",
+  FINANCEMENT_APPORT: "Financement / apport",
+  RETRAIT_EXCEPTIONNEL: "Retrait exceptionnel",
+};
+
+export const TREASURY_FREQUENCY_LABELS: Record<TreasuryFrequency, string> = {
+  JOURNALIER: "Journalier",
+  MENSUELLE: "Mensuelle",
+  TRIMESTRIELLE: "Trimestrielle",
+  ANNUELLE: "Annuelle",
+};
+
+export const TREASURY_IMPACT_LABELS: Record<TreasuryImpact, string> = {
+  AUCUN: "Aucun",
+  PRODUIT_EXCEPTIONNEL: "Produit exceptionnel",
+  CHARGE_EXCEPTIONNELLE: "Charge exceptionnelle",
+  IMMOBILISATION: "Immobilisation",
+};
+
+export const TREASURY_STATUS_LABELS: Record<TreasuryStatus, string> = {
+  PLANIFIE: "Planifié",
+  CONFIRME: "Confirmé",
+  REALISE: "Réalisé",
+  ANNULE: "Annulé",
+};
+
+export interface TreasuryEvent {
+  id: string;
+  entity: TreasuryEntity;
+  label: string;
+  flowDirection: TreasuryFlowDirection;
+  nature: TreasuryNature;
+  date: string; // YYYY-MM-DD
+  recurrence: TreasuryRecurrence;
+  startDate?: string;
+  endDate?: string;
+  frequency?: TreasuryFrequency;
+  montantHT: number;
+  tvaApplicable: boolean;
+  tauxTVA: number;
+  probabilite: number; // 0-100
+  impact: TreasuryImpact;
+  dureeAmortissement?: number;
+  statut: TreasuryStatus;
+}
+
+export interface EvenementsData {
+  events: TreasuryEvent[];
+}
+
+export const DEFAULT_EVENEMENTS: EvenementsData = {
+  events: [],
+};
+
 // ── Tax-exempt labels ──
 
 export const TAX_EXEMPT_LABELS = ["Taxe foncière", "CFE", "Taxe d'aménagement"];

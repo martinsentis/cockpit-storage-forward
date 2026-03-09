@@ -11,6 +11,7 @@ import {
   AssociesData,
   ApportsData,
   FiscaliteData,
+  EvenementsData,
   ValidatedFlags,
   SectionName,
   ProjectionInputs,
@@ -28,6 +29,7 @@ import {
   DEFAULT_ASSOCIES,
   DEFAULT_APPORTS,
   DEFAULT_FISCALITE,
+  DEFAULT_EVENEMENTS,
   DEFAULT_GLOBAL_RULE,
   createDefaultPhase,
   createDefaultCapexEvent,
@@ -50,6 +52,7 @@ export interface ProjectState {
   associes: AssociesData;
   apports: ApportsData;
   fiscalite: FiscaliteData;
+  evenements: EvenementsData;
 }
 
 export interface ProjectEntry {
@@ -102,6 +105,7 @@ const defaultState: ProjectState = {
   associes: { ...DEFAULT_ASSOCIES },
   apports: { ...DEFAULT_APPORTS },
   fiscalite: { ...DEFAULT_FISCALITE },
+  evenements: { ...DEFAULT_EVENEMENTS },
 };
 
 const defaultValidated: ValidatedFlags = {
@@ -362,6 +366,7 @@ function migrateSingleProjectState(parsed: any): { state: ProjectState; validate
       associes: rawState?.associes ?? { ...DEFAULT_ASSOCIES },
       apports: migrateApports(rawState?.apports),
       fiscalite,
+      evenements: rawState?.evenements ?? { ...DEFAULT_EVENEMENTS },
     },
     validated: { ...defaultValidated, ...parsed.validated, fiscalite: parsed.validated?.fiscalite ?? false },
   };
