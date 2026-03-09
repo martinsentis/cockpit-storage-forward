@@ -56,6 +56,7 @@ export interface ScenarioState {
 }
 
 export const DEFAULT_SCENARIO_STATE: ScenarioState = {
+  rentPreset: "RN_TARGET",
   horizonMonths: 120,
 
   indexationCA: 0.02,
