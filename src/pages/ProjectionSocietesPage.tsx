@@ -1,20 +1,39 @@
+import { useState } from "react";
 import { ProjectionHeader } from "@/components/ProjectionHeader";
-import { useEngineWithScenario } from "@/hooks/useEngine";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { useProject } from "@/contexts/ProjectContext";
+import { Slider } from "@/components/ui/slider";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+} from "recharts";
 
-function fmt(n: number) {
-  return n.toLocaleString("fr-FR", { maximumFractionDigits: 0 });
-}
+const generateMockData = (years: number) =>
+  Array.from({ length: years }, (_, i) => ({
+    year: i + 1,
+    revenue: 0,
+    ebe: 0,
+    netResult: 0,
+    cash: 0,
+  }));
 
 export default function ProjectionSocietesPage() {
-  const { state } = useProject();
-  const engine = useEngineWithScenario();
-  const ex = engine.exploitation;
-  const fo = engine.fonciere;
-  const displayHT = state.projet.displayMode === "HT";
+  const [projectionHorizon, setProjectionHorizon] = useState(10);
+  const mockData = generateMockData(projectionHorizon);
 
   return (
     <div className="space-y-6">
@@ -22,139 +41,125 @@ export default function ProjectionSocietesPage() {
 
       <ProjectionHeader />
 
-      <Tabs defaultValue="exploitation">
-        <TabsList>
-          <TabsTrigger value="exploitation">Exploitation (SAS)</TabsTrigger>
-          <TabsTrigger value="fonciere">Foncière (SCI)</TabsTrigger>
-        </TabsList>
+      {/* Curseur horizon */}
+      <Card>
+        <CardContent className="pt-6">
+          <p className="text-sm font-medium mb-4">
+            Horizon de projection : {projectionHorizon} ans
+          </p>
+          <Slider
+            min={1}
+            max={25}
+            step={1}
+            value={[projectionHorizon]}
+            onValueChange={([v]) => setProjectionHorizon(v)}
+          />
+        </CardContent>
+      </Card>
 
-        <TabsContent value="exploitation" className="space-y-4 mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                Compte de résultat
-                <Badge variant="outline" className="text-xs">{displayHT ? "HT" : "TTC"}</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground">CA Total</p>
-                  <p className="text-lg font-semibold">{fmt(ex.caTotal)} €</p>
+      {/* Indicateurs par entité */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Exploitation</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 text-sm">
+              {["CA HT", "EBE", "Résultat net", "Trésorerie fin d'année", "Loyer versé à la foncière"].map((label) => (
+                <div key={label} className="flex justify-between">
+                  <span className="text-muted-foreground">{label}</span>
+                  <span className="font-medium">— €</span>
                 </div>
-                <div>
-                  <p className="text-muted-foreground">CA {displayHT ? "HT" : "TTC"}</p>
-                  <p className="text-lg font-semibold">{fmt(displayHT ? ex.totalCAHT : ex.totalCATTC)} €</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Services (marge)</p>
-                  <p className="text-lg font-semibold">{fmt(ex.margeServicesHT)} €</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Charges totales</p>
-                  <p className="text-lg font-semibold">{fmt(displayHT ? ex.totalChargesHT : ex.totalChargesTTC)} €</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Loyer SCI</p>
-                  <p className="text-lg font-semibold">{fmt(ex.loyerSCI)} €</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Résultat</p>
-                  <p className={`text-lg font-semibold ${ex.resultat >= 0 ? "text-green-600" : "text-red-600"}`}>
-                    {fmt(ex.resultat)} €
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Ratios</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground">Surface totale</p>
-                  <p className="text-lg font-semibold">{fmt(ex.totalSurface)} m²</p>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Foncière</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 text-sm">
+              {["Loyers encaissés", "EBE", "Résultat net", "Trésorerie fin d'année", "Loyer reçu de l'exploitation"].map((label) => (
+                <div key={label} className="flex justify-between">
+                  <span className="text-muted-foreground">{label}</span>
+                  <span className="font-medium">— €</span>
                 </div>
-                <div>
-                  <p className="text-muted-foreground">Nombre de box</p>
-                  <p className="text-lg font-semibold">{fmt(ex.totalNbBox)}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Prix moyen /m²</p>
-                  <p className="text-lg font-semibold">{fmt(ex.prixM2Global)} €</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Taux d'occupation cible</p>
-                  <p className="text-lg font-semibold">{(ex.targetOccupancyWeighted * 100).toFixed(0)}%</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Marge services</p>
-                  <p className="text-lg font-semibold">{(ex.margeServicesPct * 100).toFixed(1)}%</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-        <TabsContent value="fonciere" className="space-y-4 mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Compte de résultat SCI</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground">Loyer mensuel HT</p>
-                  <p className="text-lg font-semibold">{fmt(fo.loyerMensuelHT)} €</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Autres revenus mensuels HT</p>
-                  <p className="text-lg font-semibold">{fmt(fo.totalOtherRevenuesMensuellesHT)} €</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Revenus mensuels HT</p>
-                  <p className="text-lg font-semibold">{fmt(fo.totalRevenusMensuelHT)} €</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Charges mensuelles HT</p>
-                  <p className="text-lg font-semibold">{fmt(fo.totalChargesMensuellesHT)} €</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Intérêts mensuels</p>
-                  <p className="text-lg font-semibold">{fmt(fo.interetsMensuels)} €</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Résultat courant</p>
-                  <p className={`text-lg font-semibold ${fo.resultatCourant >= 0 ? "text-green-600" : "text-red-600"}`}>
-                    {fmt(fo.resultatCourant)} €
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      {/* Graphique Performance */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Performance</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={mockData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="year" />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="revenue" name="CA HT" fill="#3b82f6" />
+              <Bar dataKey="ebe" name="EBE" fill="#22c55e" />
+              <Bar dataKey="netResult" name="Résultat net" fill="#f97316" />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Ratios fiscaux</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground">Amortissement annuel</p>
-                  <p className="text-lg font-semibold">{fmt(fo.amortissementAnnuel)} €</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Résultat fiscal</p>
-                  <p className="text-lg font-semibold">{fmt(fo.resultatFiscal)} €</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      {/* Graphique Trésorerie cumulée */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Trésorerie cumulée</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={mockData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="year" />
+              <YAxis />
+              <Tooltip />
+              <Line type="monotone" dataKey="cash" name="Trésorerie" stroke="#8b5cf6" strokeWidth={2} />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Tableau annuel */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Tableau annuel</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Année</TableHead>
+                <TableHead className="text-right">CA</TableHead>
+                <TableHead className="text-right">EBE</TableHead>
+                <TableHead className="text-right">Résultat net</TableHead>
+                <TableHead className="text-right">Trésorerie</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {mockData.map((row) => (
+                <TableRow key={row.year}>
+                  <TableCell>{row.year}</TableCell>
+                  <TableCell className="text-right">0 €</TableCell>
+                  <TableCell className="text-right">0 €</TableCell>
+                  <TableCell className="text-right">0 €</TableCell>
+                  <TableCell className="text-right">0 €</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }
