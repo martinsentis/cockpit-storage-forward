@@ -20,6 +20,7 @@ import ApportsPage from "@/pages/ApportsPage";
 import EvenementsPage from "@/pages/EvenementsPage";
 import ProjectionSocietesPage from "@/pages/ProjectionSocietesPage";
 import ProjectionAssociesPage from "@/pages/ProjectionAssociesPage";
+import DetailMoteurPage from "@/pages/DetailMoteurPage";
 import DashboardPage from "@/pages/DashboardPage";
 import NotFound from "./pages/NotFound";
 
