@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import { useScenario } from "@/contexts/ScenarioContext";
-import ProjectionHeader from "@/components/ProjectionHeader";
+import { ProjectionHeader } from "@/components/ProjectionHeader";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
