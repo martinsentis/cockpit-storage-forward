@@ -1,7 +1,7 @@
 import {
   Building2, Hammer, Landmark, TrendingUp, Users, Users2, LayoutDashboard,
   CheckCircle, AlertTriangle, Home, ArrowLeftRight, Wallet, Receipt, FolderOpen,
-  CalendarClock, LineChart, UserCheck,
+  CalendarClock, LineChart, UserCheck, Cog,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useNavigate } from "react-router-dom";
