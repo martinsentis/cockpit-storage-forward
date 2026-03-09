@@ -1,5 +1,7 @@
 import type { RampCurve } from "@/types/project";
 
+export type RentPreset = "FIXED" | "INDEXED" | "RN_TARGET" | "DSCR_TARGET";
+
 export interface ExitHypotheses {
   fonciereValuation: number;
   exploitationEBEMultiple: number;
@@ -20,6 +22,9 @@ export interface PhaseOverride {
 }
 
 export interface ScenarioState {
+  // rentPreset modifie uniquement ScenarioState
+  // ne modifie jamais ProjectState
+  rentPreset: RentPreset;
   horizonMonths: number;
 
   // Indexations
@@ -51,6 +56,7 @@ export interface ScenarioState {
 }
 
 export const DEFAULT_SCENARIO_STATE: ScenarioState = {
+  rentPreset: "RN_TARGET",
   horizonMonths: 120,
 
   indexationCA: 0.02,

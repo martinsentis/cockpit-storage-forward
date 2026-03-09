@@ -30,11 +30,19 @@ import { useProject } from "@/contexts/ProjectContext";
 import { useScenario } from "@/contexts/ScenarioContext";
 import { toast } from "@/hooks/use-toast";
 import type { RampCurve } from "@/types/project";
+import type { RentPreset } from "@/types/scenario";
 
 const RAMP_CURVE_LABELS: Record<RampCurve, string> = {
   LINEAR: "Linéaire",
   FAST_START: "Rapide puis plateau",
   SLOW_START: "Logistique",
+};
+
+const RENT_PRESET_LABELS: Record<RentPreset, string> = {
+  FIXED: "Loyer fixe",
+  INDEXED: "Loyer indexé",
+  RN_TARGET: "Résultat net cible",
+  DSCR_TARGET: "DSCR cible",
 };
 
 function formatPhaseDate(startMonth: number, projectStartDate: string): string {
@@ -181,6 +189,38 @@ export function ProjectionHeader() {
                       }
                     />
                   </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* 4.1b — Mode de loyer */}
+              <div>
+                <h4 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wide">Mode de loyer</h4>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-sm text-muted-foreground">Mode actuel :</span>
+                  <Badge variant="secondary">{RENT_PRESET_LABELS[scenarioState.rentPreset]}</Badge>
+                </div>
+                <div className="max-w-xs space-y-2">
+                  <Select
+                    value={scenarioState.rentPreset}
+                    onValueChange={(v) => updateScenarioField("rentPreset", v as RentPreset)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(RENT_PRESET_LABELS) as RentPreset[]).map((preset) => (
+                        <SelectItem key={preset} value={preset}>
+                          {RENT_PRESET_LABELS[preset]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Ce paramètre modifie uniquement le mode de calcul du loyer dans le scénario courant.
+                    Le calcul du loyer sera effectué par le moteur de projection.
+                  </p>
                 </div>
               </div>
 
