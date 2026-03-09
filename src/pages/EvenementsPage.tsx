@@ -166,7 +166,11 @@ export default function EvenementsPage() {
                     <TableCell className="whitespace-nowrap">{ev.date || "—"}</TableCell>
                     <TableCell>{TREASURY_ENTITY_LABELS[ev.entity]}</TableCell>
                     <TableCell>{ev.label}</TableCell>
-                    <TableCell>{TREASURY_FLOW_LABELS[ev.flowDirection]}</TableCell>
+                    <TableCell>
+                      <span className={cn("font-medium", ev.flowDirection === "ENTREE" ? "text-green-600" : "text-red-600")}>
+                        {ev.flowDirection === "ENTREE" ? "↑" : "↓"} {TREASURY_FLOW_LABELS[ev.flowDirection]}
+                      </span>
+                    </TableCell>
                     <TableCell className="text-right font-mono">
                       {ev.montantHT.toLocaleString("fr-FR", { style: "currency", currency: "EUR" })}
                     </TableCell>
