@@ -156,6 +156,10 @@ export default function ProjectionSocietesPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="moteur" className="mt-4">
+          <EngineInspector />
+        </TabsContent>
       </Tabs>
     </div>
   );
