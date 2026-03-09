@@ -1,48 +1,99 @@
 
 
-## Plan : Implémenter le Cockpit V1 complet
+## Plan : Corrections structurelles des onglets de projection
 
-### Contexte
-Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
+### Vue d'ensemble
 
-### Fichiers à créer
+10 corrections regroupees en 4 fichiers. Creation d'un composant partage pour le slider d'horizon vertical sticky.
 
-**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
+### Fichiers
 
-**2. `src/types/project.ts`** — Types et defaults :
-- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
-- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
-  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
-  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
-  - `revenueParams` (surface, prixM2, tauxRemplissage)
-  - `services` ([] par défaut)
-  - `opexPercentOfRevenue`
-  - `debts`, `sciDebts` ([] par défaut)
-  - `sciChargesCash`, `sciAmortization` (0 par défaut)
-  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
-  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
-- Constantes `DEFAULT_*` exportées pour chaque section
+| Fichier | Action |
+|---------|--------|
+| `src/components/ProjectionHorizonSlider.tsx` | Creer |
+| `src/pages/ProjectionSocietesPage.tsx` | Modifier |
+| `src/pages/ProjectionAssociesPage.tsx` | Modifier |
+| `src/pages/ProjectionBanquePage.tsx` | Modifier |
 
-**3. `src/contexts/ProjectContext.tsx`** :
-- State initialisé avec les defaults
-- `validated` flags (5 booleans, tous false)
-- `updateSection()`, `validateSection()`, `isProjectComplete()`
-- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
+---
 
-**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
+### 1. Nouveau composant : `ProjectionHorizonSlider`
 
-**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
+Composant partage, sticky, affiche un slider vertical dans une colonne laterale gauche.
 
-**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
-- Formulaires pré-remplis depuis le Context
-- Bouton "Enregistrer" → updateSection + validateSection
-- Champs par page alignés sur les inputs API
+- Lit `scenarioState.horizonMonths` via `useScenario()`
+- Modifie via `updateScenarioField("horizonMonths", years * 12)`
+- Plage : 0-30 ans, pas de 1
+- Affichage : label "Horizon" + valeur en annees
+- CSS : `sticky top-20` pour rester visible au scroll
+- Slider vertical (orientation verticale via CSS `writing-mode` ou slider horizontal dans colonne etroite)
 
-**7. `src/pages/DashboardPage.tsx`** :
-- Liste les sections manquantes si projet incomplet
-- Bouton "Lancer la simulation" désactivé si incomplet
-- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
-- Affiche réponse JSON ou erreur dans `<pre>`
+```text
+┌──────────────────────────────────────────┐
+│ [Slider sticky]  │  Contenu page        │
+│  Horizon          │  ProjectionHeader    │
+│  ██ 10 ans       │  Cards, Charts...    │
+│                   │                      │
+└──────────────────────────────────────────┘
+```
 
-**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
+Chaque page de projection wrappera son contenu dans un layout flex :
+```tsx
+<div className="flex gap-6">
+  <ProjectionHorizonSlider />
+  <div className="flex-1 space-y-6">
+    {/* contenu page */}
+  </div>
+</div>
+```
+
+---
+
+### 2. ProjectionSocietesPage
+
+- Supprimer `useState(10)` pour `projectionHorizon`
+- Supprimer le slider local (Card avec Slider min=1 max=25)
+- Importer `useScenario` et `ProjectionHorizonSlider`
+- Calculer `projectionYears = Math.max(1, Math.ceil(scenarioState.horizonMonths / 12))`
+- Utiliser `projectionYears` partout (mock data, graphiques, tableau)
+- Wrapper dans le layout flex avec `ProjectionHorizonSlider`
+
+---
+
+### 3. ProjectionAssociesPage
+
+- Supprimer les 3 states locaux : `exitValuation`, `ebeMultiple`, `repayCcaFirst`
+- Lire depuis `scenarioState.exitHypotheses` (fonciereValuation, exploitationEBEMultiple, repayCcaFirst)
+- Modifier via `updateExitHypotheses({ ... })`
+- Supprimer `mockInvestors`
+- Lire `state.associes.associes` via `useProject()` ; filtrer les personnes physiques (`type === "PHYSIQUE"`)
+- Afficher ownership = `partExploitation + partFonciere` (ou agreger selon le modele)
+- Wrapper dans le layout flex avec `ProjectionHorizonSlider`
+
+---
+
+### 4. ProjectionBanquePage
+
+- Supprimer `FinancingType` local (`"AMORTIZING" | "BULLET" | "LEASE"`)
+- Importer `DebtType` depuis `@/types/project`
+- State : `const [financingType, setFinancingType] = useState<DebtType>("BANK_LOAN")`
+- Select UX : `BANK_LOAN` → "Pret bancaire", `LEASE` → "Credit-bail materiel"
+- Supprimer l'option "Pret in fine" (BULLET)
+- Conserver `FinancingEntity` local (correct)
+- Wrapper dans le layout flex avec `ProjectionHorizonSlider`
+
+---
+
+### Recapitulatif des suppressions
+
+| Suppression | Page |
+|---|---|
+| `useState(10)` + slider local horizon | Societes |
+| `exitValuation`, `ebeMultiple`, `repayCcaFirst` states | Associes |
+| `mockInvestors` | Associes |
+| `FinancingType` local + option BULLET | Banque |
+
+### Principe respecte
+
+Les 3 pages deviennent des vues pures : elles lisent `scenarioState` et `ProjectContext`, ne definissent aucune source de configuration.
 
