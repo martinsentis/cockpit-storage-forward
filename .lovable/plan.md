@@ -1,59 +1,48 @@
 
 
-## Plan : Réécriture complète de ProjectionAssociesPage
+## Plan : Implémenter le Cockpit V1 complet
 
-### Fichier modifié
-`src/pages/ProjectionAssociesPage.tsx` — réécriture complète
+### Contexte
+Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
 
-### Structure
+### Fichiers à créer
 
-```text
-// TODO moteur financier (commentaire en haut)
+**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
 
-ProjectionHeader
-Card Hypothèses de sortie
-  - Texte horizon (lecture seule)
-  - Input valeur foncière
-  - Input multiple EBE
-  - Checkbox remboursement CCA
-"Horizon de projection : X ans"
-Card Waterfall des flux consolidés (exploitation + foncière)
-  - Table 7 colonnes : Année | Résultat net total | Cash disponible | Dividendes | CCA remboursés | Cash distribué total | Trésorerie restante
-Card Graphique flux associés
-  - BarChart 3 séries : Dividendes (bleu), CCA remboursés (vert), Cash distribué total (violet)
-Card Décomposition de la valeur equity à la sortie
-  - Texte : "La vente simulée correspond à la cession des deux sociétés..."
-  - Table source/montant (5 lignes)
-Fiches associés (grid responsive, 3 Cards)
-  - Nom + Badge ownership
-  - RUN : CCA remboursé, Dividendes bruts, Dividendes nets
-  - EXIT : Part valorisation exploitation, Part trésorerie exploitation, Part valorisation foncière, Part trésorerie foncière
-  - SYNTHÈSE : Apport initial, Cash total brut, Cash total net, Multiple, TRI brut
-```
+**2. `src/types/project.ts`** — Types et defaults :
+- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
+- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
+  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
+  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
+  - `revenueParams` (surface, prixM2, tauxRemplissage)
+  - `services` ([] par défaut)
+  - `opexPercentOfRevenue`
+  - `debts`, `sciDebts` ([] par défaut)
+  - `sciChargesCash`, `sciAmortization` (0 par défaut)
+  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
+  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
+- Constantes `DEFAULT_*` exportées pour chaque section
 
-### Horizon
-```typescript
-const { scenarioState } = useScenario();
-const projectionHorizon = Math.max(1, Math.ceil(scenarioState.horizonMonths / 12));
-```
+**3. `src/contexts/ProjectContext.tsx`** :
+- State initialisé avec les defaults
+- `validated` flags (5 booleans, tous false)
+- `updateSection()`, `validateSection()`, `isProjectComplete()`
+- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
 
-### Mock data
-```typescript
-const mockInvestors = [
-  { name: "Associé A", ownership: 0.40 },
-  { name: "Associé B", ownership: 0.35 },
-  { name: "Associé C", ownership: 0.25 },
-];
+**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
 
-const generateWaterfall = (years: number) =>
-  Array.from({ length: years }, (_, i) => ({
-    year: i + 1, netResult: 0, cashAvailable: 0,
-    dividends: 0, ccaRepayment: 0, totalDistributed: 0, remainingCash: 0,
-  }));
-```
+**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
 
-### Imports
-`useState`, `useScenario`, `ProjectionHeader`, `Card`/`CardContent`/`CardHeader`/`CardTitle`, `Badge`, `Separator`, `Input`, `Label`, `Checkbox`, `Table`/`TableHeader`/`TableBody`/`TableRow`/`TableHead`/`TableCell`, recharts (`ResponsiveContainer`, `BarChart`, `Bar`, `XAxis`, `YAxis`, `CartesianGrid`, `Tooltip`)
+**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
+- Formulaires pré-remplis depuis le Context
+- Bouton "Enregistrer" → updateSection + validateSection
+- Champs par page alignés sur les inputs API
 
-Suppression des anciens imports (`ExitHypothesesPanel`, `Users2`, `CardDescription`).
+**7. `src/pages/DashboardPage.tsx`** :
+- Liste les sections manquantes si projet incomplet
+- Bouton "Lancer la simulation" désactivé si incomplet
+- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
+- Affiche réponse JSON ou erreur dans `<pre>`
+
+**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
 
