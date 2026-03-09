@@ -366,6 +366,7 @@ function migrateSingleProjectState(parsed: any): { state: ProjectState; validate
       associes: rawState?.associes ?? { ...DEFAULT_ASSOCIES },
       apports: migrateApports(rawState?.apports),
       fiscalite,
+      evenements: rawState?.evenements ?? { ...DEFAULT_EVENEMENTS },
     },
     validated: { ...defaultValidated, ...parsed.validated, fiscalite: parsed.validated?.fiscalite ?? false },
   };
