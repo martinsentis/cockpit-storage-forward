@@ -30,11 +30,19 @@ import { useProject } from "@/contexts/ProjectContext";
 import { useScenario } from "@/contexts/ScenarioContext";
 import { toast } from "@/hooks/use-toast";
 import type { RampCurve } from "@/types/project";
+import type { RentPreset } from "@/types/scenario";
 
 const RAMP_CURVE_LABELS: Record<RampCurve, string> = {
   LINEAR: "Linéaire",
   FAST_START: "Rapide puis plateau",
   SLOW_START: "Logistique",
+};
+
+const RENT_PRESET_LABELS: Record<RentPreset, string> = {
+  FIXED: "Loyer fixe",
+  INDEXED: "Loyer indexé",
+  RN_TARGET: "Résultat net cible",
+  DSCR_TARGET: "DSCR cible",
 };
 
 function formatPhaseDate(startMonth: number, projectStartDate: string): string {
