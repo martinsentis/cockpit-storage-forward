@@ -1,48 +1,77 @@
 
 
-## Plan : Implémenter le Cockpit V1 complet
+## Plan : Création de ProjectionBanquePage (avec ajustements)
 
-### Contexte
-Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
+### Fichiers
 
-### Fichiers à créer
+| Fichier | Action |
+|---------|--------|
+| `src/pages/ProjectionBanquePage.tsx` | Créer |
+| `src/App.tsx` | Ajouter route + import |
+| `src/components/AppSidebar.tsx` | Ajouter lien dans `projectionSections` |
 
-**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
+### Types locaux (dans le fichier page)
 
-**2. `src/types/project.ts`** — Types et defaults :
-- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
-- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
-  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
-  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
-  - `revenueParams` (surface, prixM2, tauxRemplissage)
-  - `services` ([] par défaut)
-  - `opexPercentOfRevenue`
-  - `debts`, `sciDebts` ([] par défaut)
-  - `sciChargesCash`, `sciAmortization` (0 par défaut)
-  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
-  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
-- Constantes `DEFAULT_*` exportées pour chaque section
+```typescript
+type FinancingEntity = "FONCIERE" | "EXPLOITATION";
+type FinancingType = "AMORTIZING" | "BULLET" | "LEASE";
+```
 
-**3. `src/contexts/ProjectContext.tsx`** :
-- State initialisé avec les defaults
-- `validated` flags (5 booleans, tous false)
-- `updateSection()`, `validateSection()`, `isProjectComplete()`
-- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
+### State
 
-**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
+- `bankMode`: `"financing" | "monitoring"`
+- `entity`: `FinancingEntity` (default `"FONCIERE"`)
+- `financingType`: `FinancingType` (default `"AMORTIZING"`)
+- `loanAmount`, `interestRate`, `loanDuration`, `gracePeriod`: `number` (default 0)
+- `projectionYears`: dérivé de `scenarioState.horizonMonths` (unique variable)
 
-**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
+### Mock data
 
-**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
-- Formulaires pré-remplis depuis le Context
-- Bouton "Enregistrer" → updateSection + validateSection
-- Champs par page alignés sur les inputs API
+```typescript
+const generateBankProjection = (years: number) =>
+  Array.from({ length: years }, (_, i) => ({
+    year: i + 1, revenue: 0, ebe: 0, caf: 0,
+    debtService: 0, dscr: 0, cashAfterDebt: 0, cash: 0,
+  }));
+```
 
-**7. `src/pages/DashboardPage.tsx`** :
-- Liste les sections manquantes si projet incomplet
-- Bouton "Lancer la simulation" désactivé si incomplet
-- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
-- Affiche réponse JSON ou erreur dans `<pre>`
+### Structure page
 
-**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
+```text
+ProjectionHeader
+
+Switch (Simulation financement / Suivi bancaire)
+
+[Si financing:]
+  Card "Hypothèses de financement"
+    Select entité: Foncière / Exploitation
+    Select type: Prêt amortissable / Prêt in fine / Crédit-bail matériel
+    Inputs: montant, taux, durée, différé
+
+Card "Résumé du financement"
+  Annuité — €, Service dette — €, Capital restant dû — €
+
+Card "Soutenabilité bancaire"
+  CAF — €, Service dette — €, DSCR — x, Trésorerie min — €
+
+Card "Graphiques bancaires" (grid-cols-1 lg:grid-cols-3)
+  1. ComposedChart: Bar=CAF + Line=debtService
+  2. LineChart: DSCR
+  3. LineChart: Trésorerie (cash)
+
+Card "Tableau bancaire annuel"
+  8 cols: Année | CA | EBE | CAF | Service dette | DSCR | Cash après dette | Trésorerie
+```
+
+### Graphique CAF vs dette
+
+`ComposedChart` avec `Bar` pour CAF et `Line` pour service de la dette (pas un simple BarChart).
+
+### App.tsx
+
+Route `/projection-banque` après `/projection-associes`.
+
+### AppSidebar.tsx
+
+Ajouter `{ title: "Projection banque", url: "/projection-banque", icon: Landmark }` dans `projectionSections`.
 
