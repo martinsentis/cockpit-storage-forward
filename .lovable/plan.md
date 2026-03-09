@@ -1,36 +1,48 @@
 
 
-## Plan : Réécriture complète de ProjectionSocietesPage
+## Plan : Implémenter le Cockpit V1 complet
 
-Remplacement du contenu actuel (basé sur le moteur) par une structure UI avec données mockées et les ajustements demandés.
+### Contexte
+Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
 
-### Fichier modifié
+### Fichiers à créer
 
-`src/pages/ProjectionSocietesPage.tsx` — réécriture complète
+**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
 
-### Contenu
+**2. `src/types/project.ts`** — Types et defaults :
+- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
+- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
+  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
+  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
+  - `revenueParams` (surface, prixM2, tauxRemplissage)
+  - `services` ([] par défaut)
+  - `opexPercentOfRevenue`
+  - `debts`, `sciDebts` ([] par défaut)
+  - `sciChargesCash`, `sciAmortization` (0 par défaut)
+  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
+  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
+- Constantes `DEFAULT_*` exportées pour chaque section
 
-**Imports** : `useState` de react, `ProjectionHeader`, `Card`/`CardContent`/`CardHeader`/`CardTitle`, `Slider`, `Table`/`TableHeader`/`TableBody`/`TableRow`/`TableHead`/`TableCell`, et depuis recharts : `ResponsiveContainer`, `BarChart`, `Bar`, `LineChart`, `Line`, `XAxis`, `YAxis`, `CartesianGrid`, `Tooltip`.
+**3. `src/contexts/ProjectContext.tsx`** :
+- State initialisé avec les defaults
+- `validated` flags (5 booleans, tous false)
+- `updateSection()`, `validateSection()`, `isProjectComplete()`
+- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
 
-Suppression de tous les imports moteur (`useEngineWithScenario`, `Tabs`, `Badge`, `useProject`).
+**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
 
-**Mock data** :
-```typescript
-const generateMockData = (years: number) =>
-  Array.from({ length: years }, (_, i) => ({
-    year: i + 1, revenue: 0, ebe: 0, netResult: 0, cash: 0,
-  }));
-```
+**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
 
-**State** : `const [projectionHorizon, setProjectionHorizon] = useState(10);`
+**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
+- Formulaires pré-remplis depuis le Context
+- Bouton "Enregistrer" → updateSection + validateSection
+- Champs par page alignés sur les inputs API
 
-**Structure verticale** :
-1. Titre h1 + `<ProjectionHeader />`
-2. Slider horizon (1-25, step 1) avec label `"Horizon de projection : {projectionHorizon} ans"`
-3. Grid `grid-cols-1 md:grid-cols-2 gap-4` avec 2 Cards :
-   - **Exploitation** : CA HT, EBE, Résultat net, Trésorerie fin d'année, Loyer versé — tous affichés `— €`
-   - **Foncière** : Loyers encaissés, EBE, Résultat net, Trésorerie fin d'année, Loyer reçu — tous `— €`
-4. Card "Performance" : `ResponsiveContainer` + `BarChart` avec `mockData`, 3 `Bar` (revenue=bleu `#3b82f6`, ebe=vert `#22c55e`, netResult=orange `#f97316`), `XAxis dataKey="year"`, `YAxis`, `CartesianGrid`, `Tooltip`
-5. Card "Trésorerie cumulée" : `ResponsiveContainer` + `LineChart`, `Line dataKey="cash"`, même axes
-6. Card "Tableau annuel" : Table avec colonnes Année/CA/EBE/Résultat net/Trésorerie, `mockData.map()` pour les lignes, valeurs à `0 €`
+**7. `src/pages/DashboardPage.tsx`** :
+- Liste les sections manquantes si projet incomplet
+- Bouton "Lancer la simulation" désactivé si incomplet
+- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
+- Affiche réponse JSON ou erreur dans `<pre>`
+
+**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
 
