@@ -53,6 +53,7 @@ function emptyEvent(): Omit<TreasuryEvent, "id"> {
     probabilite: 100,
     impact: "AUCUN",
     statut: "PLANIFIE",
+    createdAt: "",
   };
 }
 
