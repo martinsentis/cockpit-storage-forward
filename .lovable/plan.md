@@ -1,48 +1,74 @@
 
 
-## Plan : Implémenter le Cockpit V1 complet
+## Plan : ProjectionHeader — Ajustement final
 
-### Contexte
-Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
+### Fichiers modifiés
 
-### Fichiers à créer
+| Fichier | Action |
+|---|---|
+| `src/types/scenario.ts` | Remplacer ScenarioState + defaults |
+| `src/contexts/ScenarioContext.tsx` | Ajouter `updatePhaseOverride`, `resetToDefaults` |
+| `src/components/ProjectionHeader.tsx` | **Créer** |
+| `src/components/ScenarioHypothesesPanel.tsx` | Marquer deprecated, adapter `indexationRate` → `indexationCA` |
+| `src/pages/ProjectionSocietesPage.tsx` | Remplacer import/usage par ProjectionHeader |
+| `src/pages/ProjectionAssociesPage.tsx` | Remplacer import/usage par ProjectionHeader |
+| `src/hooks/useEngine.ts` | Adapter `useEngineWithScenario` (supprimer refs à `indexationRate` et `rampUpMonths` globaux, utiliser `phaseOverrides` + `targetOccupancy`) |
 
-**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
+### 1. `src/types/scenario.ts`
 
-**2. `src/types/project.ts`** — Types et defaults :
-- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
-- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
-  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
-  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
-  - `revenueParams` (surface, prixM2, tauxRemplissage)
-  - `services` ([] par défaut)
-  - `opexPercentOfRevenue`
-  - `debts`, `sciDebts` ([] par défaut)
-  - `sciChargesCash`, `sciAmortization` (0 par défaut)
-  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
-  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
-- Constantes `DEFAULT_*` exportées pour chaque section
+Remplacer `ScenarioState` par la version étendue avec :
+- 3 champs d'indexation (CA, charges + cible, autres revenus foncière)
+- `targetOccupancy: number` (non-optional, défaut 0.9)
+- `phaseOverrides: Record<string, { rampUpMonths?: number; rampCurve?: RampCurve }>` avec commentaire "key = capacityPhase.id"
+- Gestionnaire : `netMensuel`, `startDate: string | null`, `hasEndDate`, `endDate: string | null`
+- Comparaison : `compareWith`, `compareSnapshotId?`
+- `exitHypotheses` conservé
+- Supprimer `indexationRate` et `rampUpMonths` de l'ancien type
 
-**3. `src/contexts/ProjectContext.tsx`** :
-- State initialisé avec les defaults
-- `validated` flags (5 booleans, tous false)
-- `updateSection()`, `validateSection()`, `isProjectComplete()`
-- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
+Import `RampCurve` depuis `@/types/project`. Extraire `DEFAULT_EXIT_HYPOTHESES` pour réutilisation dans les defaults.
 
-**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
+### 2. `src/contexts/ScenarioContext.tsx`
 
-**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
+Ajouter au context value :
+- `updatePhaseOverride(phaseId, partial)` — merge dans `phaseOverrides[phaseId]`
+- `resetToDefaults()` — remet `scenarioState` à `DEFAULT_SCENARIO_STATE`
 
-**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
-- Formulaires pré-remplis depuis le Context
-- Bouton "Enregistrer" → updateSection + validateSection
-- Champs par page alignés sur les inputs API
+### 3. `src/hooks/useEngine.ts`
 
-**7. `src/pages/DashboardPage.tsx`** :
-- Liste les sections manquantes si projet incomplet
-- Bouton "Lancer la simulation" désactivé si incomplet
-- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
-- Affiche réponse JSON ou erreur dans `<pre>`
+Dans `useEngineWithScenario` :
+- Remplacer le check `scenarioState.rampUpMonths !== undefined` par une boucle sur `phaseOverrides` qui applique les overrides par `phase.id`
+- `targetOccupancy` reste appliqué globalement (il est maintenant toujours défini, non-optional)
+- Supprimer toute référence à `indexationRate`
 
-**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
+### 4. `src/components/ScenarioHypothesesPanel.tsx`
+
+- Ajouter commentaire `@deprecated` en tête
+- Remplacer `indexationRate` par `indexationCA` dans le JSX pour que ça compile
+- Ne pas supprimer le fichier
+
+### 5. `src/components/ProjectionHeader.tsx` — Nouveau composant
+
+Structure en 2 blocs :
+
+**Ligne scénario** (Card) :
+- Badge "Working scenario"
+- Select "Comparer avec" : aucun / Baseline / Snapshot
+
+**Panneau hypothèses** (Collapsible Card) :
+- **Indexations** : 3 inputs pourcentage + select cible charges
+- **Remplissage** : Slider 0-100 (step 1), stocke `value/100`
+- **Ramp-up par phase** : lit `useProject().state.exploitation.capacityPhases`, affiche date/surface en lecture, champs éditables durée + courbe avec fallback `override ?? phase default`
+- **Salaire gestionnaire** : net mensuel (€), début (`input type="month"`), fin (checkbox + `input type="month"`)
+- **3 boutons** : Appliquer (toast confirmation), Sauvegarder (toast "à venir"), Réinitialiser (`resetToDefaults()`)
+
+Règle : `useProject()` en lecture seule, `useScenario()` pour toutes les modifications.
+
+### 6. Pages de projection
+
+- `ProjectionSocietesPage` : remplacer `<ScenarioHypothesesPanel />` par `<ProjectionHeader />`
+- `ProjectionAssociesPage` : idem
+
+### Impact compilation
+
+`indexationRate` est référencé dans 2 fichiers seulement (scenario.ts et ScenarioHypothesesPanel.tsx). `useEngine.ts` utilise `scenarioState.rampUpMonths` et `scenarioState.targetOccupancy` — les deux seront adaptés. Aucune autre référence dans le codebase.
 
