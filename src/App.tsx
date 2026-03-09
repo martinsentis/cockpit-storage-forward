@@ -21,6 +21,7 @@ import EvenementsPage from "@/pages/EvenementsPage";
 import ProjectionSocietesPage from "@/pages/ProjectionSocietesPage";
 import ProjectionAssociesPage from "@/pages/ProjectionAssociesPage";
 import DetailMoteurPage from "@/pages/DetailMoteurPage";
+import ProjectionBanquePage from "@/pages/ProjectionBanquePage";
 import DashboardPage from "@/pages/DashboardPage";
 import NotFound from "./pages/NotFound";
 
@@ -50,6 +51,7 @@ const App = () => (
                 <Route path="/evenements" element={<EvenementsPage />} />
                 <Route path="/projection-societes" element={<ProjectionSocietesPage />} />
                 <Route path="/projection-associes" element={<ProjectionAssociesPage />} />
+                <Route path="/projection-banque" element={<ProjectionBanquePage />} />
                 <Route path="/detail-moteur" element={<DetailMoteurPage />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
               </Route>
