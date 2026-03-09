@@ -1,79 +1,48 @@
 
 
-## Plan : Ajout du point mort dans ProjectionSocietesPage
+## Plan : Implémenter le Cockpit V1 complet
 
-### Fichier modifié
-`src/pages/ProjectionSocietesPage.tsx`
+### Contexte
+Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
 
-### 1. Mock data
+### Fichiers à créer
 
-```typescript
-const generateMockData = (years: number) =>
-  Array.from({ length: years }, (_, i) => ({
-    year: i + 1,
-    revenue: 0,
-    ebe: 0,
-    netResult: 0,
-    cash: 0,
-    breakEvenRevenue: 0,
-    sustainabilityRevenue: 0,
-    breakEvenSurface: 0,
-    sustainabilitySurface: 0,
-    breakEvenOccupancy: 0,
-    sustainabilityOccupancy: 0,
-  }));
-```
+**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
 
-### 2. Commentaire en haut du fichier
+**2. `src/types/project.ts`** — Types et defaults :
+- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
+- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
+  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
+  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
+  - `revenueParams` (surface, prixM2, tauxRemplissage)
+  - `services` ([] par défaut)
+  - `opexPercentOfRevenue`
+  - `debts`, `sciDebts` ([] par défaut)
+  - `sciChargesCash`, `sciAmortization` (0 par défaut)
+  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
+  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
+- Constantes `DEFAULT_*` exportées pour chaque section
 
-```
-// TODO moteur financier
-// Les indicateurs de point mort sont affichés uniquement à titre structurel.
-// Toutes les valeurs seront calculées par le moteur financier.
-// L'interface ne doit effectuer aucun calcul économique.
-```
+**3. `src/contexts/ProjectContext.tsx`** :
+- State initialisé avec les defaults
+- `validated` flags (5 booleans, tous false)
+- `updateSection()`, `validateSection()`, `isProjectComplete()`
+- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
 
-### 3. Card Exploitation — structure enrichie
+**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
 
-Indicateurs existants (CA HT, EBE, Résultat net, Trésorerie, Loyer versé) conservés avec `— €`.
+**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
 
-Puis Separator + **Point mort exploitation** (3 lignes : Surface louée `— m²`, Taux de remplissage `— %`, CA correspondant `— €`).
+**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
+- Formulaires pré-remplis depuis le Context
+- Bouton "Enregistrer" → updateSection + validateSection
+- Champs par page alignés sur les inputs API
 
-Puis Separator + **Point mort soutenabilité financière** (mêmes 3 lignes).
+**7. `src/pages/DashboardPage.tsx`** :
+- Liste les sections manquantes si projet incomplet
+- Bouton "Lancer la simulation" désactivé si incomplet
+- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
+- Affiche réponse JSON ou erreur dans `<pre>`
 
-### 4. Graphique Performance → ComposedChart
-
-Remplacer `BarChart` par `ComposedChart`. Conserver les 3 `Bar` (CA, EBE, Résultat net). Ajouter deux `ReferenceLine` horizontales :
-- Seuil exploitation : `y={0}` rouge pointillé
-- Seuil soutenabilité : `y={0}` orange pointillé
-
-Imports ajoutés : `ComposedChart`, `ReferenceLine` de recharts.
-
-### 5. Nouveau graphique — Card "Seuil de rentabilité – exploitation"
-
-Placé après le graphique Trésorerie cumulée. `LineChart` avec 3 `Line` :
-- CA exploitation (`revenue`, bleu)
-- Seuil exploitation (`breakEvenRevenue`, rouge)
-- Seuil soutenabilité (`sustainabilityRevenue`, orange)
-
-Texte explicatif sous le graphique :
-> "Le point mort correspond au niveau de chiffre d'affaires nécessaire pour couvrir les charges de l'exploitation. Le seuil de soutenabilité inclut également les remboursements de dette et les contraintes de trésorerie."
-
-### 6. Imports ajoutés
-
-`ComposedChart`, `ReferenceLine` de recharts. `Separator` de `@/components/ui/separator`.
-
-### Structure résultante
-
-```text
-ProjectionHeader
-Slider horizon
-Grid 2 cols:
-  Card Exploitation (indicateurs + separator + point mort exploitation + separator + point mort soutenabilité)
-  Card Foncière (inchangée)
-Card Performance (ComposedChart: 3 Bar + 2 ReferenceLine)
-Card Trésorerie cumulée (inchangé)
-Card Seuil de rentabilité – exploitation (LineChart + texte explicatif)
-Card Tableau annuel (inchangé)
-```
+**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
 
