@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +53,7 @@ function emptyEvent(): Omit<TreasuryEvent, "id"> {
     probabilite: 100,
     impact: "AUCUN",
     statut: "PLANIFIE",
+    createdAt: "",
   };
 }
 
@@ -70,11 +72,13 @@ export default function EvenementsPage() {
   const [startDateValue, setStartDateValue] = useState<Date | undefined>();
   const [endDateValue, setEndDateValue] = useState<Date | undefined>();
 
-  const filtered = events.filter((e) => {
-    if (filterEntity !== "all" && e.entity !== filterEntity) return false;
-    if (filterStatus !== "all" && e.statut !== filterStatus) return false;
-    return true;
-  });
+  const filtered = events
+    .filter((e) => {
+      if (filterEntity !== "all" && e.entity !== filterEntity) return false;
+      if (filterStatus !== "all" && e.statut !== filterStatus) return false;
+      return true;
+    })
+    .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
 
   const handleSave = () => {
     const newEvent: TreasuryEvent = {
@@ -83,6 +87,7 @@ export default function EvenementsPage() {
       date: dateValue ? format(dateValue, "yyyy-MM-dd") : "",
       startDate: startDateValue ? format(startDateValue, "yyyy-MM-dd") : undefined,
       endDate: endDateValue ? format(endDateValue, "yyyy-MM-dd") : undefined,
+      createdAt: new Date().toISOString(),
     };
     updateSection("evenements" as any, { events: [...events, newEvent] });
     setForm(emptyEvent());
@@ -162,7 +167,11 @@ export default function EvenementsPage() {
                     <TableCell className="whitespace-nowrap">{ev.date || "—"}</TableCell>
                     <TableCell>{TREASURY_ENTITY_LABELS[ev.entity]}</TableCell>
                     <TableCell>{ev.label}</TableCell>
-                    <TableCell>{TREASURY_FLOW_LABELS[ev.flowDirection]}</TableCell>
+                    <TableCell>
+                      <span className={cn("font-medium", ev.flowDirection === "ENTREE" ? "text-green-600" : "text-red-600")}>
+                        {ev.flowDirection === "ENTREE" ? "↑" : "↓"} {TREASURY_FLOW_LABELS[ev.flowDirection]}
+                      </span>
+                    </TableCell>
                     <TableCell className="text-right font-mono">
                       {ev.montantHT.toLocaleString("fr-FR", { style: "currency", currency: "EUR" })}
                     </TableCell>
@@ -367,6 +376,12 @@ export default function EvenementsPage() {
                 <Input type="number" min={1} value={form.dureeAmortissement ?? ""} onChange={(e) => patch({ dureeAmortissement: Number(e.target.value) })} />
               </div>
             )}
+
+            {/* Notes */}
+            <div className="col-span-2 space-y-1">
+              <Label>Notes <span className="text-muted-foreground font-normal">(facultatif)</span></Label>
+              <Textarea value={form.notes ?? ""} onChange={(e) => patch({ notes: e.target.value })} placeholder="Contexte, référence facture, explication…" rows={3} />
+            </div>
           </div>
 
           <DialogFooter>
