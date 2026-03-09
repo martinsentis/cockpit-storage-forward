@@ -233,7 +233,7 @@ export function ProjectionHeader() {
                 </h4>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <Label>Taux de remplissage cible</Label>
+                    <Label>Pourcentage de surface louée cible pour l'ensemble du capacitaire</Label>
                     <span className="text-sm font-semibold tabular-nums">
                       {Math.round(scenarioState.targetOccupancy * 100)}%
                     </span>
