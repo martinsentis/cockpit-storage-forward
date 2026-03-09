@@ -1,7 +1,7 @@
 import {
   Building2, Hammer, Landmark, TrendingUp, Users, Users2, LayoutDashboard,
   CheckCircle, AlertTriangle, Home, ArrowLeftRight, Wallet, Receipt, FolderOpen,
-  CalendarClock, LineChart, UserCheck,
+  CalendarClock, LineChart, UserCheck, Cog,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useNavigate } from "react-router-dom";
@@ -31,6 +31,7 @@ const configSections: { title: string; url: string; icon: React.ElementType; sec
 const projectionSections: { title: string; url: string; icon: React.ElementType }[] = [
   { title: "Projection sociétés", url: "/projection-societes", icon: LineChart },
   { title: "Projection associés", url: "/projection-associes", icon: UserCheck },
+  { title: "Détail moteur", url: "/detail-moteur", icon: Cog },
 ];
 
 const pilotageSections: { title: string; url: string; icon: React.ElementType }[] = [

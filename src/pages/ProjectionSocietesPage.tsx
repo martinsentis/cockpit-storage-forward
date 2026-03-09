@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useProject } from "@/contexts/ProjectContext";
-import EngineInspector from "@/components/engine/EngineInspector";
 
 function fmt(n: number) {
   return n.toLocaleString("fr-FR", { maximumFractionDigits: 0 });
@@ -27,7 +26,6 @@ export default function ProjectionSocietesPage() {
         <TabsList>
           <TabsTrigger value="exploitation">Exploitation (SAS)</TabsTrigger>
           <TabsTrigger value="fonciere">Foncière (SCI)</TabsTrigger>
-          <TabsTrigger value="moteur">Détail moteur</TabsTrigger>
         </TabsList>
 
         <TabsContent value="exploitation" className="space-y-4 mt-4">
@@ -155,10 +153,6 @@ export default function ProjectionSocietesPage() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="moteur" className="mt-4">
-          <EngineInspector />
         </TabsContent>
       </Tabs>
     </div>
