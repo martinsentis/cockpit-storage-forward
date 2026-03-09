@@ -39,10 +39,11 @@ const RAMP_CURVE_LABELS: Record<RampCurve, string> = {
 };
 
 const RENT_PRESET_LABELS: Record<RentPreset, string> = {
-  FIXED: "Loyer fixe",
-  INDEXED: "Loyer indexé",
-  RN_TARGET: "Résultat net cible",
-  DSCR_TARGET: "DSCR cible",
+  SCI_AUTONOMY: "Autonomie financière SCI",
+  DEBT_PAYDOWN: "Désendettement SCI",
+  OPTIMIZATION: "Optimisation fiscale",
+  MIX: "Mixte",
+  FIXED_AMOUNT: "Montant fixe",
 };
 
 function formatPhaseDate(startMonth: number, projectStartDate: string): string {
