@@ -3,6 +3,7 @@ import {
   ProjetData,
   BuildData,
   FinancementData,
+  EvenementsData,
   ExploitationData,
   GouvernanceData,
   FonciereData,
