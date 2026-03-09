@@ -21,6 +21,7 @@ import EvenementsPage from "@/pages/EvenementsPage";
 import ProjectionSocietesPage from "@/pages/ProjectionSocietesPage";
 import ProjectionAssociesPage from "@/pages/ProjectionAssociesPage";
 import DetailMoteurPage from "@/pages/DetailMoteurPage";
+import ProjectionBanquePage from "@/pages/ProjectionBanquePage";
 import DashboardPage from "@/pages/DashboardPage";
 import NotFound from "./pages/NotFound";
 
