@@ -9,6 +9,8 @@ const COLUMNS = [
   "Cash-flow opérationnel", "Service de dette", "Cash-flow net",
 ];
 
+const ENTITIES = ["Exploitation", "Foncière"];
+
 interface Props {
   data?: any;
   highlightedCells?: string[];
@@ -27,27 +29,34 @@ export default function EngineMonthlyPnL({ data, highlightedCells = [], onCellCl
 
   return (
     <>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            {COLUMNS.map((col) => (
-              <TableHead key={col} className="whitespace-nowrap">{col}</TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {!data && (
-            <TableRow>
-              <TableCell colSpan={COLUMNS.length} className="h-32 text-center text-muted-foreground">
-                <div className="flex flex-col items-center gap-2">
-                  <Search className="h-5 w-5" />
-                  <span>Le PNL mensuel apparaîtra ici lorsque le moteur sera connecté.</span>
-                </div>
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
+      <div className="space-y-8">
+        {ENTITIES.map((entity) => (
+          <div key={entity} className="space-y-3">
+            <h3 className="text-lg font-semibold text-foreground">{entity}</h3>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {COLUMNS.map((col) => (
+                    <TableHead key={col} className="whitespace-nowrap">{col}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {!data && (
+                  <TableRow>
+                    <TableCell colSpan={COLUMNS.length} className="h-32 text-center text-muted-foreground">
+                      <div className="flex flex-col items-center gap-2">
+                        <Search className="h-5 w-5" />
+                        <span>Le PNL mensuel de {entity} apparaîtra ici lorsque le moteur sera connecté.</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        ))}
+      </div>
 
       <Sheet open={!!selectedCell} onOpenChange={(open) => !open && setSelectedCell(null)}>
         <SheetContent>
