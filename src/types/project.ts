@@ -700,7 +700,7 @@ export type TreasuryEntity = "exploitation" | "fonciere";
 export type TreasuryFlowDirection = "ENTREE" | "SORTIE";
 export type TreasuryNature = "PONCTUEL" | "CHARGE_RECURRENTE_TEMP" | "PRODUIT_RECURRENT_TEMP" | "FINANCEMENT_APPORT" | "RETRAIT_EXCEPTIONNEL";
 export type TreasuryRecurrence = "PONCTUEL" | "RECURRENT";
-export type TreasuryFrequency = "JOURNALIER" | "MENSUELLE" | "TRIMESTRIELLE" | "ANNUELLE";
+export type TreasuryFrequency = "HEBDOMADAIRE" | "MENSUELLE" | "TRIMESTRIELLE" | "ANNUELLE";
 export type TreasuryImpact = "AUCUN" | "PRODUIT_EXCEPTIONNEL" | "CHARGE_EXCEPTIONNELLE" | "IMMOBILISATION";
 export type TreasuryStatus = "PLANIFIE" | "CONFIRME" | "REALISE" | "ANNULE";
 
