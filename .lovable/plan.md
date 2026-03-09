@@ -1,35 +1,48 @@
 
 
-## Plan : Onglet "Détail moteur" + 4 composants engine
+## Plan : Implémenter le Cockpit V1 complet
 
-### Fichiers
+### Contexte
+Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
 
-| Fichier | Action |
-|---|---|
-| `src/components/engine/EngineInspector.tsx` | Nouveau |
-| `src/components/engine/EngineMonthlyPnL.tsx` | Nouveau |
-| `src/components/engine/EngineFormulaInspector.tsx` | Nouveau |
-| `src/components/engine/EngineLedgerView.tsx` | Nouveau |
-| `src/pages/ProjectionSocietesPage.tsx` | Ajouter onglet "Détail moteur" |
+### Fichiers à créer
 
-### Détail
+**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
 
-**`ProjectionSocietesPage.tsx`** — Ajouter un 3e `TabsTrigger value="moteur"` dans le TabsList existant (l.26-29). Ajouter `TabsContent value="moteur"` rendant `<EngineInspector />`. Import du composant.
+**2. `src/types/project.ts`** — Types et defaults :
+- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
+- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
+  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
+  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
+  - `revenueParams` (surface, prixM2, tauxRemplissage)
+  - `services` ([] par défaut)
+  - `opexPercentOfRevenue`
+  - `debts`, `sciDebts` ([] par défaut)
+  - `sciChargesCash`, `sciAmortization` (0 par défaut)
+  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
+  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
+- Constantes `DEFAULT_*` exportées pour chaque section
 
-**`EngineInspector.tsx`** — `const projectionData = null`. Tabs internes avec 3 sous-onglets :
-- "PNL mensuel" → `<EngineMonthlyPnL data={projectionData} />`
-- "Explication des calculs" → `<EngineFormulaInspector data={projectionData} />`
-- "Ledger des flux" → `<EngineLedgerView data={projectionData} />`
+**3. `src/contexts/ProjectContext.tsx`** :
+- State initialisé avec les defaults
+- `validated` flags (5 booleans, tous false)
+- `updateSection()`, `validateSection()`, `isProjectComplete()`
+- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
 
-**`EngineMonthlyPnL.tsx`** — Props : `data?: any`, `highlightedCells?: string[]` (default `[]`), `onCellClick?: (cellId: string) => void`. Table avec 11 colonnes (Mois, Revenus, Charges exploitation, EBE, Amortissements, Résultat exploitation, Résultat net, IS provisionné, Cash-flow opérationnel, Service de dette, Cash-flow net). Si `!data` : body vide + message placeholder. Cellules dans `highlightedCells` reçoivent `bg-amber-50 cursor-pointer` + icône AlertTriangle. Clic sur cellule highlightée → ouvre un Sheet avec message placeholder. State local `selectedCell` pour gérer l'ouverture du Sheet.
+**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
 
-**`EngineFormulaInspector.tsx`** — Props : `data?: any`. Card avec message « Les explications de calcul apparaîtront ici lorsque le moteur sera connecté. »
+**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
 
-**`EngineLedgerView.tsx`** — Props : `data?: any`. Table avec 5 colonnes (Date, Entité, Type de flux, Description, Montant). Si `!data` : body vide + message placeholder.
+**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
+- Formulaires pré-remplis depuis le Context
+- Bouton "Enregistrer" → updateSection + validateSection
+- Champs par page alignés sur les inputs API
 
-### Contraintes respectées
-- Aucun appel useEngine
-- Aucune logique financière
-- Aucune modification ProjectState / ScenarioState
-- Robuste si `data === null`
+**7. `src/pages/DashboardPage.tsx`** :
+- Liste les sections manquantes si projet incomplet
+- Bouton "Lancer la simulation" désactivé si incomplet
+- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
+- Affiche réponse JSON ou erreur dans `<pre>`
+
+**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
 
