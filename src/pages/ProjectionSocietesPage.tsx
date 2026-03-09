@@ -1,4 +1,4 @@
-import { ScenarioHypothesesPanel } from "@/components/ScenarioHypothesesPanel";
+import { ProjectionHeader } from "@/components/ProjectionHeader";
 import { useEngineWithScenario } from "@/hooks/useEngine";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,7 +20,7 @@ export default function ProjectionSocietesPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Projection sociétés</h1>
 
-      <ScenarioHypothesesPanel />
+      <ProjectionHeader />
 
       <Tabs defaultValue="exploitation">
         <TabsList>

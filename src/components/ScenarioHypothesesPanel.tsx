@@ -1,3 +1,9 @@
+/**
+ * @deprecated
+ * Replaced by ProjectionHeader.
+ * Kept temporarily to avoid breaking imports.
+ */
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,8 +42,8 @@ export function ScenarioHypothesesPanel() {
               id="scenario-indexation"
               type="number"
               step={0.1}
-              value={((scenarioState.indexationRate ?? 0) * 100).toFixed(1)}
-              onChange={(e) => updateScenarioField("indexationRate", (Number(e.target.value) || 0) / 100)}
+              value={((scenarioState.indexationCA ?? 0) * 100).toFixed(1)}
+              onChange={(e) => updateScenarioField("indexationCA", (Number(e.target.value) || 0) / 100)}
             />
           </div>
 
@@ -48,14 +54,10 @@ export function ScenarioHypothesesPanel() {
               type="number"
               step={1}
               placeholder="Par défaut (config)"
-              value={scenarioState.targetOccupancy !== undefined ? (scenarioState.targetOccupancy * 100).toFixed(0) : ""}
+              value={(scenarioState.targetOccupancy * 100).toFixed(0)}
               onChange={(e) => {
                 const v = e.target.value;
-                if (v === "") {
-                  updateScenarioField("targetOccupancy", undefined);
-                } else {
-                  updateScenarioField("targetOccupancy", (Number(v) || 0) / 100);
-                }
+                updateScenarioField("targetOccupancy", (Number(v) || 0) / 100);
               }}
             />
           </div>
@@ -67,15 +69,8 @@ export function ScenarioHypothesesPanel() {
               type="number"
               min={0}
               placeholder="Par défaut (config)"
-              value={scenarioState.rampUpMonths ?? ""}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === "") {
-                  updateScenarioField("rampUpMonths", undefined);
-                } else {
-                  updateScenarioField("rampUpMonths", Number(v) || 0);
-                }
-              }}
+              value=""
+              disabled
             />
           </div>
         </div>

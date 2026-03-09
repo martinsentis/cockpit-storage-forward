@@ -1,3 +1,5 @@
+import type { RampCurve } from "@/types/project";
+
 export interface ExitHypotheses {
   fonciereValuation: number;
   exploitationEBEMultiple: number;
@@ -5,23 +7,67 @@ export interface ExitHypotheses {
   repayCcaFirst: boolean;
 }
 
+export const DEFAULT_EXIT_HYPOTHESES: ExitHypotheses = {
+  fonciereValuation: 0,
+  exploitationEBEMultiple: 6,
+  repayDebtFirst: true,
+  repayCcaFirst: true,
+};
+
+export interface PhaseOverride {
+  rampUpMonths?: number;
+  rampCurve?: RampCurve;
+}
+
 export interface ScenarioState {
   horizonMonths: number;
-  indexationRate: number;
-  targetOccupancy?: number;
-  rampUpMonths?: number;
+
+  // Indexations
+  indexationCA: number;
+  indexationCharges: number;
+  indexationChargesTarget: "exploitation" | "fonciere" | "les_deux";
+  indexationAutresRevenusFonciere: number;
+
+  // Remplissage
+  targetOccupancy: number;
+
+  /**
+   * Phase overrides — key = capacityPhase.id (never array index)
+   */
+  phaseOverrides: Record<string, PhaseOverride>;
+
+  // Gestionnaire
+  gestionnaireNetMensuel: number;
+  gestionnaireStartDate: string | null; // "YYYY-MM"
+  gestionnaireHasEndDate: boolean;
+  gestionnaireEndDate: string | null; // "YYYY-MM"
+
+  // Comparaison
+  compareWith: "none" | "baseline" | "snapshot";
+  compareSnapshotId?: string;
+
+  // Exit
   exitHypotheses: ExitHypotheses;
 }
 
 export const DEFAULT_SCENARIO_STATE: ScenarioState = {
   horizonMonths: 120,
-  indexationRate: 0.02,
-  targetOccupancy: undefined,
-  rampUpMonths: undefined,
-  exitHypotheses: {
-    fonciereValuation: 0,
-    exploitationEBEMultiple: 6,
-    repayDebtFirst: true,
-    repayCcaFirst: true,
-  },
+
+  indexationCA: 0.02,
+  indexationCharges: 0.02,
+  indexationChargesTarget: "les_deux",
+  indexationAutresRevenusFonciere: 0.02,
+
+  targetOccupancy: 0.9,
+
+  phaseOverrides: {},
+
+  gestionnaireNetMensuel: 0,
+  gestionnaireStartDate: null,
+  gestionnaireHasEndDate: false,
+  gestionnaireEndDate: null,
+
+  compareWith: "none",
+
+  exitHypotheses: DEFAULT_EXIT_HYPOTHESES,
 };

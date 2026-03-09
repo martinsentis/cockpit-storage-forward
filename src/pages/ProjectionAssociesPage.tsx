@@ -1,4 +1,4 @@
-import { ScenarioHypothesesPanel } from "@/components/ScenarioHypothesesPanel";
+import { ProjectionHeader } from "@/components/ProjectionHeader";
 import { ExitHypothesesPanel } from "@/components/ExitHypothesesPanel";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +9,7 @@ export default function ProjectionAssociesPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Projection associés</h1>
 
-      <ScenarioHypothesesPanel />
+      <ProjectionHeader />
       <ExitHypothesesPanel />
 
       <Card>
