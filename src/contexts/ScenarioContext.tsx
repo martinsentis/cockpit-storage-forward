@@ -1,3 +1,4 @@
+// ScenarioContext — provides scenario state to projection pages
 import React, { createContext, useContext, useState, useCallback } from "react";
 import type { ScenarioState, ExitHypotheses, PhaseOverride } from "@/types/scenario";
 import { DEFAULT_SCENARIO_STATE } from "@/types/scenario";
