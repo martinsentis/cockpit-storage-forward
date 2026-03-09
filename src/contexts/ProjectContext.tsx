@@ -10,6 +10,7 @@ import {
   LoyerDynamiqueData,
   RentPlanPhase,
   AssociesData,
+  EvenementsData,
   ApportsData,
   FiscaliteData,
   ValidatedFlags,
