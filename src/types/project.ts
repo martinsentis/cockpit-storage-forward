@@ -520,7 +520,7 @@ export function createDefaultPhaseDraft(): PhaseDraft {
     currentStep: 0,
     capexEstimate: { equipementProductifM2: 0, amenagement: 0, taxeAmenagement: 0, honoraires: 0, divers: 0 },
     financing: [],
-    entityPorteuse: "SCI",
+    entityPorteuse: "FONCIERE",
     amortissable: true,
     dureeAmortissement: 10,
   };
