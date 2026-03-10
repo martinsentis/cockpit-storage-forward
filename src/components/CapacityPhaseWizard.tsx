@@ -571,7 +571,7 @@ export default function CapacityPhaseWizard({
                   { label: "Durée ramp-up", value: `${phase.rampUpMonths} mois` },
                   { label: "Atteinte régime cible", value: formatMonthIndex(phase.startMonth + phase.rampUpMonths, projectStartDate) },
                   { label: "Courbe", value: RAMP_LABELS[phase.rampCurve] },
-                  { label: "Entité porteuse", value: draft.entityPorteuse === "SCI" ? "SCI" : "Exploitation" },
+                  { label: "Entité porteuse", value: draft.entityPorteuse === "FONCIERE" ? "Foncière (SCI)" : "Exploitation" },
                   { label: "Amortissement", value: draft.amortissable ? `${draft.dureeAmortissement} ans` : "Non amortissable" },
                 ].map(row => (
                   <div key={row.label} className="flex justify-between py-1 border-b border-border last:border-0">

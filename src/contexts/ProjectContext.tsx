@@ -556,7 +556,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       value={{
         state, validated, activeProjectId: multiState.activeProjectId,
         activeProjectMeta: activeEntry?.meta ?? null,
-        updateSection, batchUpdateSections, validateSection, isProjectComplete, buildProjectionInputs,
+        updateSection, batchUpdateSections, validateSection, isProjectComplete,
         projectList, createProject, switchProject, deleteProject, updateProjectMeta,
         hasActiveProject,
       }}

@@ -795,39 +795,19 @@ export interface ProjectMeta {
   createdAt: string;
 }
 
-// ── API payload type ──
+// ── Financing Entity (centralized) ──
 
-export interface PhaseProjection {
-  startMonth: number;
-  endMonth: number;
-  occupancyRate: number;
-}
+export type FinancingEntity = "FONCIERE" | "EXPLOITATION";
 
-export interface ProjectionInputs {
-  horizonMonths: number;
-  initialCash: number;
-  sciInitialCash: number;
-  taxRate: number;
-  bufferMin: number;
-  dscrMin: number;
-  phases: PhaseProjection[];
-  revenueParams: {
-    surface: number;
-    prixM2: number;
-    tauxRemplissage: number;
-  };
-  services: never[];
-  debts: DebtItem[];
-  sciDebts: DebtItem[];
-  sciChargesCash: number;
-  sciAmortization: number;
-  ccaBalance: number;
-  distributableCashRate: number;
-  ccaPriorityRatio: number;
-  reserveStrategicRatio: number;
-  reserveAfterCcaFullyRepaid: number;
-  rentPlan: RentPlanPhase[];
-}
+export const FINANCING_ENTITY_LABELS: Record<FinancingEntity, string> = {
+  FONCIERE: "Foncière",
+  EXPLOITATION: "Exploitation",
+};
+
+export const FINANCING_ENTITY_TO_ID: Record<FinancingEntity, string> = {
+  FONCIERE: FONCIERE_ENTITY_ID,
+  EXPLOITATION: EXPLOITATION_ENTITY_ID,
+};
 
 // ── Validated flags ──
 

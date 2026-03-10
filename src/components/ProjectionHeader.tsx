@@ -205,13 +205,13 @@ export function ProjectionHeader() {
                 <div className="max-w-xs space-y-2">
                   <Select
                     value={scenarioState.rentPreset}
-                    onValueChange={(v) => updateScenarioField("rentPreset", v as RentPreset)}
+                    onValueChange={(v) => updateScenarioField("rentPreset", v as RentStrategyMode)}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {(Object.keys(RENT_PRESET_LABELS) as RentPreset[]).map((preset) => (
+                      {(Object.keys(RENT_PRESET_LABELS) as RentStrategyMode[]).map((preset) => (
                         <SelectItem key={preset} value={preset}>
                           {RENT_PRESET_LABELS[preset]}
                         </SelectItem>

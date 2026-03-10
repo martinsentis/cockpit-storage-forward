@@ -1,6 +1,4 @@
-import type { RampCurve } from "@/types/project";
-
-export type RentPreset = "SCI_AUTONOMY" | "DEBT_PAYDOWN" | "OPTIMIZATION" | "MIX" | "FIXED_AMOUNT";
+import type { RampCurve, RentStrategyMode } from "@/types/project";
 
 export interface ExitHypotheses {
   fonciereValuation: number;
@@ -24,7 +22,7 @@ export interface PhaseOverride {
 export interface ScenarioState {
   // rentPreset modifie uniquement ScenarioState
   // ne modifie jamais ProjectState
-  rentPreset: RentPreset;
+  rentPreset: RentStrategyMode;
   horizonMonths: number;
 
   // Indexations

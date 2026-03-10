@@ -82,8 +82,9 @@ export default function ProjectionBanquePage() {
                 <Select value={entity} onValueChange={(v) => setEntity(v as FinancingEntity)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="FONCIERE">Foncière</SelectItem>
-                    <SelectItem value="EXPLOITATION">Exploitation</SelectItem>
+                    {(Object.entries(FINANCING_ENTITY_LABELS) as [FinancingEntity, string][]).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>{label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
