@@ -411,18 +411,6 @@ function loadFromStorage(): MultiProjectState {
   return { projects: {}, activeProjectId: null };
 }
 
-// Helper: compute phase CA HT
-function phaseCAHT(p: CapacityPhase): number {
-  if (p.modeBox === "MACRO") {
-    const priceHT = p.prixType === "HT" ? p.prixM2 : p.prixM2 / (1 + p.vatRate);
-    return p.surface * priceHT;
-  }
-  const active = (p.typologies ?? []).filter(t => t.actif);
-  return active.reduce((sum, t) => {
-    const unitHT = t.prixType === "HT" ? t.prixMensuel : t.prixMensuel / (1 + t.vatRate);
-    return sum + t.nombreDeBox * unitHT;
-  }, 0);
-}
 
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [multiState, setMultiState] = useState<MultiProjectState>(loadFromStorage);
