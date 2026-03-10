@@ -26,7 +26,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip,
 } from "recharts";
 
-type FinancingEntity = "FONCIERE" | "EXPLOITATION";
+
 
 const generateBankProjection = (years: number) =>
   Array.from({ length: years }, (_, i) => ({
