@@ -38,7 +38,7 @@ const RAMP_CURVE_LABELS: Record<RampCurve, string> = {
   SLOW_START: "Logistique",
 };
 
-const RENT_PRESET_LABELS: Record<RentPreset, string> = {
+const RENT_PRESET_LABELS: Record<RentStrategyMode, string> = {
   SCI_AUTONOMY: "Autonomie financière SCI",
   DEBT_PAYDOWN: "Désendettement SCI",
   OPTIMIZATION: "Optimisation fiscale",
