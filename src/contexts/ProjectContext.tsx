@@ -268,10 +268,6 @@ function migrateGouvernance(g: any): GouvernanceData {
     entityRules,
     distributionHistory: g?.distributionHistory ?? [],
     ccaBalance: g?.ccaBalance ?? DEFAULT_GOUVERNANCE.ccaBalance,
-    distributableCashRate: g?.distributableCashRate ?? DEFAULT_GOUVERNANCE.distributableCashRate,
-    ccaPriorityRatio: g?.ccaPriorityRatio ?? DEFAULT_GOUVERNANCE.ccaPriorityRatio,
-    reserveStrategicRatio: g?.reserveStrategicRatio ?? DEFAULT_GOUVERNANCE.reserveStrategicRatio,
-    reserveAfterCcaFullyRepaid: g?.reserveAfterCcaFullyRepaid ?? DEFAULT_GOUVERNANCE.reserveAfterCcaFullyRepaid,
   };
 }
 
