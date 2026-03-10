@@ -343,6 +343,7 @@ function migrateSingleProjectState(parsed: any): { state: ProjectState; validate
 
   const fiscalite: FiscaliteData = {
     corporateTaxRate: taxRate,
+    dividendFlatTaxRate: rawState?.fiscalite?.dividendFlatTaxRate ?? 0.30,
   };
 
   return {

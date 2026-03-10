@@ -42,10 +42,12 @@ export interface ProjetData {
 
 export interface FiscaliteData {
   corporateTaxRate: number; // e.g. 0.25
+  dividendFlatTaxRate: number; // e.g. 0.30
 }
 
 export const DEFAULT_FISCALITE: FiscaliteData = {
   corporateTaxRate: 0.25,
+  dividendFlatTaxRate: 0.30,
 };
 
 // ── Build / CAPEX ──
