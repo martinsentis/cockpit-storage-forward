@@ -74,7 +74,6 @@ interface ProjectContextValue {
   batchUpdateSections: (updates: Partial<{ [K in keyof ProjectState]: Partial<ProjectState[K]> }>) => void;
   validateSection: (section: SectionName) => void;
   isProjectComplete: () => boolean;
-  buildProjectionInputs: () => ProjectionInputs;
   // Multi-project management
   projectList: ProjectMeta[];
   createProject: (meta: Omit<ProjectMeta, "id" | "createdAt">) => string;
