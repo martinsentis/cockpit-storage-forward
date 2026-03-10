@@ -550,61 +550,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   }, []);
 
-  const buildProjectionInputs = useCallback((): ProjectionInputs => {
-    const p = state.projet;
-    const e = state.exploitation;
-    const f = state.financement;
-    const g = state.gouvernance;
-    const fi = state.fiscalite;
-
-    const engineOutputs = computeEngine({
-      projet: state.projet,
-      build: state.build,
-      financement: state.financement,
-      exploitation: state.exploitation,
-      fonciere: state.fonciere,
-      loyerDynamique: state.loyerDynamique,
-      gouvernance: state.gouvernance,
-      fiscalite: state.fiscalite,
-    });
-    const loyer = engineOutputs.loyerDynamique.loyerCalcule;
-
-    const phases = e.capacityPhases ?? [createDefaultPhase()];
-    const totalSurface = phases.reduce((s, ph) => s + phaseSurface(ph), 0);
-    const totalCA = phases.reduce((s, ph) => s + phaseCAHT(ph), 0);
-
-    const projectionPhases: PhaseProjection[] = phases.map(ph => ({
-      startMonth: ph.startMonth,
-      endMonth: ph.startMonth + ph.rampUpMonths - 1,
-      occupancyRate: ph.targetOccupancy,
-    }));
-
-    return {
-      horizonMonths: p.horizonMonths ?? DEFAULT_PROJET.horizonMonths,
-      initialCash: f.initialCash ?? DEFAULT_FINANCEMENT.initialCash,
-      sciInitialCash: f.sciInitialCash ?? DEFAULT_FINANCEMENT.sciInitialCash,
-      taxRate: fi.corporateTaxRate ?? DEFAULT_FISCALITE.corporateTaxRate,
-      bufferMin: f.bufferMin ?? DEFAULT_FINANCEMENT.bufferMin,
-      dscrMin: f.dscrMin ?? DEFAULT_FINANCEMENT.dscrMin,
-      phases: projectionPhases,
-      revenueParams: {
-        surface: totalSurface,
-        prixM2: totalSurface > 0 ? totalCA / totalSurface : 0,
-        tauxRemplissage: 1.0,
-      },
-      services: [],
-      debts: f.debts ?? [],
-      sciDebts: f.sciDebts ?? [],
-      sciChargesCash: f.sciChargesCash ?? DEFAULT_FINANCEMENT.sciChargesCash,
-      sciAmortization: f.sciAmortization ?? DEFAULT_FINANCEMENT.sciAmortization,
-      ccaBalance: g.ccaBalance ?? DEFAULT_GOUVERNANCE.ccaBalance,
-      distributableCashRate: g.distributableCashRate ?? DEFAULT_GOUVERNANCE.distributableCashRate,
-      ccaPriorityRatio: g.ccaPriorityRatio ?? DEFAULT_GOUVERNANCE.ccaPriorityRatio,
-      reserveStrategicRatio: g.reserveStrategicRatio ?? DEFAULT_GOUVERNANCE.reserveStrategicRatio,
-      reserveAfterCcaFullyRepaid: g.reserveAfterCcaFullyRepaid ?? DEFAULT_GOUVERNANCE.reserveAfterCcaFullyRepaid,
-      rentPlan: state.loyerDynamique.rentPlan,
-    };
-  }, [state]);
 
   return (
     <ProjectContext.Provider
