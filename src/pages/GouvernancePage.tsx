@@ -539,11 +539,7 @@ export default function GouvernancePage() {
   };
 
   const save = () => {
-    const synced: GouvernanceData = {
-      ...form,
-      distributableCashRate: form.globalRule.distributableCashRate,
-    };
-    updateSection("gouvernance", synced);
+    updateSection("gouvernance", form);
     validateSection("gouvernance");
     toast.success("Section Gouvernance enregistrée");
   };

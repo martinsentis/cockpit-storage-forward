@@ -252,7 +252,7 @@ export interface PhaseDraft {
   currentStep: number;
   capexEstimate: PhaseCapexEstimate;
   financing: PhaseFinancingLine[];
-  entityPorteuse: "SCI" | "EXPLOITATION";
+  entityPorteuse: "FONCIERE" | "EXPLOITATION";
   amortissable: boolean;
   dureeAmortissement: number;
 }
@@ -451,12 +451,7 @@ export interface GouvernanceData {
   globalRule: GlobalGouvernanceRule;
   entityRules: EntityGouvernanceRule[];
   distributionHistory: DistributionEvent[];
-  // Legacy flat fields (kept for engine compatibility)
   ccaBalance: number;
-  distributableCashRate: number;
-  ccaPriorityRatio: number;
-  reserveStrategicRatio: number;
-  reserveAfterCcaFullyRepaid: number;
 }
 
 // ── Defaults ──
@@ -525,7 +520,7 @@ export function createDefaultPhaseDraft(): PhaseDraft {
     currentStep: 0,
     capexEstimate: { equipementProductifM2: 0, amenagement: 0, taxeAmenagement: 0, honoraires: 0, divers: 0 },
     financing: [],
-    entityPorteuse: "SCI",
+    entityPorteuse: "FONCIERE",
     amortissable: true,
     dureeAmortissement: 10,
   };
@@ -590,10 +585,6 @@ export const DEFAULT_GOUVERNANCE: GouvernanceData = {
   entityRules: [],
   distributionHistory: [],
   ccaBalance: 0,
-  distributableCashRate: 0.5,
-  ccaPriorityRatio: 0.7,
-  reserveStrategicRatio: 0.1,
-  reserveAfterCcaFullyRepaid: 0.3,
 };
 
 // ── Associés & Sociétés ──
@@ -804,39 +795,19 @@ export interface ProjectMeta {
   createdAt: string;
 }
 
-// ── API payload type ──
+// ── Financing Entity (centralized) ──
 
-export interface PhaseProjection {
-  startMonth: number;
-  endMonth: number;
-  occupancyRate: number;
-}
+export type FinancingEntity = "FONCIERE" | "EXPLOITATION";
 
-export interface ProjectionInputs {
-  horizonMonths: number;
-  initialCash: number;
-  sciInitialCash: number;
-  taxRate: number;
-  bufferMin: number;
-  dscrMin: number;
-  phases: PhaseProjection[];
-  revenueParams: {
-    surface: number;
-    prixM2: number;
-    tauxRemplissage: number;
-  };
-  services: never[];
-  debts: DebtItem[];
-  sciDebts: DebtItem[];
-  sciChargesCash: number;
-  sciAmortization: number;
-  ccaBalance: number;
-  distributableCashRate: number;
-  ccaPriorityRatio: number;
-  reserveStrategicRatio: number;
-  reserveAfterCcaFullyRepaid: number;
-  rentPlan: RentPlanPhase[];
-}
+export const FINANCING_ENTITY_LABELS: Record<FinancingEntity, string> = {
+  FONCIERE: "Foncière",
+  EXPLOITATION: "Exploitation",
+};
+
+export const FINANCING_ENTITY_TO_ID: Record<FinancingEntity, string> = {
+  FONCIERE: FONCIERE_ENTITY_ID,
+  EXPLOITATION: EXPLOITATION_ENTITY_ID,
+};
 
 // ── Validated flags ──
 

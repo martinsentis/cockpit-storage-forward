@@ -528,10 +528,10 @@ export default function CapacityPhaseWizard({
             <div className="space-y-6">
               <div className="space-y-3">
                 <Label className="font-semibold">Entité porteuse de l'investissement</Label>
-                <RadioGroup value={draft.entityPorteuse} onValueChange={v => updateDraft({ entityPorteuse: v as "SCI" | "EXPLOITATION" })}>
+                <RadioGroup value={draft.entityPorteuse} onValueChange={v => updateDraft({ entityPorteuse: v as "FONCIERE" | "EXPLOITATION" })}>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="SCI" id="ep-sci" />
-                    <Label htmlFor="ep-sci">SCI (foncière)</Label>
+                    <RadioGroupItem value="FONCIERE" id="ep-sci" />
+                    <Label htmlFor="ep-sci">Foncière (SCI)</Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="EXPLOITATION" id="ep-expl" />
@@ -571,7 +571,7 @@ export default function CapacityPhaseWizard({
                   { label: "Durée ramp-up", value: `${phase.rampUpMonths} mois` },
                   { label: "Atteinte régime cible", value: formatMonthIndex(phase.startMonth + phase.rampUpMonths, projectStartDate) },
                   { label: "Courbe", value: RAMP_LABELS[phase.rampCurve] },
-                  { label: "Entité porteuse", value: draft.entityPorteuse === "SCI" ? "SCI" : "Exploitation" },
+                  { label: "Entité porteuse", value: draft.entityPorteuse === "FONCIERE" ? "Foncière (SCI)" : "Exploitation" },
                   { label: "Amortissement", value: draft.amortissable ? `${draft.dureeAmortissement} ans` : "Non amortissable" },
                 ].map(row => (
                   <div key={row.label} className="flex justify-between py-1 border-b border-border last:border-0">

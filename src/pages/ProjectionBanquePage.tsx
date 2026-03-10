@@ -8,8 +8,8 @@ import { useState } from "react";
 import { useScenario } from "@/contexts/ScenarioContext";
 import { ProjectionHeader } from "@/components/ProjectionHeader";
 import { ProjectionHorizonSlider } from "@/components/ProjectionHorizonSlider";
-import type { DebtType } from "@/types/project";
-import { DEBT_TYPE_LABELS } from "@/types/project";
+import type { DebtType, FinancingEntity } from "@/types/project";
+import { DEBT_TYPE_LABELS, FINANCING_ENTITY_LABELS } from "@/types/project";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
@@ -26,7 +26,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip,
 } from "recharts";
 
-type FinancingEntity = "FONCIERE" | "EXPLOITATION";
+
 
 const generateBankProjection = (years: number) =>
   Array.from({ length: years }, (_, i) => ({
@@ -82,8 +82,9 @@ export default function ProjectionBanquePage() {
                 <Select value={entity} onValueChange={(v) => setEntity(v as FinancingEntity)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="FONCIERE">Foncière</SelectItem>
-                    <SelectItem value="EXPLOITATION">Exploitation</SelectItem>
+                    {(Object.entries(FINANCING_ENTITY_LABELS) as [FinancingEntity, string][]).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>{label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

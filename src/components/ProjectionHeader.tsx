@@ -30,7 +30,7 @@ import { useProject } from "@/contexts/ProjectContext";
 import { useScenario } from "@/contexts/ScenarioContext";
 import { toast } from "@/hooks/use-toast";
 import type { RampCurve } from "@/types/project";
-import type { RentPreset } from "@/types/scenario";
+import type { RentStrategyMode } from "@/types/project";
 
 const RAMP_CURVE_LABELS: Record<RampCurve, string> = {
   LINEAR: "Linéaire",
@@ -38,7 +38,7 @@ const RAMP_CURVE_LABELS: Record<RampCurve, string> = {
   SLOW_START: "Logistique",
 };
 
-const RENT_PRESET_LABELS: Record<RentPreset, string> = {
+const RENT_PRESET_LABELS: Record<RentStrategyMode, string> = {
   SCI_AUTONOMY: "Autonomie financière SCI",
   DEBT_PAYDOWN: "Désendettement SCI",
   OPTIMIZATION: "Optimisation fiscale",
@@ -205,13 +205,13 @@ export function ProjectionHeader() {
                 <div className="max-w-xs space-y-2">
                   <Select
                     value={scenarioState.rentPreset}
-                    onValueChange={(v) => updateScenarioField("rentPreset", v as RentPreset)}
+                    onValueChange={(v) => updateScenarioField("rentPreset", v as RentStrategyMode)}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {(Object.keys(RENT_PRESET_LABELS) as RentPreset[]).map((preset) => (
+                      {(Object.keys(RENT_PRESET_LABELS) as RentStrategyMode[]).map((preset) => (
                         <SelectItem key={preset} value={preset}>
                           {RENT_PRESET_LABELS[preset]}
                         </SelectItem>

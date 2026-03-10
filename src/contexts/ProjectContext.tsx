@@ -14,8 +14,6 @@ import {
   EvenementsData,
   ValidatedFlags,
   SectionName,
-  ProjectionInputs,
-  PhaseProjection,
   CapacityPhase,
   CapexEvent,
   ProjectMeta,
@@ -35,8 +33,6 @@ import {
   createDefaultCapexEvent,
   createDefaultAllocationOrder,
 } from "@/types/project";
-import { computeEngine } from "@/engine/engine";
-import { phaseSurface } from "@/engine/engine";
 
 const STORAGE_KEY = "pilotagebox_projects";
 const LEGACY_STORAGE_KEY = "pilotagebox_project_state";
@@ -76,7 +72,6 @@ interface ProjectContextValue {
   batchUpdateSections: (updates: Partial<{ [K in keyof ProjectState]: Partial<ProjectState[K]> }>) => void;
   validateSection: (section: SectionName) => void;
   isProjectComplete: () => boolean;
-  buildProjectionInputs: () => ProjectionInputs;
   // Multi-project management
   projectList: ProjectMeta[];
   createProject: (meta: Omit<ProjectMeta, "id" | "createdAt">) => string;
@@ -271,10 +266,6 @@ function migrateGouvernance(g: any): GouvernanceData {
     entityRules,
     distributionHistory: g?.distributionHistory ?? [],
     ccaBalance: g?.ccaBalance ?? DEFAULT_GOUVERNANCE.ccaBalance,
-    distributableCashRate: g?.distributableCashRate ?? DEFAULT_GOUVERNANCE.distributableCashRate,
-    ccaPriorityRatio: g?.ccaPriorityRatio ?? DEFAULT_GOUVERNANCE.ccaPriorityRatio,
-    reserveStrategicRatio: g?.reserveStrategicRatio ?? DEFAULT_GOUVERNANCE.reserveStrategicRatio,
-    reserveAfterCcaFullyRepaid: g?.reserveAfterCcaFullyRepaid ?? DEFAULT_GOUVERNANCE.reserveAfterCcaFullyRepaid,
   };
 }
 
@@ -418,18 +409,6 @@ function loadFromStorage(): MultiProjectState {
   return { projects: {}, activeProjectId: null };
 }
 
-// Helper: compute phase CA HT
-function phaseCAHT(p: CapacityPhase): number {
-  if (p.modeBox === "MACRO") {
-    const priceHT = p.prixType === "HT" ? p.prixM2 : p.prixM2 / (1 + p.vatRate);
-    return p.surface * priceHT;
-  }
-  const active = (p.typologies ?? []).filter(t => t.actif);
-  return active.reduce((sum, t) => {
-    const unitHT = t.prixType === "HT" ? t.prixMensuel : t.prixMensuel / (1 + t.vatRate);
-    return sum + t.nombreDeBox * unitHT;
-  }, 0);
-}
 
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [multiState, setMultiState] = useState<MultiProjectState>(loadFromStorage);
@@ -569,68 +548,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   }, []);
 
-  const buildProjectionInputs = useCallback((): ProjectionInputs => {
-    const p = state.projet;
-    const e = state.exploitation;
-    const f = state.financement;
-    const g = state.gouvernance;
-    const fi = state.fiscalite;
-
-    const engineOutputs = computeEngine({
-      projet: state.projet,
-      build: state.build,
-      financement: state.financement,
-      exploitation: state.exploitation,
-      fonciere: state.fonciere,
-      loyerDynamique: state.loyerDynamique,
-      gouvernance: state.gouvernance,
-      fiscalite: state.fiscalite,
-    });
-    const loyer = engineOutputs.loyerDynamique.loyerCalcule;
-
-    const phases = e.capacityPhases ?? [createDefaultPhase()];
-    const totalSurface = phases.reduce((s, ph) => s + phaseSurface(ph), 0);
-    const totalCA = phases.reduce((s, ph) => s + phaseCAHT(ph), 0);
-
-    const projectionPhases: PhaseProjection[] = phases.map(ph => ({
-      startMonth: ph.startMonth,
-      endMonth: ph.startMonth + ph.rampUpMonths - 1,
-      occupancyRate: ph.targetOccupancy,
-    }));
-
-    return {
-      horizonMonths: p.horizonMonths ?? DEFAULT_PROJET.horizonMonths,
-      initialCash: f.initialCash ?? DEFAULT_FINANCEMENT.initialCash,
-      sciInitialCash: f.sciInitialCash ?? DEFAULT_FINANCEMENT.sciInitialCash,
-      taxRate: fi.corporateTaxRate ?? DEFAULT_FISCALITE.corporateTaxRate,
-      bufferMin: f.bufferMin ?? DEFAULT_FINANCEMENT.bufferMin,
-      dscrMin: f.dscrMin ?? DEFAULT_FINANCEMENT.dscrMin,
-      phases: projectionPhases,
-      revenueParams: {
-        surface: totalSurface,
-        prixM2: totalSurface > 0 ? totalCA / totalSurface : 0,
-        tauxRemplissage: 1.0,
-      },
-      services: [],
-      debts: f.debts ?? [],
-      sciDebts: f.sciDebts ?? [],
-      sciChargesCash: f.sciChargesCash ?? DEFAULT_FINANCEMENT.sciChargesCash,
-      sciAmortization: f.sciAmortization ?? DEFAULT_FINANCEMENT.sciAmortization,
-      ccaBalance: g.ccaBalance ?? DEFAULT_GOUVERNANCE.ccaBalance,
-      distributableCashRate: g.distributableCashRate ?? DEFAULT_GOUVERNANCE.distributableCashRate,
-      ccaPriorityRatio: g.ccaPriorityRatio ?? DEFAULT_GOUVERNANCE.ccaPriorityRatio,
-      reserveStrategicRatio: g.reserveStrategicRatio ?? DEFAULT_GOUVERNANCE.reserveStrategicRatio,
-      reserveAfterCcaFullyRepaid: g.reserveAfterCcaFullyRepaid ?? DEFAULT_GOUVERNANCE.reserveAfterCcaFullyRepaid,
-      rentPlan: state.loyerDynamique.rentPlan,
-    };
-  }, [state]);
 
   return (
     <ProjectContext.Provider
       value={{
         state, validated, activeProjectId: multiState.activeProjectId,
         activeProjectMeta: activeEntry?.meta ?? null,
-        updateSection, batchUpdateSections, validateSection, isProjectComplete, buildProjectionInputs,
+        updateSection, batchUpdateSections, validateSection, isProjectComplete,
         projectList, createProject, switchProject, deleteProject, updateProjectMeta,
         hasActiveProject,
       }}
