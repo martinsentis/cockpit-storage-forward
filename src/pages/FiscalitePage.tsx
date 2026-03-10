@@ -32,6 +32,18 @@ export default function FiscalitePage() {
             Ce taux s'applique au résultat fiscal de la société d'exploitation et de la société foncière.
           </p>
         </div>
+        <div className="space-y-2">
+          <Label>Flat tax sur les dividendes (%)</Label>
+          <Input
+            type="number"
+            step="0.01"
+            value={Math.round((form.dividendFlatTaxRate ?? 0.30) * 100 * 100) / 100}
+            onChange={e => setForm({ ...form, dividendFlatTaxRate: Number(e.target.value) / 100 })}
+          />
+          <p className="text-xs text-muted-foreground">
+            Taux appliqué lors du versement de dividendes à un associé personne physique, pour obtenir le montant net d'impôt.
+          </p>
+        </div>
         <Button onClick={save} className="w-full">Enregistrer</Button>
       </CardContent>
     </Card>
