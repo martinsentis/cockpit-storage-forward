@@ -14,8 +14,6 @@ import {
   EvenementsData,
   ValidatedFlags,
   SectionName,
-  ProjectionInputs,
-  PhaseProjection,
   CapacityPhase,
   CapexEvent,
   ProjectMeta,
