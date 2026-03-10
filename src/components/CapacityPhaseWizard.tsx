@@ -528,10 +528,10 @@ export default function CapacityPhaseWizard({
             <div className="space-y-6">
               <div className="space-y-3">
                 <Label className="font-semibold">Entité porteuse de l'investissement</Label>
-                <RadioGroup value={draft.entityPorteuse} onValueChange={v => updateDraft({ entityPorteuse: v as "SCI" | "EXPLOITATION" })}>
+                <RadioGroup value={draft.entityPorteuse} onValueChange={v => updateDraft({ entityPorteuse: v as "FONCIERE" | "EXPLOITATION" })}>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="SCI" id="ep-sci" />
-                    <Label htmlFor="ep-sci">SCI (foncière)</Label>
+                    <RadioGroupItem value="FONCIERE" id="ep-sci" />
+                    <Label htmlFor="ep-sci">Foncière (SCI)</Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="EXPLOITATION" id="ep-expl" />
