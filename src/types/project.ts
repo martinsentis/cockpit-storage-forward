@@ -451,12 +451,7 @@ export interface GouvernanceData {
   globalRule: GlobalGouvernanceRule;
   entityRules: EntityGouvernanceRule[];
   distributionHistory: DistributionEvent[];
-  // Legacy flat fields (kept for engine compatibility)
   ccaBalance: number;
-  distributableCashRate: number;
-  ccaPriorityRatio: number;
-  reserveStrategicRatio: number;
-  reserveAfterCcaFullyRepaid: number;
 }
 
 // ── Defaults ──
