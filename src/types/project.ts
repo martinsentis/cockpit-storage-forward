@@ -585,10 +585,6 @@ export const DEFAULT_GOUVERNANCE: GouvernanceData = {
   entityRules: [],
   distributionHistory: [],
   ccaBalance: 0,
-  distributableCashRate: 0.5,
-  ccaPriorityRatio: 0.7,
-  reserveStrategicRatio: 0.1,
-  reserveAfterCcaFullyRepaid: 0.3,
 };
 
 // ── Associés & Sociétés ──
