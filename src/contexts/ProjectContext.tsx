@@ -33,8 +33,6 @@ import {
   createDefaultCapexEvent,
   createDefaultAllocationOrder,
 } from "@/types/project";
-import { computeEngine } from "@/engine/engine";
-import { phaseSurface } from "@/engine/engine";
 
 const STORAGE_KEY = "pilotagebox_projects";
 const LEGACY_STORAGE_KEY = "pilotagebox_project_state";
