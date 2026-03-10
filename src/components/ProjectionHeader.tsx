@@ -30,7 +30,7 @@ import { useProject } from "@/contexts/ProjectContext";
 import { useScenario } from "@/contexts/ScenarioContext";
 import { toast } from "@/hooks/use-toast";
 import type { RampCurve } from "@/types/project";
-import type { RentPreset } from "@/types/scenario";
+import type { RentStrategyMode } from "@/types/project";
 
 const RAMP_CURVE_LABELS: Record<RampCurve, string> = {
   LINEAR: "Linéaire",
