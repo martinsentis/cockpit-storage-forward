@@ -252,7 +252,7 @@ export interface PhaseDraft {
   currentStep: number;
   capexEstimate: PhaseCapexEstimate;
   financing: PhaseFinancingLine[];
-  entityPorteuse: "SCI" | "EXPLOITATION";
+  entityPorteuse: "FONCIERE" | "EXPLOITATION";
   amortissable: boolean;
   dureeAmortissement: number;
 }
