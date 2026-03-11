@@ -1,62 +1,88 @@
 /**
- * useEngine — React hook that provides engine outputs from project state.
+ * useEngine — React hook that provides engine outputs, fetched from backend API.
+ * Falls back to local computeEngine for initial rendering.
  */
 
 import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useProject } from "@/contexts/ProjectContext";
 import { useScenario } from "@/contexts/ScenarioContext";
 import { computeEngine } from "@/engine/engine";
 import type { EngineOutputs, EngineInputs } from "@/engine/engineTypes";
 
+async function fetchEngine(inputs: EngineInputs): Promise<EngineOutputs> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  const res = await fetch("http://localhost:3001/run-projection", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(inputs),
+    signal: controller.signal,
+  });
+  clearTimeout(timeout);
+  if (!res.ok) throw new Error("Engine API error");
+  return res.json();
+}
+
+export { fetchEngine };
+
 export function useEngine(): EngineOutputs {
   const { state } = useProject();
 
-  return useMemo(() => {
-    const inputs: EngineInputs = {
-      projet: state.projet,
-      build: state.build,
-      financement: state.financement,
-      exploitation: state.exploitation,
-      fonciere: state.fonciere,
-      loyerDynamique: state.loyerDynamique,
-      gouvernance: state.gouvernance,
-      fiscalite: state.fiscalite,
-    };
-    return computeEngine(inputs);
-  }, [state]);
+  const inputs = useMemo<EngineInputs>(() => ({
+    projet: state.projet,
+    build: state.build,
+    financement: state.financement,
+    exploitation: state.exploitation,
+    fonciere: state.fonciere,
+    loyerDynamique: state.loyerDynamique,
+    gouvernance: state.gouvernance,
+    fiscalite: state.fiscalite,
+  }), [state]);
+
+  const { data } = useQuery({
+    queryKey: ["engine", inputs],
+    queryFn: () => fetchEngine(inputs),
+    initialData: computeEngine(inputs),
+    staleTime: 10_000,
+  });
+
+  return data;
 }
 
 export function useEngineWithOverrides(overrides: Partial<EngineInputs>): EngineOutputs {
   const { state } = useProject();
 
-  return useMemo(() => {
-    const inputs: EngineInputs = {
-      projet: state.projet,
-      build: state.build,
-      financement: state.financement,
-      exploitation: state.exploitation,
-      fonciere: state.fonciere,
-      loyerDynamique: state.loyerDynamique,
-      gouvernance: state.gouvernance,
-      fiscalite: state.fiscalite,
-      ...overrides,
-    };
-    return computeEngine(inputs);
-  }, [state, overrides]);
+  const inputs = useMemo<EngineInputs>(() => ({
+    projet: state.projet,
+    build: state.build,
+    financement: state.financement,
+    exploitation: state.exploitation,
+    fonciere: state.fonciere,
+    loyerDynamique: state.loyerDynamique,
+    gouvernance: state.gouvernance,
+    fiscalite: state.fiscalite,
+    ...overrides,
+  }), [state, overrides]);
+
+  const { data } = useQuery({
+    queryKey: ["engine", inputs],
+    queryFn: () => fetchEngine(inputs),
+    initialData: computeEngine(inputs),
+    staleTime: 10_000,
+  });
+
+  return data;
 }
 
 /**
  * useEngineWithScenario — Merges ScenarioState overrides into EngineInputs.
- * Scenario overrides (targetOccupancy, phaseOverrides) are applied on top of
- * the project configuration before calling the engine.
- * The engine itself is NOT modified.
  */
 export function useEngineWithScenario(): EngineOutputs {
   const { state } = useProject();
   const { scenarioState } = useScenario();
 
-  return useMemo(() => {
-    // Apply scenario overrides to exploitation phases
+  const inputs = useMemo<EngineInputs>(() => {
     const exploitation = {
       ...state.exploitation,
       capacityPhases: state.exploitation.capacityPhases.map((phase) => {
@@ -70,7 +96,7 @@ export function useEngineWithScenario(): EngineOutputs {
       }),
     };
 
-    const inputs: EngineInputs = {
+    return {
       projet: {
         ...state.projet,
         horizonMonths: scenarioState.horizonMonths,
@@ -83,6 +109,14 @@ export function useEngineWithScenario(): EngineOutputs {
       gouvernance: state.gouvernance,
       fiscalite: state.fiscalite,
     };
-    return computeEngine(inputs);
   }, [state, scenarioState]);
+
+  const { data } = useQuery({
+    queryKey: ["engine", inputs],
+    queryFn: () => fetchEngine(inputs),
+    initialData: computeEngine(inputs),
+    staleTime: 10_000,
+  });
+
+  return data;
 }
