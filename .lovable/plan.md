@@ -1,48 +1,60 @@
 
 
-## Plan : Implémenter le Cockpit V1 complet
+## Plan : Brancher useEngine sur l'API backend avec stabilisation
 
-### Contexte
-Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
+### Fichiers modifies : 2
 
-### Fichiers à créer
+**1. `src/hooks/useEngine.ts`**
 
-**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
+- Ajouter `fetchEngine` avec `AbortController` (timeout 8s)
+- Importer `useQuery` depuis `@tanstack/react-query`
+- Les 3 hooks (`useEngine`, `useEngineWithOverrides`, `useEngineWithScenario`) :
+  - Construisent `inputs` comme aujourd'hui
+  - Appellent `useQuery` avec `queryKey: ["engine", inputs]`, `staleTime: 10_000`, `initialData: computeEngine(inputs)`
+  - Retournent `query.data` (jamais undefined grace a `initialData`)
 
-**2. `src/types/project.ts`** — Types et defaults :
-- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
-- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
-  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
-  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
-  - `revenueParams` (surface, prixM2, tauxRemplissage)
-  - `services` ([] par défaut)
-  - `opexPercentOfRevenue`
-  - `debts`, `sciDebts` ([] par défaut)
-  - `sciChargesCash`, `sciAmortization` (0 par défaut)
-  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
-  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
-- Constantes `DEFAULT_*` exportées pour chaque section
+```typescript
+async function fetchEngine(inputs: EngineInputs): Promise<EngineOutputs> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  const res = await fetch("http://localhost:3001/run-projection", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(inputs),
+    signal: controller.signal,
+  });
+  clearTimeout(timeout);
+  if (!res.ok) throw new Error("Engine API error");
+  return res.json();
+}
+```
 
-**3. `src/contexts/ProjectContext.tsx`** :
-- State initialisé avec les defaults
-- `validated` flags (5 booleans, tous false)
-- `updateSection()`, `validateSection()`, `isProjectComplete()`
-- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
+Chaque hook suit ce pattern :
+```typescript
+export function useEngine(): EngineOutputs {
+  const { state } = useProject();
+  const inputs = useMemo<EngineInputs>(() => ({
+    projet: state.projet, build: state.build, /* ... 8 sections */
+  }), [state]);
 
-**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
+  const { data } = useQuery({
+    queryKey: ["engine", inputs],
+    queryFn: () => fetchEngine(inputs),
+    initialData: computeEngine(inputs),
+    staleTime: 10_000,
+  });
+  return data;
+}
+```
 
-**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
+**2. `src/pages/LoyerDynamiquePage.tsx`**
 
-**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
-- Formulaires pré-remplis depuis le Context
-- Bouton "Enregistrer" → updateSection + validateSection
-- Champs par page alignés sur les inputs API
+- Remplacer l'import `computeEngine` par `useQuery` + `fetchEngine` (reexporte ou inline)
+- Meme pattern : `useQuery` avec `queryKey: ["engine-loyer", inputs]`, `initialData: computeEngine(inputs)`, `staleTime: 10_000`
+- `computeEngine` reste importe uniquement pour `initialData`
 
-**7. `src/pages/DashboardPage.tsx`** :
-- Liste les sections manquantes si projet incomplet
-- Bouton "Lancer la simulation" désactivé si incomplet
-- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
-- Affiche réponse JSON ou erreur dans `<pre>`
-
-**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
+### Ce qui ne change pas
+- UI, types, contexts, engine.ts, engineTypes.ts
+- Signature des hooks (retournent toujours `EngineOutputs` synchrone)
+- `computeEngine` reste le rendu initial instantane
 
