@@ -42,13 +42,17 @@ export default function LoyerDynamiquePage() {
   );
 
   // Engine for informative indicators only
-  const engineOutputs = useMemo(() => {
-    const inputs: EngineInputs = {
-      ...state,
-      loyerDynamique: { rentPlan: phases },
-    };
-    return computeEngine(inputs);
-  }, [state, phases]);
+  const inputs = useMemo<EngineInputs>(() => ({
+    ...state,
+    loyerDynamique: { rentPlan: phases },
+  }), [state, phases]);
+
+  const { data: engineOutputs } = useQuery({
+    queryKey: ["engine-loyer", inputs],
+    queryFn: () => fetchEngine(inputs),
+    initialData: computeEngine(inputs),
+    staleTime: 10_000,
+  });
 
   const computed = engineOutputs.loyerDynamique;
 
