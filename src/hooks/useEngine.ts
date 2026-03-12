@@ -13,7 +13,7 @@ import type { EngineOutputs, EngineInputs } from "@/engine/engineTypes";
 async function fetchEngine(inputs: EngineInputs): Promise<EngineOutputs> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
-  const res = await fetch("https://pilotagebox-production.up.railway.app/run-projection", {
+  const res = await fetch("https://pilotagebox-production.up.railway.app/compute-engine", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(inputs),
@@ -29,16 +29,19 @@ export { fetchEngine };
 export function useEngine(): EngineOutputs {
   const { state } = useProject();
 
-  const inputs = useMemo<EngineInputs>(() => ({
-    projet: state.projet,
-    build: state.build,
-    financement: state.financement,
-    exploitation: state.exploitation,
-    fonciere: state.fonciere,
-    loyerDynamique: state.loyerDynamique,
-    gouvernance: state.gouvernance,
-    fiscalite: state.fiscalite,
-  }), [state]);
+  const inputs = useMemo<EngineInputs>(
+    () => ({
+      projet: state.projet,
+      build: state.build,
+      financement: state.financement,
+      exploitation: state.exploitation,
+      fonciere: state.fonciere,
+      loyerDynamique: state.loyerDynamique,
+      gouvernance: state.gouvernance,
+      fiscalite: state.fiscalite,
+    }),
+    [state],
+  );
 
   const { data } = useQuery({
     queryKey: ["engine", inputs],
@@ -53,17 +56,20 @@ export function useEngine(): EngineOutputs {
 export function useEngineWithOverrides(overrides: Partial<EngineInputs>): EngineOutputs {
   const { state } = useProject();
 
-  const inputs = useMemo<EngineInputs>(() => ({
-    projet: state.projet,
-    build: state.build,
-    financement: state.financement,
-    exploitation: state.exploitation,
-    fonciere: state.fonciere,
-    loyerDynamique: state.loyerDynamique,
-    gouvernance: state.gouvernance,
-    fiscalite: state.fiscalite,
-    ...overrides,
-  }), [state, overrides]);
+  const inputs = useMemo<EngineInputs>(
+    () => ({
+      projet: state.projet,
+      build: state.build,
+      financement: state.financement,
+      exploitation: state.exploitation,
+      fonciere: state.fonciere,
+      loyerDynamique: state.loyerDynamique,
+      gouvernance: state.gouvernance,
+      fiscalite: state.fiscalite,
+      ...overrides,
+    }),
+    [state, overrides],
+  );
 
   const { data } = useQuery({
     queryKey: ["engine", inputs],
