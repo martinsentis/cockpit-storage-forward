@@ -1,35 +1,48 @@
 
 
-## Plan : Export / Import JSON sur la page d'accueil
+## Plan : Implémenter le Cockpit V1 complet
 
-### Fichiers modifiés : 2
+### Contexte
+Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
 
-**1. `src/contexts/ProjectContext.tsx`**
-- Ajouter `importProject(entry: ProjectEntry): string` au contexte — insère un projet complet (meta + state + validated) dans le store avec un nouvel `id` et `createdAt` pour éviter les collisions, puis persiste dans localStorage.
-- Ajouter `getProjectEntry(id: string): ProjectEntry | null` pour récupérer un projet complet à exporter.
+### Fichiers à créer
 
-**2. `src/pages/Index.tsx`**
-- Ajouter deux boutons à côté de "Nouveau projet" :
-  - **Exporter** (icône `Download`) : visible sur chaque carte projet (dans le hover, à côté de la corbeille). Clic → construit le JSON du `ProjectEntry`, crée un `Blob`, déclenche un téléchargement `projet-{nom}.json`.
-  - **Importer** (icône `Upload`) : bouton global à côté de "Nouveau projet". Clic → ouvre un `<input type="file" accept=".json">` caché. À la sélection, lit le fichier via `FileReader`, parse le JSON, valide la structure minimale (présence de `meta`, `state`, `validated`), appelle `importProject`, puis navigue vers `/projet`.
-- Toast de succès/erreur via `sonner`.
+**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
 
-### Détail technique
+**2. `src/types/project.ts`** — Types et defaults :
+- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
+- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
+  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
+  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
+  - `revenueParams` (surface, prixM2, tauxRemplissage)
+  - `services` ([] par défaut)
+  - `opexPercentOfRevenue`
+  - `debts`, `sciDebts` ([] par défaut)
+  - `sciChargesCash`, `sciAmortization` (0 par défaut)
+  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
+  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
+- Constantes `DEFAULT_*` exportées pour chaque section
 
-Export d'un projet :
-```typescript
-function handleExport(id: string) {
-  const entry = getProjectEntry(id);
-  if (!entry) return;
-  const blob = new Blob([JSON.stringify(entry, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `projet-${entry.meta.nom}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-```
+**3. `src/contexts/ProjectContext.tsx`** :
+- State initialisé avec les defaults
+- `validated` flags (5 booleans, tous false)
+- `updateSection()`, `validateSection()`, `isProjectComplete()`
+- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
 
-Import : lecture fichier → `JSON.parse` → validation structure → `importProject` → toast + navigate.
+**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
+
+**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
+
+**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
+- Formulaires pré-remplis depuis le Context
+- Bouton "Enregistrer" → updateSection + validateSection
+- Champs par page alignés sur les inputs API
+
+**7. `src/pages/DashboardPage.tsx`** :
+- Liste les sections manquantes si projet incomplet
+- Bouton "Lancer la simulation" désactivé si incomplet
+- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
+- Affiche réponse JSON ou erreur dans `<pre>`
+
+**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
 

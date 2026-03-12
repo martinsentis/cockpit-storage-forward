@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useProject } from "@/contexts/ProjectContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,11 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Trash2, MapPin, Calendar, FolderOpen } from "lucide-react";
+import { Plus, Trash2, MapPin, Calendar, FolderOpen, Download, Upload } from "lucide-react";
 import { MONTH_NAMES } from "@/lib/monthUtils";
+import { toast } from "sonner";
 
 export default function Index() {
-  const { projectList, createProject, switchProject, deleteProject } = useProject();
+  const { projectList, createProject, switchProject, deleteProject, getProjectEntry, importProject } = useProject();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -53,17 +55,66 @@ export default function Index() {
     }
   }
 
+  function handleExport(e: React.MouseEvent, id: string) {
+    e.stopPropagation();
+    const entry = getProjectEntry(id);
+    if (!entry) return;
+    const blob = new Blob([JSON.stringify(entry, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `projet-${entry.meta.nom}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Projet exporté avec succès");
+  }
+
+  function handleImportFile(file: File) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result as string);
+        if (!parsed.meta || !parsed.state || !parsed.validated) {
+          toast.error("Fichier invalide : structure de projet manquante (meta, state, validated)");
+          return;
+        }
+        importProject(parsed);
+        toast.success(`Projet "${parsed.meta.nom}" importé avec succès`);
+        navigate("/projet");
+      } catch {
+        toast.error("Impossible de lire le fichier JSON");
+      }
+    };
+    reader.readAsText(file);
+  }
+
   return (
     <div className="min-h-screen bg-background p-8">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleImportFile(file);
+          e.target.value = "";
+        }}
+      />
       <div className="max-w-4xl mx-auto space-y-8">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Mes projets</h1>
             <p className="text-muted-foreground mt-1">Sélectionnez un projet ou créez-en un nouveau</p>
           </div>
-          <Button onClick={openCreate} size="lg">
-            <Plus className="h-5 w-5 mr-2" /> Nouveau projet
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+              <Upload className="h-5 w-5 mr-2" /> Importer
+            </Button>
+            <Button onClick={openCreate} size="lg">
+              <Plus className="h-5 w-5 mr-2" /> Nouveau projet
+            </Button>
+          </div>
         </div>
 
         {projectList.length === 0 ? (
@@ -88,14 +139,26 @@ export default function Index() {
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <CardTitle className="text-lg">{p.nom}</CardTitle>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={(e) => { e.stopPropagation(); setDeleteId(p.id); }}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={(e) => handleExport(e, p.id)}
+                        title="Exporter"
+                      >
+                        <Download className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={(e) => { e.stopPropagation(); setDeleteId(p.id); }}
+                        title="Supprimer"
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-2">
