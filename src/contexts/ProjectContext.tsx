@@ -79,6 +79,9 @@ interface ProjectContextValue {
   deleteProject: (id: string) => void;
   updateProjectMeta: (id: string, updates: Partial<Omit<ProjectMeta, "id" | "createdAt">>) => void;
   hasActiveProject: boolean;
+  // Import / Export
+  getProjectEntry: (id: string) => ProjectEntry | null;
+  importProject: (entry: ProjectEntry) => string;
 }
 
 const ProjectContext = createContext<ProjectContextValue | null>(null);
