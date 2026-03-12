@@ -46,7 +46,7 @@ export function useEngine(): EngineOutputs {
   const { data } = useQuery({
     queryKey: ["engine", inputs],
     queryFn: () => fetchEngine(inputs),
-    initialData: computeEngine(inputs),
+    placeholderData: computeEngine(inputs),
     staleTime: 10_000,
   });
 
