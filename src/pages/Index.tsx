@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useProject } from "@/contexts/ProjectContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,11 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Trash2, MapPin, Calendar, FolderOpen } from "lucide-react";
+import { Plus, Trash2, MapPin, Calendar, FolderOpen, Download, Upload } from "lucide-react";
 import { MONTH_NAMES } from "@/lib/monthUtils";
+import { toast } from "sonner";
 
 export default function Index() {
-  const { projectList, createProject, switchProject, deleteProject } = useProject();
+  const { projectList, createProject, switchProject, deleteProject, getProjectEntry, importProject } = useProject();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
