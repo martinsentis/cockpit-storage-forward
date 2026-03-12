@@ -13,7 +13,7 @@ import type { EngineOutputs, EngineInputs } from "@/engine/engineTypes";
 async function fetchEngine(inputs: EngineInputs): Promise<EngineOutputs> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
-  fetch("/api/run-projection", {
+  const res = await fetch("/api/run-projection", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(inputs),
