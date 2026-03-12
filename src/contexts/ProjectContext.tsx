@@ -552,6 +552,27 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   }, []);
 
+  const getProjectEntry = useCallback((id: string): ProjectEntry | null => {
+    return multiState.projects[id] ?? null;
+  }, [multiState]);
+
+  const importProject = useCallback((entry: ProjectEntry): string => {
+    const id = crypto.randomUUID();
+    const migrated = migrateSingleProjectState({ state: entry.state, validated: entry.validated });
+    const meta: ProjectMeta = {
+      ...entry.meta,
+      id,
+      createdAt: new Date().toISOString(),
+    };
+    setMultiState(prev => ({
+      projects: {
+        ...prev.projects,
+        [id]: { meta, state: migrated.state, validated: migrated.validated },
+      },
+      activeProjectId: id,
+    }));
+    return id;
+  }, []);
 
   return (
     <ProjectContext.Provider
@@ -560,7 +581,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         activeProjectMeta: activeEntry?.meta ?? null,
         updateSection, batchUpdateSections, validateSection, isProjectComplete,
         projectList, createProject, switchProject, deleteProject, updateProjectMeta,
-        hasActiveProject,
+        hasActiveProject, getProjectEntry, importProject,
       }}
     >
       {children}
