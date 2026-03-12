@@ -55,17 +55,66 @@ export default function Index() {
     }
   }
 
+  function handleExport(e: React.MouseEvent, id: string) {
+    e.stopPropagation();
+    const entry = getProjectEntry(id);
+    if (!entry) return;
+    const blob = new Blob([JSON.stringify(entry, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `projet-${entry.meta.nom}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Projet exporté avec succès");
+  }
+
+  function handleImportFile(file: File) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result as string);
+        if (!parsed.meta || !parsed.state || !parsed.validated) {
+          toast.error("Fichier invalide : structure de projet manquante (meta, state, validated)");
+          return;
+        }
+        importProject(parsed);
+        toast.success(`Projet "${parsed.meta.nom}" importé avec succès`);
+        navigate("/projet");
+      } catch {
+        toast.error("Impossible de lire le fichier JSON");
+      }
+    };
+    reader.readAsText(file);
+  }
+
   return (
     <div className="min-h-screen bg-background p-8">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleImportFile(file);
+          e.target.value = "";
+        }}
+      />
       <div className="max-w-4xl mx-auto space-y-8">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Mes projets</h1>
             <p className="text-muted-foreground mt-1">Sélectionnez un projet ou créez-en un nouveau</p>
           </div>
-          <Button onClick={openCreate} size="lg">
-            <Plus className="h-5 w-5 mr-2" /> Nouveau projet
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+              <Upload className="h-5 w-5 mr-2" /> Importer
+            </Button>
+            <Button onClick={openCreate} size="lg">
+              <Plus className="h-5 w-5 mr-2" /> Nouveau projet
+            </Button>
+          </div>
         </div>
 
         {projectList.length === 0 ? (
