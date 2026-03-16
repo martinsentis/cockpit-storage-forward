@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useProject } from "@/contexts/ProjectContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
