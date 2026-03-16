@@ -8,20 +8,24 @@ import { useQuery } from "@tanstack/react-query";
 import { useProject } from "@/contexts/ProjectContext";
 import { useScenario } from "@/contexts/ScenarioContext";
 import { computeEngine } from "@/engine/engine";
+import { mapEngineInputsToProjectionInputs } from "@/engine/mapToProjectionInputs";
+import { mapProjectionResultsToEngineOutputs } from "@/engine/mapFromProjectionResults";
 import type { EngineOutputs, EngineInputs } from "@/engine/engineTypes";
 
 async function fetchEngine(inputs: EngineInputs): Promise<EngineOutputs> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
-  const res = await fetch("/api/run-projection", {
+  const payload = mapEngineInputsToProjectionInputs(inputs);
+  const res = await fetch("https://pilotagebox-production.up.railway.app/run-projection", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(inputs),
+    body: JSON.stringify(payload),
     signal: controller.signal,
   });
   clearTimeout(timeout);
   if (!res.ok) throw new Error("Engine API error");
-  return res.json();
+  const results = await res.json();
+  return mapProjectionResultsToEngineOutputs(results);
 }
 
 export { fetchEngine };
