@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
 import type { RentStrategyMode, RentPlanPhase } from "@/types/project";
 import { computeEngine } from "@/engine/engine";
-import { fetchEngine } from "@/hooks/useEngine";
+
 import type { EngineInputs } from "@/engine/engineTypes";
 
 function fmt(n: number) { return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(n); }
