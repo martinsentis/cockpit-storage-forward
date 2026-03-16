@@ -1,71 +1,48 @@
 
 
-## Corrected Plan: Request Adapter + Response Adapter
+## Plan : Implémenter le Cockpit V1 complet
 
-### 1. Request Adapter — `src/engine/mapToProjectionInputs.ts`
+### Contexte
+Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
 
-**Corrections applied:**
+### Fichiers à créer
 
-**`reserveAfterCcaFullyRepaid`** → `true` (boolean, not a ratio)
+**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
 
-**`rentConstraints` mode translation table:**
+**2. `src/types/project.ts`** — Types et defaults :
+- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
+- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
+  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
+  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
+  - `revenueParams` (surface, prixM2, tauxRemplissage)
+  - `services` ([] par défaut)
+  - `opexPercentOfRevenue`
+  - `debts`, `sciDebts` ([] par défaut)
+  - `sciChargesCash`, `sciAmortization` (0 par défaut)
+  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
+  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
+- Constantes `DEFAULT_*` exportées pour chaque section
 
-| Frontend mode | Backend mode |
-|---|---|
-| `SCI_AUTONOMY` | `AUTONOMIE_SCI` |
-| `DEBT_PAYDOWN` | `DESENDETTEMENT_SCI` |
-| `OPTIMIZATION` | `OPTIMISATION_FISCALE` |
-| `MIX` | `OPTIMISATION_EBE_EXPLOITATION` |
-| `FIXED_AMOUNT` | `FIXE` |
+**3. `src/contexts/ProjectContext.tsx`** :
+- State initialisé avec les defaults
+- `validated` flags (5 booleans, tous false)
+- `updateSection()`, `validateSection()`, `isProjectComplete()`
+- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
 
-Fallback: `AUTONOMIE_SCI`
+**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
 
-All other field mappings remain as previously approved (taxSchedules hardcoded, phases with `phaseId/totalSurface/operationalStartMonth/rampUpStartMonth/rampUpDurationMonths/isActive`, revenueParams from first active phase, debts wrapped in `{debt, state}`, operatingCharges as `SAS_OPEX`, etc.)
+**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
 
----
+**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
+- Formulaires pré-remplis depuis le Context
+- Bouton "Enregistrer" → updateSection + validateSection
+- Champs par page alignés sur les inputs API
 
-### 2. Response Adapter — `src/engine/mapFromProjectionResults.ts`
+**7. `src/pages/DashboardPage.tsx`** :
+- Liste les sections manquantes si projet incomplet
+- Bouton "Lancer la simulation" désactivé si incomplet
+- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
+- Affiche réponse JSON ou erreur dans `<pre>`
 
-**Problem:** Backend returns `MonthlyResult[]`. Frontend components expect `EngineOutputs` (with `.exploitation`, `.fonciere`, `.loyerDynamique` sub-objects).
-
-**Pages consuming `EngineOutputs` today:**
-
-| Page | Hook | Fields used |
-|---|---|---|
-| `ExploitationPage` | `useEngineWithOverrides` | `engineOutputs.exploitation.*` (totalCAHT, caServicesHT, phaseMetrics, etc.) |
-| `FoncierePage` | `useEngine` | `engine.fonciere.*`, `engine.loyerDynamique.loyerCalcule` |
-| `LoyerDynamiquePage` | `fetchEngine` directly | `engineOutputs.loyerDynamique.*` |
-| Projection pages | `useEngineWithScenario` | Currently mock data, not yet wired |
-
-**Strategy:** Create `mapProjectionResultsToEngineOutputs(results: MonthlyResult[]): EngineOutputs` that derives the legacy shape from the monthly series. This keeps all existing pages working without changes.
-
-The adapter will:
-- Take the last month's row to extract snapshot values (cashEnd, sciCashEnd, totalCAHT, etc.)
-- Sum/average across months to derive annualized metrics
-- Extract exploitation vs foncière metrics from `projectedByCategory` if present
-- Derive `loyerCalcule` from the rent-related entries
-
-**Projection pages** (Sociétés, Banque, Associés) will eventually consume `MonthlyResult[]` directly for time-series charts and tables, but that's a separate wiring step.
-
----
-
-### 3. Changes to `src/hooks/useEngine.ts`
-
-- Import both adapters
-- `fetchEngine`: URL → `"https://pilotagebox-production.up.railway.app/run-projection"`
-- `fetchEngine`: body → `JSON.stringify(mapEngineInputsToProjectionInputs(inputs))`
-- `fetchEngine`: response → `mapProjectionResultsToEngineOutputs(await res.json())`
-- Return type stays `Promise<EngineOutputs>` — all consumers unchanged
-
----
-
-### 4. Files to create/modify
-
-| Action | File |
-|---|---|
-| Create | `src/engine/mapToProjectionInputs.ts` — request adapter with corrected mappings |
-| Create | `src/engine/mapFromProjectionResults.ts` — response adapter `MonthlyResult[] → EngineOutputs` |
-| Modify | `src/hooks/useEngine.ts` — use both adapters, direct Railway URL |
-
-No other files change. All existing pages continue working via the same `EngineOutputs` interface.
+**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
 
