@@ -1,48 +1,71 @@
 
 
-## Plan : Implémenter le Cockpit V1 complet
+## Plan: Fix engine integration on input pages
 
-### Contexte
-Le projet est vierge (juste le scaffold shadcn). On doit créer toute l'architecture SaaS : sidebar, 6 pages, state global, et l'appel API avec un `buildProjectionInputs()` qui produit un payload complet sans aucun `undefined`.
+Three files need modification. Each replaces backend-hitting hooks with local `computeEngine()` using explicit `EngineInputs`.
 
-### Fichiers à créer
+### 1. `src/pages/FoncierePage.tsx`
 
-**1. `src/config.ts`** — `export const API_URL = "https://phylis-unrationalising-rudolf.ngrok-free.dev"`
+**Line 1**: Add `useMemo` to import (`useState` → `useState, useMemo`)
+**Line 22**: Replace `import { useEngine } from "@/hooks/useEngine"` with:
+```ts
+import { computeEngine } from "@/engine/engine";
+import type { EngineInputs } from "@/engine/engineTypes";
+```
+**Lines 33-35**: Replace with explicit `EngineInputs` construction + `computeEngine`:
+```ts
+const engineInputs = useMemo<EngineInputs>(() => ({
+  projet: state.projet, build: state.build, financement: state.financement,
+  exploitation: state.exploitation, fonciere: state.fonciere,
+  loyerDynamique: state.loyerDynamique, gouvernance: state.gouvernance,
+  fiscalite: state.fiscalite,
+}), [state]);
+const engine = useMemo(() => computeEngine(engineInputs), [engineInputs]);
+const sci = engine.fonciere;
+const loyerMensuel = engine.loyerDynamique.loyerCalcule;
+```
 
-**2. `src/types/project.ts`** — Types et defaults :
-- Types par section (ProjetData, BuildData, FinancementData, ExploitationData, GouvernanceData)
-- Type `ProjectionInputs` aligné sur le contrat API avec tous les champs obligatoires :
-  - `horizonMonths`, `initialCash`, `sciInitialCash`, `taxRate`, `bufferMin`, `dscrMin`
-  - `phases` (1 phase par défaut : mois 1→12, 100% remplissage)
-  - `revenueParams` (surface, prixM2, tauxRemplissage)
-  - `services` ([] par défaut)
-  - `opexPercentOfRevenue`
-  - `debts`, `sciDebts` ([] par défaut)
-  - `sciChargesCash`, `sciAmortization` (0 par défaut)
-  - `ccaBalance`, `distributableCashRate`, `ccaPriorityRatio`, `reserveStrategicRatio`, `reserveAfterCcaFullyRepaid`
-  - `rentConstraints` ({ mode: "fixed", monthlyRent: 0 })
-- Constantes `DEFAULT_*` exportées pour chaque section
+### 2. `src/pages/ExploitationPage.tsx`
 
-**3. `src/contexts/ProjectContext.tsx`** :
-- State initialisé avec les defaults
-- `validated` flags (5 booleans, tous false)
-- `updateSection()`, `validateSection()`, `isProjectComplete()`
-- `buildProjectionInputs()` : fusionne state + defaults via `??` sur chaque champ. Retourne un objet typé `ProjectionInputs` complet. Inclut toujours au moins 1 phase, services=[], debts=[], sciDebts=[]
+**Line 30**: Replace `import { useEngineWithOverrides } from "@/hooks/useEngine"` with:
+```ts
+import { computeEngine } from "@/engine/engine";
+import type { EngineInputs } from "@/engine/engineTypes";
+```
+**Line 332**: Replace `const engineOutputs = useEngineWithOverrides({ exploitation: form })` with:
+```ts
+const engineOutputs = useMemo(() => computeEngine({
+  projet: state.projet, build: state.build, financement: state.financement,
+  exploitation: form, fonciere: state.fonciere,
+  loyerDynamique: state.loyerDynamique, gouvernance: state.gouvernance,
+  fiscalite: state.fiscalite,
+}), [state, form]);
+```
+(`useMemo` already imported on line 1)
 
-**4. `src/components/AppSidebar.tsx`** — Sidebar avec 6 liens, icônes CheckCircle (vert) / AlertTriangle (orange) selon `validated[section]`
+### 3. `src/pages/LoyerDynamiquePage.tsx`
 
-**5. `src/components/Layout.tsx`** — SidebarProvider + SidebarTrigger + Outlet
+**Line 2**: Remove `import { useQuery } from "@tanstack/react-query"`
+**Line 16**: Remove `import { fetchEngine } from "@/hooks/useEngine"`
+**Lines 15, 17**: Keep `computeEngine` and `EngineInputs` imports (already present)
+**Lines 45-57**: Replace `useMemo` + `useQuery` block with:
+```ts
+const engineOutputs = useMemo(() => computeEngine({
+  projet: state.projet, build: state.build, financement: state.financement,
+  exploitation: state.exploitation, fonciere: state.fonciere,
+  loyerDynamique: { rentPlan: phases }, gouvernance: state.gouvernance,
+  fiscalite: state.fiscalite,
+}), [state, phases]);
+const computed = engineOutputs.loyerDynamique;
+```
 
-**6. 5 pages métier** (ProjetPage, BuildPage, FinancementPage, ExploitationPage, GouvernancePage) :
-- Formulaires pré-remplis depuis le Context
-- Bouton "Enregistrer" → updateSection + validateSection
-- Champs par page alignés sur les inputs API
+### Summary
 
-**7. `src/pages/DashboardPage.tsx`** :
-- Liste les sections manquantes si projet incomplet
-- Bouton "Lancer la simulation" désactivé si incomplet
-- Si complet : `buildProjectionInputs()` → POST `${API_URL}/simulate`
-- Affiche réponse JSON ou erreur dans `<pre>`
+| File | Remove | Add |
+|---|---|---|
+| FoncierePage | `useEngine` hook | `computeEngine` + explicit `EngineInputs` |
+| ExploitationPage | `useEngineWithOverrides` hook | `computeEngine` + explicit `EngineInputs` with `exploitation: form` |
+| LoyerDynamiquePage | `useQuery`, `fetchEngine` | `computeEngine` + explicit `EngineInputs` with `loyerDynamique: { rentPlan: phases }` |
 
-**8. `src/App.tsx`** — ProjectProvider wrapper, routes imbriquées dans Layout, `/` → redirect `/projet`
+No other files change. All three pages become purely local computation with no network calls.
 
