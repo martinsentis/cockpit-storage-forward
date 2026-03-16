@@ -19,7 +19,8 @@ import {
   isTaxExemptLabel,
 } from "@/types/project";
 import { formatMonthIndex } from "@/lib/monthUtils";
-import { useEngine } from "@/hooks/useEngine";
+import { computeEngine } from "@/engine/engine";
+import type { EngineInputs } from "@/engine/engineTypes";
 
 function uid() { return crypto.randomUUID(); }
 function fmt(n: number) { return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(n); }
