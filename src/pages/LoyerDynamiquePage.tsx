@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+
 import { useProject } from "@/contexts/ProjectContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
 import type { RentStrategyMode, RentPlanPhase } from "@/types/project";
 import { computeEngine } from "@/engine/engine";
-import { fetchEngine } from "@/hooks/useEngine";
+
 import type { EngineInputs } from "@/engine/engineTypes";
 
 function fmt(n: number) { return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(n); }
@@ -42,18 +42,12 @@ export default function LoyerDynamiquePage() {
   );
 
   // Engine for informative indicators only
-  const inputs = useMemo<EngineInputs>(() => ({
-    ...state,
-    loyerDynamique: { rentPlan: phases },
+  const engineOutputs = useMemo(() => computeEngine({
+    projet: state.projet, build: state.build, financement: state.financement,
+    exploitation: state.exploitation, fonciere: state.fonciere,
+    loyerDynamique: { rentPlan: phases }, gouvernance: state.gouvernance,
+    fiscalite: state.fiscalite,
   }), [state, phases]);
-
-  const { data: engineOutputs } = useQuery({
-    queryKey: ["engine-loyer", inputs],
-    queryFn: () => fetchEngine(inputs),
-    initialData: computeEngine(inputs),
-    staleTime: 10_000,
-  });
-
   const computed = engineOutputs.loyerDynamique;
 
   const updatePhase = (id: string, updater: (p: RentPlanPhase) => RentPlanPhase) => {

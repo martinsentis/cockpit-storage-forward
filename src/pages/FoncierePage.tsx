@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useProject } from "@/contexts/ProjectContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +19,8 @@ import {
   isTaxExemptLabel,
 } from "@/types/project";
 import { formatMonthIndex } from "@/lib/monthUtils";
-import { useEngine } from "@/hooks/useEngine";
+import { computeEngine } from "@/engine/engine";
+import type { EngineInputs } from "@/engine/engineTypes";
 
 function uid() { return crypto.randomUUID(); }
 function fmt(n: number) { return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(n); }
@@ -30,7 +31,13 @@ export default function FoncierePage() {
   const projectStartDate = state.projet.projectStartDate;
   const defaultVatRate = state.projet.defaultVatRate ?? 0.20;
 
-  const engine = useEngine();
+  const engineInputs = useMemo<EngineInputs>(() => ({
+    projet: state.projet, build: state.build, financement: state.financement,
+    exploitation: state.exploitation, fonciere: state.fonciere,
+    loyerDynamique: state.loyerDynamique, gouvernance: state.gouvernance,
+    fiscalite: state.fiscalite,
+  }), [state]);
+  const engine = useMemo(() => computeEngine(engineInputs), [engineInputs]);
   const sci = engine.fonciere;
   const loyerMensuel = engine.loyerDynamique.loyerCalcule;
 
