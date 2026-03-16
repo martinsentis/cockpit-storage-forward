@@ -31,7 +31,13 @@ export default function FoncierePage() {
   const projectStartDate = state.projet.projectStartDate;
   const defaultVatRate = state.projet.defaultVatRate ?? 0.20;
 
-  const engine = useEngine();
+  const engineInputs = useMemo<EngineInputs>(() => ({
+    projet: state.projet, build: state.build, financement: state.financement,
+    exploitation: state.exploitation, fonciere: state.fonciere,
+    loyerDynamique: state.loyerDynamique, gouvernance: state.gouvernance,
+    fiscalite: state.fiscalite,
+  }), [state]);
+  const engine = useMemo(() => computeEngine(engineInputs), [engineInputs]);
   const sci = engine.fonciere;
   const loyerMensuel = engine.loyerDynamique.loyerCalcule;
 
