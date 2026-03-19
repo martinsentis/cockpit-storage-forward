@@ -13,6 +13,7 @@ import { mapProjectionResultsToEngineOutputs } from "@/engine/mapFromProjectionR
 import type { EngineOutputs, EngineInputs } from "@/engine/engineTypes";
 
 async function fetchEngine(inputs: EngineInputs): Promise<EngineOutputs> {
+  console.log("FETCH ENGINE CALLED");
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   const payload = mapEngineInputsToProjectionInputs(inputs);
