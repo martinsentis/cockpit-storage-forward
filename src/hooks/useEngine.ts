@@ -58,7 +58,7 @@ export function useEngine(): EngineOutputs {
 }
 
 
-
+/**
  * useEngineWithScenario — Merges ScenarioState overrides into EngineInputs.
  */
 export function useEngineWithScenario(): EngineOutputs {
