@@ -1,44 +1,36 @@
 
 
-## Audit Report: `computeEngine()` Migration
+## Plan: Activate engine on ProjectionSocietesPage with debug
 
-### 1. Old hooks usage in pages: **CLEAN**
+`useEngine()` returns `EngineOutputs` directly (not a query object — no `.isLoading`). The debug block needs to reflect this: show keys and JSON of the returned object.
 
-No `.tsx` page file imports from `@/hooks/useEngine`. The three input pages (FoncierePage, ExploitationPage, LoyerDynamiquePage) all use `computeEngine` directly.
+### Changes to `src/pages/ProjectionSocietesPage.tsx`
 
-### 2. `computeEngine(state)` (direct state pass): **CLEAN**
+**1. Add import (after line 8):**
+```ts
+import { useEngine } from "@/hooks/useEngine";
+```
 
-No occurrence found. All three pages construct explicit `EngineInputs` objects with individual fields.
+**2. Add hook call (after line 50, inside component):**
+```ts
+const engine = useEngine();
+```
 
-### 3. Page-by-page verification
+**3. Add debug blocks in JSX (after `<ProjectionHeader />`, ~line 58):**
+```tsx
+<Card className="border-yellow-500">
+  <CardHeader><CardTitle className="text-sm">ENGINE STATUS (debug)</CardTitle></CardHeader>
+  <CardContent className="text-xs space-y-1">
+    <p>hasData: {String(!!engine)}</p>
+    <p>keys: {Object.keys(engine || {}).join(", ")}</p>
+  </CardContent>
+</Card>
+<pre className="bg-muted p-4 rounded text-xs overflow-auto max-h-64">
+  {JSON.stringify(engine, null, 2)}
+</pre>
+```
 
-| Page | Pattern | Status |
-|---|---|---|
-| `FoncierePage.tsx` | `useMemo` → explicit `EngineInputs` → `computeEngine(engineInputs)` | Correct |
-| `ExploitationPage.tsx` | `useMemo` → explicit fields with `exploitation: form` override | Correct |
-| `LoyerDynamiquePage.tsx` | `useMemo` → explicit fields with `loyerDynamique: { rentPlan: phases }` | Correct |
+Note: `isLoading` is not available since `useEngine()` destructures only `data` from `useQuery`. The debug shows `hasData` and object keys instead, which confirms the backend responded.
 
-### 4. Imports: **CLEAN**
-
-All three pages import `computeEngine` from `@/engine/engine` and `EngineInputs` from `@/engine/engineTypes`.
-
-### 5. Remaining reference: `src/hooks/useEngine.ts`
-
-This file still exists and exports `useEngine`, `useEngineWithOverrides`, `useEngineWithScenario`, and `fetchEngine`. However:
-
-- **No page imports from it** — confirmed by search.
-- `useEngineWithScenario` and `fetchEngine` are still needed for output/projection pages (future integration). The engine inspector components (`src/components/engine/`) may also reference it.
-- **No action required now.** This file is the hook layer for output pages and should remain available.
-
-### 6. Summary
-
-| Item | Result |
-|---|---|
-| Files modified (previous step) | `FoncierePage.tsx`, `ExploitationPage.tsx`, `LoyerDynamiquePage.tsx` |
-| Files verified clean | All `.tsx` pages — no stale imports from `useEngine` |
-| `computeEngine(state)` violations | None |
-| Explicit `EngineInputs` contract | Respected in all 3 input pages |
-| `useEngine.ts` hook file | Retained — needed for future output pages |
-
-**Migration is complete.** All input pages call `computeEngine()` with a strict `EngineInputs` object. No backend-hitting hooks remain on configuration pages.
+No other changes.
 
