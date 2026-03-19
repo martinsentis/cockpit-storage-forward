@@ -6,6 +6,7 @@
 import { ProjectionHeader } from "@/components/ProjectionHeader";
 import { ProjectionHorizonSlider } from "@/components/ProjectionHorizonSlider";
 import { useScenario } from "@/contexts/ScenarioContext";
+import { useEngine } from "@/hooks/useEngine";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -48,6 +49,7 @@ export default function ProjectionSocietesPage() {
   const { scenarioState } = useScenario();
   const projectionYears = Math.max(1, Math.ceil(scenarioState.horizonMonths / 12));
   const mockData = generateMockData(projectionYears);
+  const engine = useEngine();
 
   return (
     <div className="flex gap-6">
@@ -56,6 +58,17 @@ export default function ProjectionSocietesPage() {
         <h1 className="text-2xl font-bold">Projection sociétés</h1>
 
         <ProjectionHeader />
+
+        <Card className="border-yellow-500">
+          <CardHeader><CardTitle className="text-sm">ENGINE STATUS (debug)</CardTitle></CardHeader>
+          <CardContent className="text-xs space-y-1">
+            <p>hasData: {String(!!engine)}</p>
+            <p>keys: {Object.keys(engine || {}).join(", ")}</p>
+          </CardContent>
+        </Card>
+        <pre className="bg-muted p-4 rounded text-xs overflow-auto max-h-64">
+          {JSON.stringify(engine, null, 2)}
+        </pre>
 
         {/* Indicateurs par entité */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
