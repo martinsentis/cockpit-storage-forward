@@ -6,6 +6,7 @@
 import { ProjectionHeader } from "@/components/ProjectionHeader";
 import { ProjectionHorizonSlider } from "@/components/ProjectionHorizonSlider";
 import { useScenario } from "@/contexts/ScenarioContext";
+import { useEngine } from "@/hooks/useEngine";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
