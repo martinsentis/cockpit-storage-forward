@@ -59,6 +59,17 @@ export default function ProjectionSocietesPage() {
 
         <ProjectionHeader />
 
+        <Card className="border-yellow-500">
+          <CardHeader><CardTitle className="text-sm">ENGINE STATUS (debug)</CardTitle></CardHeader>
+          <CardContent className="text-xs space-y-1">
+            <p>hasData: {String(!!engine)}</p>
+            <p>keys: {Object.keys(engine || {}).join(", ")}</p>
+          </CardContent>
+        </Card>
+        <pre className="bg-muted p-4 rounded text-xs overflow-auto max-h-64">
+          {JSON.stringify(engine, null, 2)}
+        </pre>
+
         {/* Indicateurs par entité */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Card Exploitation enrichie */}
