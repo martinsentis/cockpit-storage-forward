@@ -57,33 +57,6 @@ export function useEngine(): EngineOutputs {
   return data;
 }
 
-export function useEngineWithOverrides(overrides: Partial<EngineInputs>): EngineOutputs {
-  const { state } = useProject();
-
-  const inputs = useMemo<EngineInputs>(
-    () => ({
-      projet: state.projet,
-      build: state.build,
-      financement: state.financement,
-      exploitation: state.exploitation,
-      fonciere: state.fonciere,
-      loyerDynamique: state.loyerDynamique,
-      gouvernance: state.gouvernance,
-      fiscalite: state.fiscalite,
-      ...overrides,
-    }),
-    [state, overrides],
-  );
-
-  const { data } = useQuery({
-    queryKey: ["engine", inputs],
-    queryFn: () => fetchEngine(inputs),
-    initialData: computeEngine(inputs),
-    staleTime: 10_000,
-  });
-
-  return data;
-}
 
 /**
  * useEngineWithScenario — Merges ScenarioState overrides into EngineInputs.
