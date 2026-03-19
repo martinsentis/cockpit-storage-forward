@@ -49,6 +49,7 @@ export default function ProjectionSocietesPage() {
   const { scenarioState } = useScenario();
   const projectionYears = Math.max(1, Math.ceil(scenarioState.horizonMonths / 12));
   const mockData = generateMockData(projectionYears);
+  const engine = useEngine();
 
   return (
     <div className="flex gap-6">
