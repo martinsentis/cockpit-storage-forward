@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BookOpen } from "lucide-react";
-import type { BackendMonthlyResult } from "@/engine/useEngine";
+import type { BackendMonthlyResult } from "@/hooks/useEngine";
 
 interface Props {
   data?: BackendMonthlyResult[];
