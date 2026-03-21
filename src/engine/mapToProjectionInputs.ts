@@ -131,7 +131,7 @@ function mapDebt(d: DebtItem): ProjectionDebt {
   return {
     debt: {
       principalAmount: d.amount,
-      nominalRateAnnual: d.annualRate,
+      nominalRateAnnual: d.annualRate / 100,
       insuranceRateAnnual,
       totalDurationMonths: d.durationMonths,
       defermentMonths: d.deferralMonths ?? 0,
