@@ -97,7 +97,7 @@ export default function ProjectionAssociesPage() {
   const valorisationExploitation = lastEbe * exploitationEBEMultiple;
   const tresorerieExploitation   = lastMonth?.cashEnd ?? 0;
   const valorisationFonciere     = fonciereValuation;
-  const tresorerieF onciere       = lastMonth?.sciCashEnd ?? 0;
+  const tresorerieFonciere       = lastMonth?.sciCashEnd ?? 0;
   const totalEquity = valorisationExploitation + tresorerieExploitation + valorisationFonciere + tresorerieFonciere;
 
   // ── Totaux pour fiches associés ──────────────────────────────
