@@ -6,13 +6,7 @@
  */
 
 import type { EngineInputs } from "./engineTypes";
-import type {
-  CapacityPhase,
-  ChargeItem,
-  DebtItem,
-  Gestionnaire,
-  RentStrategyMode,
-} from "@/types/project";
+import type { CapacityPhase, ChargeItem, DebtItem, Gestionnaire, RentStrategyMode } from "@/types/project";
 
 // ══════════════════════════════════════════════════════════════
 // Backend contract types
@@ -136,8 +130,7 @@ function mapDebt(d: DebtItem): ProjectionDebt {
 }
 
 function mapChargeToOperating(c: ChargeItem): OperatingCharge {
-  const monthlyAmount =
-    c.frequency === "ANNUELLE" ? c.amountInput / 12 : c.amountInput;
+  const monthlyAmount = c.frequency === "ANNUELLE" ? c.amountInput / 12 : c.amountInput;
   return {
     categoryCode: "SAS_OPEX",
     monthlyAmount,
@@ -147,9 +140,7 @@ function mapChargeToOperating(c: ChargeItem): OperatingCharge {
 
 function mapGestionnaireToOperating(g: Gestionnaire): OperatingCharge {
   const monthlyAmount =
-    g.type === "PRESTATAIRE"
-      ? g.facturationMensuelle
-      : g.salaireBrut * (1 + g.tauxChargesPatronales);
+    g.type === "PRESTATAIRE" ? g.facturationMensuelle : g.salaireBrut * (1 + g.tauxChargesPatronales);
   return {
     categoryCode: "SAS_OPEX",
     monthlyAmount,
@@ -170,7 +161,7 @@ function buildRentConstraints(inputs: EngineInputs): RentConstraints {
   // Pass through strategy parameters for modes that need them
   if (phase.strategy.parameters) {
     if (backendMode === "FIXE" && phase.strategy.parameters.fixed_rent_amount != null) {
-      constraints.monthlyRent = phase.strategy.parameters.fixed_rent_amount;
+      constraints.fixedRentAmount = phase.strategy.parameters.fixed_rent_amount;
     }
   }
 
@@ -190,13 +181,9 @@ function deriveCcaPriorityRatio(inputs: EngineInputs): number {
 // Main adapter
 // ══════════════════════════════════════════════════════════════
 
-export function mapEngineInputsToProjectionInputs(
-  inputs: EngineInputs
-): ProjectionInputs {
+export function mapEngineInputsToProjectionInputs(inputs: EngineInputs): ProjectionInputs {
   // Revenue params from first active phase (or first phase)
-  const activePhases = inputs.exploitation.capacityPhases.filter(
-    (p) => p.status === "ACTIVE"
-  );
+  const activePhases = inputs.exploitation.capacityPhases.filter((p) => p.status === "ACTIVE");
   const refPhase = activePhases[0] ?? inputs.exploitation.capacityPhases[0];
 
   return {
