@@ -49,17 +49,18 @@ function buildSciRows(months: BackendMonthlyResult[]) {
     const revenue = cat["SCI_RENT"] ?? 0;
     const interest = Math.abs(cat["SCI_DEBT_INTEREST"] ?? 0);
     const principal = Math.abs(cat["SCI_DEBT_PRINCIPAL"] ?? 0);
+    const insurance = Math.abs(cat["SCI_DEBT_INSURANCE"] ?? 0);
     const tax = Math.abs(cat["SCI_TAX"] ?? 0);
-    const ebe = revenue;
-    const resultatNet = ebe - interest - tax;
+    const ebe = revenue - interest; // loyer - charges financières
+    const resultatNet = ebe - tax;
     const cfOp = ebe - tax;
-    const debtService = interest + principal;
+    const debtService = interest + principal + insurance;
     const cfNet = m.sciCashEnd - (i === 0 ? 0 : prevCash);
     prevCash = m.sciCashEnd;
     return {
       mois: m.monthIndex + 1,
       revenus: revenue,
-      charges: 0,
+      charges: interest, // intérêts = principale charge SCI
       ebe,
       amort: 0,
       resExpl: ebe,
