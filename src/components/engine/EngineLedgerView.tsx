@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Table, TableHeader, TableHead, TableRow, TableBody, TableCell } from "@/components/ui/table";
 import { Search } from "lucide-react";
-import type { BackendMonthlyResult } from "@/engine/useEngine";
+import type { BackendMonthlyResult } from "@/hooks/useEngine";
 
 interface Props {
   data?: BackendMonthlyResult[];
