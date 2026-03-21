@@ -22,8 +22,8 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
-import { useMonthlyResults } from "@/engine/useEngine";
-import type { BackendMonthlyResult } from "@/engine/useEngine";
+import { useMonthlyResults } from "@/hooks/useEngine";
+import type { BackendMonthlyResult } from "@/hooks/useEngine";
 
 // Agrège les données mensuelles en années
 function toYearlyData(months: BackendMonthlyResult[]) {
