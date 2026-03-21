@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Table, TableHeader, TableHead, TableRow, TableBody, TableCell } from "@/components/ui/table";
 import { Search } from "lucide-react";
-import type { BackendMonthlyResult } from "@/engine/useEngine";
+import type { BackendMonthlyResult } from "@/hooks/useEngine";
 
 const fmt = (v: number) => (v === 0 ? "—" : v.toLocaleString("fr-FR", { maximumFractionDigits: 0 }) + " €");
 
