@@ -1,8 +1,8 @@
 import { ProjectionHeader } from "@/components/ProjectionHeader";
 import { ProjectionHorizonSlider } from "@/components/ProjectionHorizonSlider";
 import { useScenario } from "@/contexts/ScenarioContext";
-import { useEngine, useMonthlyResults } from "@/engine/useEngine";
-import type { BackendMonthlyResult } from "@/engine/useEngine";
+import { useEngine, useMonthlyResults } from "@/hooks/useEngine";
+import type { BackendMonthlyResult } from "@/hooks/useEngine";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
