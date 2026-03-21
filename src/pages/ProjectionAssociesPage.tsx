@@ -15,8 +15,8 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
 } from "recharts";
 import { DoorOpen, TrendingUp, Users2, BarChart3 } from "lucide-react";
-import { useMonthlyResults } from "@/engine/useEngine";
-import type { BackendMonthlyResult } from "@/engine/useEngine";
+import { useMonthlyResults } from "@/hooks/useEngine";
+import type { BackendMonthlyResult } from "@/hooks/useEngine";
 
 const fmt = (v: number) =>
   v.toLocaleString("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
