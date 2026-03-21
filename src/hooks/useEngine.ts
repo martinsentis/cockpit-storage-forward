@@ -58,7 +58,6 @@ export function useEngine(): EngineOutputs {
   return data;
 }
 
-
 /**
  * useEngineWithScenario — Merges ScenarioState overrides into EngineInputs.
  */
@@ -103,4 +102,54 @@ export function useEngineWithScenario(): EngineOutputs {
   });
 
   return data;
+}
+
+// ══════════════════════════════════════════════════════════════
+// Type brut renvoyé par le backend (série mensuelle complète)
+// ══════════════════════════════════════════════════════════════
+export interface BackendMonthlyResult {
+  monthIndex: number;
+  cashEnd: number;
+  sciCashEnd: number;
+  dscr: number;
+  projectedByCategory?: Record<string, number>;
+  warnings?: string[];
+}
+
+async function fetchMonthlyResults(inputs: EngineInputs): Promise<BackendMonthlyResult[]> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  const payload = mapEngineInputsToProjectionInputs(inputs);
+  const res = await fetch("https://pilotagebox-production.up.railway.app/run-projection", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: controller.signal,
+  });
+  clearTimeout(timeout);
+  if (!res.ok) throw new Error("Engine API error");
+  return res.json();
+}
+
+export function useMonthlyResults(): BackendMonthlyResult[] {
+  const { state } = useProject();
+  const inputs = useMemo<EngineInputs>(
+    () => ({
+      projet: state.projet,
+      build: state.build,
+      financement: state.financement,
+      exploitation: state.exploitation,
+      fonciere: state.fonciere,
+      loyerDynamique: state.loyerDynamique,
+      gouvernance: state.gouvernance,
+      fiscalite: state.fiscalite,
+    }),
+    [state],
+  );
+  const { data } = useQuery({
+    queryKey: ["engine-monthly", inputs],
+    queryFn: () => fetchMonthlyResults(inputs),
+    staleTime: 10_000,
+  });
+  return data ?? [];
 }
