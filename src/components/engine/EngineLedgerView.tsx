@@ -45,7 +45,7 @@ export default function EngineLedgerView({ data }: Props) {
   // Déplie chaque mois en lignes de flux
   const rows: { mois: number; entite: string; type: string; montant: number }[] = [];
   for (const m of data) {
-    const cat = m.projectedByCategory ?? {};
+    const cat: Record<string, number> = m.projectedByCategory ?? {};
     for (const [key, amount] of Object.entries(cat)) {
       if (amount === 0) continue;
       rows.push({
