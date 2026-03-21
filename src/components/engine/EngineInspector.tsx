@@ -2,9 +2,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import EngineMonthlyPnL from "./EngineMonthlyPnL";
 import EngineFormulaInspector from "./EngineFormulaInspector";
 import EngineLedgerView from "./EngineLedgerView";
+import { useMonthlyResults } from "@/engine/useEngine";
 
 export default function EngineInspector() {
-  const projectionData = null;
+  const data = useMonthlyResults();
 
   return (
     <Tabs defaultValue="pnl" className="space-y-4">
@@ -13,15 +14,14 @@ export default function EngineInspector() {
         <TabsTrigger value="formulas">Explication des calculs</TabsTrigger>
         <TabsTrigger value="ledger">Ledger des flux</TabsTrigger>
       </TabsList>
-
       <TabsContent value="pnl">
-        <EngineMonthlyPnL data={projectionData} />
+        <EngineMonthlyPnL data={data} />
       </TabsContent>
       <TabsContent value="formulas">
-        <EngineFormulaInspector data={projectionData} />
+        <EngineFormulaInspector data={data} />
       </TabsContent>
       <TabsContent value="ledger">
-        <EngineLedgerView data={projectionData} />
+        <EngineLedgerView data={data} />
       </TabsContent>
     </Tabs>
   );
