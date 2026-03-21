@@ -1,9 +1,3 @@
-// TODO moteur financier
-// Cet écran est une vue bancaire du scénario.
-// Les valeurs affichées sont des placeholders.
-// Les calculs réels (CAF, service de dette, DSCR, trésorerie) seront fournis par le moteur financier.
-// Les financements créés ici deviendront des DebtItem dans le working state.
-
 import { useState } from "react";
 import { useScenario } from "@/contexts/ScenarioContext";
 import { ProjectionHeader } from "@/components/ProjectionHeader";
@@ -15,35 +9,70 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import {
-  Select, SelectTrigger, SelectContent, SelectItem, SelectValue,
-} from "@/components/ui/select";
-import {
-  Table, TableHeader, TableRow, TableHead, TableBody, TableCell,
-} from "@/components/ui/table";
-import {
-  ResponsiveContainer, ComposedChart, Bar, LineChart, Line,
-  XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer,
+  ComposedChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
 } from "recharts";
+import { useMonthlyResults } from "@/engine/useEngine";
+import type { BackendMonthlyResult } from "@/engine/useEngine";
 
+// Agrège les données mensuelles en années
+function toYearlyData(months: BackendMonthlyResult[]) {
+  const years: {
+    year: number;
+    revenue: number;
+    ebe: number;
+    caf: number;
+    debtService: number;
+    dscr: number;
+    cashAfterDebt: number;
+    cash: number;
+  }[] = [];
 
+  for (let y = 0; y < Math.ceil(months.length / 12); y++) {
+    const slice = months.slice(y * 12, y * 12 + 12);
+    const last = slice[slice.length - 1];
+    const cat = (m: BackendMonthlyResult) => m.projectedByCategory ?? {};
 
-const generateBankProjection = (years: number) =>
-  Array.from({ length: years }, (_, i) => ({
-    year: i + 1,
-    revenue: 0,
-    ebe: 0,
-    caf: 0,
-    debtService: 0,
-    dscr: 0,
-    cashAfterDebt: 0,
-    cash: 0,
-  }));
+    const revenue = slice.reduce((s, m) => s + (cat(m)["SAS_REVENUE"] ?? 0), 0);
+    const opex = slice.reduce((s, m) => s + Math.abs(cat(m)["SAS_OPEX"] ?? 0), 0);
+    const rent = slice.reduce((s, m) => s + Math.abs(cat(m)["SAS_RENT"] ?? 0), 0);
+    const tax = slice.reduce((s, m) => s + Math.abs(cat(m)["SAS_TAX"] ?? 0), 0);
+    const dInterest = slice.reduce((s, m) => s + Math.abs(cat(m)["SAS_EXP_DEBT_INTEREST"] ?? 0), 0);
+    const dPrincipal = slice.reduce((s, m) => s + Math.abs(cat(m)["SAS_EXP_DEBT_PRINCIPAL"] ?? 0), 0);
+
+    const ebe = revenue - opex - rent;
+    const caf = ebe - tax;
+    const debtService = dInterest + dPrincipal;
+    const dscrValues = slice.map((m) => m.dscr).filter((d) => d > 0);
+    const dscr = dscrValues.length > 0 ? dscrValues.reduce((a, b) => a + b, 0) / dscrValues.length : 0;
+
+    years.push({
+      year: y + 1,
+      revenue: Math.round(revenue),
+      ebe: Math.round(ebe),
+      caf: Math.round(caf),
+      debtService: Math.round(debtService),
+      dscr: Math.round(dscr * 100) / 100,
+      cashAfterDebt: Math.round(caf - debtService),
+      cash: Math.round(last?.cashEnd ?? 0),
+    });
+  }
+  return years;
+}
 
 export default function ProjectionBanquePage() {
   const { scenarioState } = useScenario();
-  const projectionYears = Math.max(1, Math.ceil(scenarioState.horizonMonths / 12));
-
+  const monthlyResults = useMonthlyResults();
   const [bankMode, setBankMode] = useState<"financing" | "monitoring">("financing");
   const [entity, setEntity] = useState<FinancingEntity>("FONCIERE");
   const [financingType, setFinancingType] = useState<DebtType>("BANK_LOAN");
@@ -52,15 +81,20 @@ export default function ProjectionBanquePage() {
   const [loanDuration, setLoanDuration] = useState(0);
   const [gracePeriod, setGracePeriod] = useState(0);
 
-  const data = generateBankProjection(projectionYears);
+  const data = toYearlyData(monthlyResults);
+
+  // KPIs résumé (moyenne sur toute la projection)
+  const avgDscr =
+    data.length > 0 ? data.reduce((s, r) => s + r.dscr, 0) / data.filter((r) => r.dscr > 0).length || 0 : 0;
+  const totalCaf = data.reduce((s, r) => s + r.caf, 0);
+  const totalDebtService = data.reduce((s, r) => s + r.debtService, 0);
+  const minCash = data.length > 0 ? Math.min(...data.map((r) => r.cash)) : 0;
 
   return (
     <div className="flex gap-6">
       <ProjectionHorizonSlider />
       <div className="flex-1 space-y-6 p-6">
         <ProjectionHeader />
-
-        {/* Mode switch */}
         <div className="flex items-center gap-3">
           <Label className="text-sm font-medium">Simulation financement</Label>
           <Switch
@@ -70,7 +104,6 @@ export default function ProjectionBanquePage() {
           <Label className="text-sm font-medium">Suivi bancaire</Label>
         </div>
 
-        {/* Hypothèses de financement */}
         {bankMode === "financing" && (
           <Card>
             <CardHeader>
@@ -80,10 +113,14 @@ export default function ProjectionBanquePage() {
               <div className="space-y-2">
                 <Label>Entité porteuse</Label>
                 <Select value={entity} onValueChange={(v) => setEntity(v as FinancingEntity)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     {(Object.entries(FINANCING_ENTITY_LABELS) as [FinancingEntity, string][]).map(([key, label]) => (
-                      <SelectItem key={key} value={key}>{label}</SelectItem>
+                      <SelectItem key={key} value={key}>
+                        {label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -91,10 +128,14 @@ export default function ProjectionBanquePage() {
               <div className="space-y-2">
                 <Label>Type de financement</Label>
                 <Select value={financingType} onValueChange={(v) => setFinancingType(v as DebtType)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     {(Object.entries(DEBT_TYPE_LABELS) as [DebtType, string][]).map(([key, label]) => (
-                      <SelectItem key={key} value={key}>{label}</SelectItem>
+                      <SelectItem key={key} value={key}>
+                        {label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -105,15 +146,28 @@ export default function ProjectionBanquePage() {
               </div>
               <div className="space-y-2">
                 <Label>Taux d'intérêt annuel (%)</Label>
-                <Input type="number" step="0.01" value={interestRate || ""} onChange={(e) => setInterestRate(Number(e.target.value))} />
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={interestRate || ""}
+                  onChange={(e) => setInterestRate(Number(e.target.value))}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Durée (années)</Label>
-                <Input type="number" value={loanDuration || ""} onChange={(e) => setLoanDuration(Number(e.target.value))} />
+                <Input
+                  type="number"
+                  value={loanDuration || ""}
+                  onChange={(e) => setLoanDuration(Number(e.target.value))}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Différé d'amortissement (années)</Label>
-                <Input type="number" value={gracePeriod || ""} onChange={(e) => setGracePeriod(Number(e.target.value))} />
+                <Input
+                  type="number"
+                  value={gracePeriod || ""}
+                  onChange={(e) => setGracePeriod(Number(e.target.value))}
+                />
               </div>
             </CardContent>
           </Card>
@@ -121,31 +175,6 @@ export default function ProjectionBanquePage() {
 
         <Separator />
 
-        {/* Résumé financement */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Résumé du financement</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Annuité estimée</p>
-                <p className="text-xl font-semibold">0 €</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Service de la dette annuel</p>
-                <p className="text-xl font-semibold">0 €</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Capital restant dû final</p>
-                <p className="text-xl font-semibold">0 €</p>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mt-4">Les calculs seront fournis par le moteur financier.</p>
-          </CardContent>
-        </Card>
-
-        {/* Soutenabilité bancaire */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Soutenabilité bancaire</CardTitle>
@@ -153,29 +182,25 @@ export default function ProjectionBanquePage() {
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
-                <p className="text-sm text-muted-foreground">CAF</p>
-                <p className="text-xl font-semibold">0 €</p>
+                <p className="text-sm text-muted-foreground">CAF totale</p>
+                <p className="text-xl font-semibold">{totalCaf.toLocaleString()} €</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Service de la dette</p>
-                <p className="text-xl font-semibold">0 €</p>
+                <p className="text-sm text-muted-foreground">Service de la dette total</p>
+                <p className="text-xl font-semibold">{totalDebtService.toLocaleString()} €</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">DSCR</p>
-                <p className="text-xl font-semibold">0 x</p>
+                <p className="text-sm text-muted-foreground">DSCR moyen</p>
+                <p className="text-xl font-semibold">{avgDscr.toFixed(2)} x</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Trésorerie minimale</p>
-                <p className="text-xl font-semibold">0 €</p>
+                <p className="text-xl font-semibold">{minCash.toLocaleString()} €</p>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-4">
-              Ces indicateurs permettent d'évaluer la capacité du projet à supporter son financement.
-            </p>
           </CardContent>
         </Card>
 
-        {/* Graphiques bancaires */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Graphiques bancaires</CardTitle>
@@ -189,9 +214,16 @@ export default function ProjectionBanquePage() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="year" />
                     <YAxis />
-                    <Tooltip />
+                    <Tooltip formatter={(v: number) => v.toLocaleString() + " €"} />
                     <Bar dataKey="caf" name="CAF" fill="hsl(var(--primary))" />
-                    <Line type="monotone" dataKey="debtService" name="Service dette" stroke="hsl(var(--destructive))" strokeWidth={2} dot={false} />
+                    <Line
+                      type="monotone"
+                      dataKey="debtService"
+                      name="Service dette"
+                      stroke="hsl(var(--destructive))"
+                      strokeWidth={2}
+                      dot={false}
+                    />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
@@ -214,8 +246,14 @@ export default function ProjectionBanquePage() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="year" />
                     <YAxis />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="cash" name="Trésorerie" stroke="hsl(var(--accent-foreground))" strokeWidth={2} />
+                    <Tooltip formatter={(v: number) => v.toLocaleString() + " €"} />
+                    <Line
+                      type="monotone"
+                      dataKey="cash"
+                      name="Trésorerie"
+                      stroke="hsl(var(--accent-foreground))"
+                      strokeWidth={2}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -223,7 +261,6 @@ export default function ProjectionBanquePage() {
           </CardContent>
         </Card>
 
-        {/* Tableau bancaire annuel */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Tableau bancaire annuel</CardTitle>
