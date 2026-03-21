@@ -2,7 +2,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import EngineMonthlyPnL from "./EngineMonthlyPnL";
 import EngineFormulaInspector from "./EngineFormulaInspector";
 import EngineLedgerView from "./EngineLedgerView";
-import { useMonthlyResults } from "@/engine/useEngine";
+import { useMonthlyResults } from "@/hooks/useEngine";
 
 export default function EngineInspector() {
   const data = useMonthlyResults();
