@@ -6,10 +6,10 @@
  */
 
 import type { EngineInputs } from "./engineTypes";
-import type { CapacityPhase, ChargeItem, DebtItem, Gestionnaire, RentStrategyMode } from "@/types/project";
+import type { CapacityPhase, ChargeItem, DebtItem, Gestionnaire, RentStrategyMode, ServiceItem } from "@/types/project";
 
 // ══════════════════════════════════════════════════════════════
-// Backend contract types
+// Backend contract types (alignés sur debtEngine.ts)
 // ══════════════════════════════════════════════════════════════
 
 interface TaxBracket {
@@ -29,6 +29,7 @@ interface ProjectionPhase {
   operationalStartMonth: number;
   rampUpStartMonth: number;
   rampUpDurationMonths: number;
+  rampCurve?: "LINEAR" | "FAST_START" | "SLOW_START";
   isActive: boolean;
 }
 
@@ -47,18 +48,22 @@ interface OperatingCharge {
 
 interface ProjectionDebt {
   debt: {
-    amount: number;
-    annualRate: number;
-    durationMonths: number;
-    startMonth: number;
+    principalAmount: number;
+    nominalRateAnnual: number;
+    insuranceRateAnnual: number;
+    totalDurationMonths: number;
+    defermentMonths?: number;
+    defermentType?: "NONE" | "INTEREST_ONLY" | "TOTAL";
   };
   state: {
     remainingPrincipal: number;
+    remainingMonths: number;
   };
 }
 
 interface RentConstraints {
   mode: string;
+  fixedRentAmount?: number;
   [key: string]: unknown;
 }
 
@@ -111,20 +116,30 @@ function mapPhase(p: CapacityPhase): ProjectionPhase {
     operationalStartMonth: p.startMonth,
     rampUpStartMonth: p.startMonth,
     rampUpDurationMonths: p.rampUpMonths,
+    rampCurve: p.rampCurve,
     isActive: p.status === "ACTIVE",
   };
 }
 
 function mapDebt(d: DebtItem): ProjectionDebt {
+  // Convertit assurance mensuelle (€) en taux annuel pour le moteur
+  const insuranceRateAnnual = d.amount > 0 ? (d.insuranceMonthly / d.amount) * 12 : 0;
+
+  // Convertit le type de différé
+  const defermentType = d.deferralType === "PARTIAL" ? "INTEREST_ONLY" : d.deferralType === "TOTAL" ? "TOTAL" : "NONE";
+
   return {
     debt: {
-      amount: d.amount,
-      annualRate: d.annualRate,
-      durationMonths: d.durationMonths,
-      startMonth: d.startMonth ?? 0,
+      principalAmount: d.amount,
+      nominalRateAnnual: d.annualRate,
+      insuranceRateAnnual,
+      totalDurationMonths: d.durationMonths,
+      defermentMonths: d.deferralMonths ?? 0,
+      defermentType,
     },
     state: {
       remainingPrincipal: d.amount,
+      remainingMonths: d.durationMonths,
     },
   };
 }
@@ -148,21 +163,29 @@ function mapGestionnaireToOperating(g: Gestionnaire): OperatingCharge {
   };
 }
 
+function mapService(s: ServiceItem) {
+  // Seul le type PAR_M2 est supporté par le moteur (revenu × surface louée)
+  // Les services FIXE et PAR_BOX sont ignorés pour l'instant
+  if (!s.actif || s.type !== "PAR_M2") return null;
+  return {
+    code: s.nom,
+    monthlyAmountPerLeasedM2: s.montantUnitaire,
+    isActive: true,
+  };
+}
+
 function buildRentConstraints(inputs: EngineInputs): RentConstraints {
   const plan = inputs.loyerDynamique.rentPlan;
   if (!plan || plan.length === 0) {
     return { mode: "AUTONOMIE_SCI" };
   }
+
   const phase = plan[0];
   const backendMode = RENT_MODE_MAP[phase.strategy.mode] ?? "AUTONOMIE_SCI";
-
   const constraints: RentConstraints = { mode: backendMode };
 
-  // Pass through strategy parameters for modes that need them
-  if (phase.strategy.parameters) {
-    if (backendMode === "FIXE" && phase.strategy.parameters.fixed_rent_amount != null) {
-      constraints.fixedRentAmount = phase.strategy.parameters.fixed_rent_amount;
-    }
+  if (backendMode === "FIXE" && phase.strategy.parameters.fixed_rent_amount != null) {
+    constraints.fixedRentAmount = phase.strategy.parameters.fixed_rent_amount; // ✅ corrigé
   }
 
   return constraints;
@@ -182,7 +205,6 @@ function deriveCcaPriorityRatio(inputs: EngineInputs): number {
 // ══════════════════════════════════════════════════════════════
 
 export function mapEngineInputsToProjectionInputs(inputs: EngineInputs): ProjectionInputs {
-  // Revenue params from first active phase (or first phase)
   const activePhases = inputs.exploitation.capacityPhases.filter((p) => p.status === "ACTIVE");
   const refPhase = activePhases[0] ?? inputs.exploitation.capacityPhases[0];
 
@@ -192,7 +214,6 @@ export function mapEngineInputsToProjectionInputs(inputs: EngineInputs): Project
     sciInitialCash: inputs.financement.sciInitialCash,
     projectStartDate: inputs.projet.projectStartDate,
 
-    // Hardcoded default tax schedule (IS barème PME)
     taxSchedules: [
       {
         startDate: "2024-01",
@@ -216,7 +237,7 @@ export function mapEngineInputsToProjectionInputs(inputs: EngineInputs): Project
       indexationMonth: 0,
     },
 
-    services: inputs.exploitation.services.filter((s) => s.actif),
+    services: inputs.exploitation.services.map(mapService).filter((s): s is NonNullable<typeof s> => s !== null),
 
     operatingCharges: [
       ...inputs.exploitation.charges.map(mapChargeToOperating),
