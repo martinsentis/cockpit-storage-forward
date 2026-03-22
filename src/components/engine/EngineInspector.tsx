@@ -5,7 +5,8 @@ import EngineLedgerView from "./EngineLedgerView";
 import { useMonthlyResults } from "@/hooks/useEngine";
 
 export default function EngineInspector() {
-  const data = useMonthlyResults();
+  const { data } = useMonthlyResults();
+  const monthlyData = data ?? [];
 
   return (
     <Tabs defaultValue="pnl" className="space-y-4">
