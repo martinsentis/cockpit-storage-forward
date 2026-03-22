@@ -236,8 +236,6 @@ function SciTable({ rows }: { rows: ReturnType<typeof buildSciRows> }) {
 // ── Export principal ─────────────────────────────────────────
 export default function EngineMonthlyPnL({ data }: Props) {
   if (!data || data.length === 0) {
-
-  if (!data || data.length === 0) {
     return (
       <div className="h-32 flex flex-col items-center justify-center gap-2 text-muted-foreground">
         <Search className="h-5 w-5" />
