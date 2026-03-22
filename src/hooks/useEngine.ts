@@ -116,16 +116,18 @@ export interface BackendMonthlyResult {
   warnings?: string[];
 }
 
-async function fetchMonthlyResults(inputs: ProjectionInputs): Promise<BackendMonthlyResult[]> {
+const API_BASE_URL = "https://pilotagebox-production.up.railway.app";
+
+async function fetchMonthlyResults(inputs: EngineInputs): Promise<BackendMonthlyResult[]> {
   const controller = new AbortController();
-  // ✅ 20 secondes (AUTONOMIE_SCI peut être lent)
   const timeout = setTimeout(() => controller.abort(), 20_000);
 
   try {
+    const payload = mapEngineInputsToProjectionInputs(inputs);
     const res = await fetch(`${API_BASE_URL}/run-projection`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(inputs),
+      body: JSON.stringify(payload),
       signal: controller.signal,
     });
 
@@ -137,7 +139,6 @@ async function fetchMonthlyResults(inputs: ProjectionInputs): Promise<BackendMon
     }
 
     const data = await res.json();
-    // Le backend retourne { months: [...] } ou directement [...]
     return Array.isArray(data) ? data : (data.months ?? []);
   } catch (err) {
     clearTimeout(timeout);
@@ -145,69 +146,47 @@ async function fetchMonthlyResults(inputs: ProjectionInputs): Promise<BackendMon
   }
 }
 
-
-// =============================================
-// CONSTANTE PARTAGÉE — un seul horizonMonths
-// =============================================
-const DEFAULT_HORIZON_MONTHS = 60;
-
 // =============================================
 // HOOK CENTRAL — useMonthlyResults
-// UN SEUL appel backend, mis en cache React Query
 // =============================================
 export function useMonthlyResults() {
-  const { project } = useProject();
-  const { state: scenarioState } = useScenario();
+  const { state } = useProject();
+  const { scenarioState } = useScenario();
 
-  const inputs = useMemo(() => {
-    if (!project) return null;
-    try {
-      // Merge scénario dans les inputs
-      const base = mapToProjectionInputs(project, DEFAULT_HORIZON_MONTHS);
-
-      // Override gestionnaire
-      if (scenarioState.gestionnaireNetMensuel > 0) {
-        base.operatingCharges = base.operatingCharges.map((c) =>
-          c.categoryCode === "SAS_OPEX" && c._isGestionnaire
-            ? { ...c, monthlyAmount: scenarioState.gestionnaireNetMensuel * 1.45 }
-            : c
-        );
-      }
-
-      // Override rent mode
-      if (scenarioState.rentPreset && scenarioState.rentPreset !== base.rentConstraints.mode) {
-        base.rentConstraints = {
-          ...base.rentConstraints,
-          mode: scenarioState.rentPreset as any,
+  const inputs = useMemo<EngineInputs>(() => {
+    const exploitation = {
+      ...state.exploitation,
+      capacityPhases: state.exploitation.capacityPhases.map((phase) => {
+        const override = scenarioState.phaseOverrides[phase.id];
+        return {
+          ...phase,
+          targetOccupancy: scenarioState.targetOccupancy,
+          ...(override?.rampUpMonths !== undefined ? { rampUpMonths: override.rampUpMonths } : {}),
+          ...(override?.rampCurve !== undefined ? { rampCurve: override.rampCurve } : {}),
         };
-        // Si on passe en FIXE via le preset, s'assurer que fixedRentAmount est défini
-        if (scenarioState.rentPreset === "FIXE") {
-          base.rentConstraints.fixedRentAmount = scenarioState.fixedRentAmount ?? 1000;
-        }
-      }
+      }),
+    };
 
-      return base;
-    } catch (e) {
-      console.error("[useMonthlyResults] mapToProjectionInputs failed:", e);
-      return null;
-    }
-  }, [project, scenarioState]);
-
-  const queryKey = useMemo(
-    () => ["monthly-results", DEFAULT_HORIZON_MONTHS, inputs],
-    [inputs]
-  );
+    return {
+      projet: {
+        ...state.projet,
+        horizonMonths: scenarioState.horizonMonths,
+      },
+      build: state.build,
+      financement: state.financement,
+      exploitation,
+      fonciere: state.fonciere,
+      loyerDynamique: state.loyerDynamique,
+      gouvernance: state.gouvernance,
+      fiscalite: state.fiscalite,
+    };
+  }, [state, scenarioState]);
 
   return useQuery<BackendMonthlyResult[]>({
-    queryKey,
-    queryFn: async () => {
-      if (!inputs) throw new Error("No inputs");
-      return fetchMonthlyResults(inputs);
-    },
-    enabled: !!inputs,
+    queryKey: ["monthly-results", inputs],
+    queryFn: () => fetchMonthlyResults(inputs),
     staleTime: 30_000,
     placeholderData: (prev) => prev,
   });
 }
-
 
