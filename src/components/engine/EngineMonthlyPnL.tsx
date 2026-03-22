@@ -178,6 +178,7 @@ function SciTable({ rows }: { rows: ReturnType<typeof buildSciRows> }) {
               <TableHead>Mois</TableHead>
               <TableHead className="text-right text-amber-600 font-semibold">Loyer reçu</TableHead>
               <TableHead className="text-right text-red-600">Intérêts dette</TableHead>
+              <TableHead className="text-right text-muted-foreground">Amortissement</TableHead>
               <TableHead className="text-right font-semibold">EBE</TableHead>
               <TableHead className="text-right">IS</TableHead>
               <TableHead className="text-right">Rés. net</TableHead>
