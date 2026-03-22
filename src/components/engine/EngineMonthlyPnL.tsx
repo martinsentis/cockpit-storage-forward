@@ -59,12 +59,14 @@ function buildSciRows(months: BackendMonthlyResult[]) {
     const ebe = loyer - interest;
     const debtService = interest + principal + insurance;
     const resNet = ebe - tax;
+    const amortissement = m.sciAmortization ?? 0;
     const cfNet = m.sciCashEnd - (i === 0 ? 0 : prevCash);
     prevCash = m.sciCashEnd;
     return {
       mois: m.monthIndex + 1,
       loyer,
       interest,
+      amortissement,
       ebe,
       tax,
       resNet,
