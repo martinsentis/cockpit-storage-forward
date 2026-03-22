@@ -77,6 +77,7 @@ export interface ProjectionInputs {
   sciDebts: { debt: BackendDebt; state: BackendDebtState }[];
   sciChargesCash: number;
   sciAmortization: number;
+  sciOtherRevenuesMonthly: number;
   ccaBalanceSas: number;
   ccaBalanceSci: number;
   distributableCashRate: number;
