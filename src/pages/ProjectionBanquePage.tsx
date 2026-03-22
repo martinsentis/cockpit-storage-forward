@@ -72,7 +72,7 @@ function toYearlyData(months: BackendMonthlyResult[]) {
 
 export default function ProjectionBanquePage() {
   const { scenarioState } = useScenario();
-  const monthlyResults = useMonthlyResults();
+  const { data: monthlyResults = [] } = useMonthlyResults();
   const [bankMode, setBankMode] = useState<"financing" | "monitoring">("financing");
   const [entity, setEntity] = useState<FinancingEntity>("FONCIERE");
   const [financingType, setFinancingType] = useState<DebtType>("BANK_LOAN");

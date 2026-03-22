@@ -5,7 +5,8 @@ import EngineLedgerView from "./EngineLedgerView";
 import { useMonthlyResults } from "@/hooks/useEngine";
 
 export default function EngineInspector() {
-  const data = useMonthlyResults();
+  const { data } = useMonthlyResults();
+  const monthlyData = data ?? [];
 
   return (
     <Tabs defaultValue="pnl" className="space-y-4">
@@ -15,13 +16,13 @@ export default function EngineInspector() {
         <TabsTrigger value="ledger">Ledger des flux</TabsTrigger>
       </TabsList>
       <TabsContent value="pnl">
-        <EngineMonthlyPnL data={data} />
+        <EngineMonthlyPnL data={monthlyData} />
       </TabsContent>
       <TabsContent value="formulas">
-        <EngineFormulaInspector data={data} />
+        <EngineFormulaInspector data={monthlyData} />
       </TabsContent>
       <TabsContent value="ledger">
-        <EngineLedgerView data={data} />
+        <EngineLedgerView data={monthlyData} />
       </TabsContent>
     </Tabs>
   );

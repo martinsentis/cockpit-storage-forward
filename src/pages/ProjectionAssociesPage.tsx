@@ -72,7 +72,7 @@ function toYearlyWaterfall(months: BackendMonthlyResult[]) {
 export default function ProjectionAssociesPage() {
   const { scenarioState, updateExitHypotheses } = useScenario();
   const { state } = useProject();
-  const monthlyResults = useMonthlyResults();
+  const { data: monthlyResults = [] } = useMonthlyResults();
 
   const projectionYears = Math.max(1, Math.ceil(scenarioState.horizonMonths / 12));
   const { fonciereValuation, exploitationEBEMultiple, repayCcaFirst } = scenarioState.exitHypotheses;
