@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Table, TableHeader, TableHead, TableRow, TableBody, TableCell } from "@/components/ui/table";
 import { Search } from "lucide-react";
 import type { BackendMonthlyResult } from "@/hooks/useEngine";
-import { useEngine } from "@/hooks/useEngine";
 
 const fmt = (v: number) => (v === 0 ? "—" : v.toLocaleString("fr-FR", { maximumFractionDigits: 0 }) + " €");
 const fmtPct = (v: number) => (v === 0 ? "—" : (v * 100).toFixed(1) + " %");
@@ -12,7 +11,7 @@ interface Props {
 }
 
 // ── Lignes SAS ───────────────────────────────────────────────
-function buildSasRows(months: BackendMonthlyResult[], prixM2: number, totalSurface: number) {
+function buildSasRows(months: BackendMonthlyResult[]) {
   let prevCash = months[0]?.cashEnd ?? 0;
   return months.map((m, i) => {
     const cat = m.projectedByCategory ?? {};
@@ -28,14 +27,14 @@ function buildSasRows(months: BackendMonthlyResult[], prixM2: number, totalSurfa
     const resNet = ebe - interest - tax;
     const cfNet = m.cashEnd - (i === 0 ? 0 : prevCash);
 
-    // % surface louée dérivé du revenu
-    const leasedSurface = prixM2 > 0 ? revenue / prixM2 : 0;
-    const occupancy = totalSurface > 0 ? leasedSurface / totalSurface : 0;
+    const pctLoue = m.activeSurface > 0
+      ? m.leasedSurface / m.activeSurface
+      : null;
 
     prevCash = m.cashEnd;
     return {
       mois: m.monthIndex + 1,
-      occupancy,
+      pctLoue,
       revenue,
       opex,
       loyer,
@@ -108,16 +107,16 @@ function SasTable({ rows }: { rows: ReturnType<typeof buildSasRows> }) {
                 <TableCell className="text-right">
                   <span
                     className={`font-medium ${
-                      row.occupancy === 0
+                      row.pctLoue == null
                         ? "text-muted-foreground"
-                        : row.occupancy >= 0.8
+                        : row.pctLoue >= 0.8
                           ? "text-green-600"
-                          : row.occupancy >= 0.5
+                          : row.pctLoue >= 0.5
                             ? "text-amber-600"
                             : "text-red-500"
                     }`}
                   >
-                    {fmtPct(row.occupancy)}
+                    {row.pctLoue != null ? Math.round(row.pctLoue * 100) + "%" : "—"}
                   </span>
                 </TableCell>
 
@@ -235,10 +234,6 @@ function SciTable({ rows }: { rows: ReturnType<typeof buildSciRows> }) {
 
 // ── Export principal ─────────────────────────────────────────
 export default function EngineMonthlyPnL({ data }: Props) {
-  const engine = useEngine();
-  const prixM2 = engine?.exploitation?.prixM2Global ?? 0;
-  const totalSurface = engine?.exploitation?.totalSurface ?? 0;
-
   if (!data || data.length === 0) {
     return (
       <div className="h-32 flex flex-col items-center justify-center gap-2 text-muted-foreground">
@@ -256,7 +251,7 @@ export default function EngineMonthlyPnL({ data }: Props) {
           Le loyer SCI (<span className="text-amber-600 font-medium">en orange</span>) est la charge intra-groupe versée
           à la foncière. Le % surface louée est calculé par rapport au capacitaire total.
         </p>
-        <SasTable rows={buildSasRows(data, prixM2, totalSurface)} />
+        <SasTable rows={buildSasRows(data)} />
       </div>
 
       <div className="space-y-3">
