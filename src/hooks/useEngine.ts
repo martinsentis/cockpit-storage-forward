@@ -25,7 +25,10 @@ async function fetchEngine(inputs: EngineInputs): Promise<EngineOutputs> {
     signal: controller.signal,
   });
   clearTimeout(timeout);
-  if (!res.ok) throw new Error("Engine API error");
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw new Error(`Engine API ${res.status}: ${errBody}`);
+  }
   const results = await res.json();
   return mapProjectionResultsToEngineOutputs(results);
 }
@@ -59,14 +62,15 @@ export function useEngine(): EngineOutputs {
   return data;
 }
 
-/**
- * useEngineWithScenario — Merges ScenarioState overrides into EngineInputs.
- */
-export function useEngineWithScenario(): EngineOutputs {
+// ══════════════════════════════════════════════════════════════
+// Shared inputs builder for scenario-aware hooks
+// ══════════════════════════════════════════════════════════════
+
+function useBuildScenarioInputs(): EngineInputs {
   const { state } = useProject();
   const { scenarioState } = useScenario();
 
-  const inputs = useMemo<EngineInputs>(() => {
+  return useMemo<EngineInputs>(() => {
     const exploitation = {
       ...state.exploitation,
       capacityPhases: state.exploitation.capacityPhases.map((phase) => {
@@ -94,6 +98,13 @@ export function useEngineWithScenario(): EngineOutputs {
       fiscalite: state.fiscalite,
     };
   }, [state, scenarioState]);
+}
+
+/**
+ * useEngineWithScenario — Merges ScenarioState overrides into EngineInputs.
+ */
+export function useEngineWithScenario(): EngineOutputs {
+  const inputs = useBuildScenarioInputs();
 
   const { data } = useQuery({
     queryKey: ["engine", inputs],
@@ -149,39 +160,10 @@ async function fetchMonthlyResults(inputs: EngineInputs): Promise<BackendMonthly
 
 // =============================================
 // HOOK CENTRAL — useMonthlyResults
+// Uses shared inputs from useBuildScenarioInputs
 // =============================================
 export function useMonthlyResults() {
-  const { state } = useProject();
-  const { scenarioState } = useScenario();
-
-  const inputs = useMemo<EngineInputs>(() => {
-    const exploitation = {
-      ...state.exploitation,
-      capacityPhases: state.exploitation.capacityPhases.map((phase) => {
-        const override = scenarioState.phaseOverrides[phase.id];
-        return {
-          ...phase,
-          targetOccupancy: scenarioState.targetOccupancy,
-          ...(override?.rampUpMonths !== undefined ? { rampUpMonths: override.rampUpMonths } : {}),
-          ...(override?.rampCurve !== undefined ? { rampCurve: override.rampCurve } : {}),
-        };
-      }),
-    };
-
-    return {
-      projet: {
-        ...state.projet,
-        horizonMonths: scenarioState.horizonMonths,
-      },
-      build: state.build,
-      financement: state.financement,
-      exploitation,
-      fonciere: state.fonciere,
-      loyerDynamique: state.loyerDynamique,
-      gouvernance: state.gouvernance,
-      fiscalite: state.fiscalite,
-    };
-  }, [state, scenarioState]);
+  const inputs = useBuildScenarioInputs();
 
   return useQuery<BackendMonthlyResult[]>({
     queryKey: ["monthly-results", inputs],

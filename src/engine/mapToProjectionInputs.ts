@@ -412,7 +412,7 @@ export function mapToProjectionInputs(project: any, horizonMonths = 60): Project
   // ── Projet ─────────────────────────────────────────────
   const projectStartDate = (project.projet?.projectStartDate ?? "2025-01").slice(0, 7);
 
-  const horizon: number = horizonMonths ?? project.projet?.horizonMonths ?? 60;
+  const horizon: number = project.projet?.horizonMonths ?? horizonMonths;
 
   // ── Fiscalité — déjà en décimal dans EngineInputs ──────
   const taxRate: number = project.fiscalite?.corporateTaxRate ?? 0.25;
