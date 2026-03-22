@@ -199,6 +199,9 @@ function SciTable({ rows }: { rows: ReturnType<typeof buildSciRows> }) {
                 {/* Intérêts */}
                 <TableCell className="text-right text-red-600">{fmt(row.interest)}</TableCell>
 
+                {/* Amortissement */}
+                <TableCell className="text-right text-muted-foreground">{fmt(row.amortissement)}</TableCell>
+
                 {/* EBE */}
                 <TableCell className={`text-right font-semibold ${row.ebe < 0 ? "text-red-600" : ""}`}>
                   {fmt(row.ebe)}

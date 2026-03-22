@@ -126,6 +126,8 @@ export interface BackendMonthlyResult {
   dscr: number;
   leasedSurface: number;
   activeSurface: number;
+  leasedSurfacePercent: number;
+  sciAmortization: number;
   projectedByCategory?: Record<string, number>;
   warnings?: string[];
 }

@@ -472,6 +472,12 @@ export function mapToProjectionInputs(project: any, horizonMonths = 60): Project
     sciDebts,
     sciChargesCash,
     sciAmortization,
+    sciOtherRevenuesMonthly: (project.fonciere?.otherRevenues ?? [])
+      .filter((r: any) => r.isActive !== false)
+      .reduce((sum: number, r: any) => {
+        const ht = r.prixType === 'TTC' ? (r.montant ?? 0) / (1 + (r.vatRate ?? 0)) : (r.montant ?? 0);
+        return sum + (r.frequency === 'ANNUELLE' ? ht / 12 : ht);
+      }, 0),
     rentConstraints,
     ccaBalanceSas,
     ccaBalanceSci,
