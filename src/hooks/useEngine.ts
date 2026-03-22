@@ -131,42 +131,70 @@ async function fetchMonthlyResults(inputs: EngineInputs): Promise<BackendMonthly
   return res.json();
 }
 
-export function useMonthlyResults(): BackendMonthlyResult[] {
-  const { state } = useProject();
-  const { scenarioState } = useScenario();
+// =============================================
+// CONSTANTE PARTAGÉE — un seul horizonMonths
+// =============================================
+const DEFAULT_HORIZON_MONTHS = 60;
 
-  const inputs = useMemo<EngineInputs>(() => {
-    // ── Override gestionnaire salary depuis le scénario ──
-    const gestionnaires = state.exploitation.gestionnaires.map((g) => {
-      if (g.type === "SALARIE" && g.actif && scenarioState.gestionnaireNetMensuel > 0) {
-        return { ...g, salaireBrut: scenarioState.gestionnaireNetMensuel };
+// =============================================
+// HOOK CENTRAL — useMonthlyResults
+// UN SEUL appel backend, mis en cache React Query
+// =============================================
+export function useMonthlyResults() {
+  const { project } = useProject();
+  const { state: scenarioState } = useScenario();
+
+  const inputs = useMemo(() => {
+    if (!project) return null;
+    try {
+      // Merge scénario dans les inputs
+      const base = mapToProjectionInputs(project, DEFAULT_HORIZON_MONTHS);
+
+      // Override gestionnaire
+      if (scenarioState.gestionnaireNetMensuel > 0) {
+        base.operatingCharges = base.operatingCharges.map((c) =>
+          c.categoryCode === "SAS_OPEX" && c._isGestionnaire
+            ? { ...c, monthlyAmount: scenarioState.gestionnaireNetMensuel * 1.45 }
+            : c
+        );
       }
-      return g;
-    });
 
-    // Si aucun gestionnaire salarié actif mais scénario en a un → l'ajouter
-    const hasActiveSalarie = gestionnaires.some((g) => g.type === "SALARIE" && g.actif);
-    const finalGestionnaires =
-      hasActiveSalarie || scenarioState.gestionnaireNetMensuel === 0
-        ? gestionnaires
-        : [
-            ...gestionnaires,
-            {
-              id: "scenario-gestionnaire",
-              nom: "Gestionnaire (scénario)",
-              type: "SALARIE" as const,
-              actif: true,
-              facturationMensuelle: 0,
-              prixType: "HT" as const,
-              vatRate: 0,
-              salaireBrut: scenarioState.gestionnaireNetMensuel,
-              tauxChargesPatronales: 0.42,
-              activeFromStart: true,
-              startMonth: 0,
-              hasEndMonth: false,
-              endMonth: null,
-            },
-          ];
+      // Override rent mode
+      if (scenarioState.rentPreset && scenarioState.rentPreset !== base.rentConstraints.mode) {
+        base.rentConstraints = {
+          ...base.rentConstraints,
+          mode: scenarioState.rentPreset as any,
+        };
+        // Si on passe en FIXE via le preset, s'assurer que fixedRentAmount est défini
+        if (scenarioState.rentPreset === "FIXE") {
+          base.rentConstraints.fixedRentAmount = scenarioState.fixedRentAmount ?? 1000;
+        }
+      }
+
+      return base;
+    } catch (e) {
+      console.error("[useMonthlyResults] mapToProjectionInputs failed:", e);
+      return null;
+    }
+  }, [project, scenarioState]);
+
+  const queryKey = useMemo(
+    () => ["monthly-results", DEFAULT_HORIZON_MONTHS, inputs],
+    [inputs]
+  );
+
+  return useQuery<BackendMonthlyResult[]>({
+    queryKey,
+    queryFn: async () => {
+      if (!inputs) throw new Error("No inputs");
+      return fetchMonthlyResults(inputs);
+    },
+    enabled: !!inputs,
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
+  });
+}
+
 
     // ── Override phases (taux d'occupation + ramp-up) ──
     const capacityPhases = state.exploitation.capacityPhases.map((phase) => {
