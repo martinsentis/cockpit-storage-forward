@@ -2,10 +2,13 @@
 // VERSION CANONIQUE — alignée sur backend ProjectionEngine V1
 // Contrats vérifiés sur : debtEngine.ts, rentSolver.ts, revenueCapacityEngine.ts, projectionEngine.ts
 
-import { Project } from "@/types/project";
+// ✅ FIX 1 : pas d'import Project (le nom varie selon le projet)
+// On accepte n'importe quel objet projet en entrée
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyProject = Record<string, any>;
 
 // ============================================================
-// TYPES BACKEND (miroir des interfaces du backend)
+// TYPES BACKEND (miroir exact des interfaces du backend)
 // ============================================================
 
 export interface BackendDebt {
@@ -64,36 +67,27 @@ export interface BackendOperatingCharge {
 
 export interface ProjectionInputs {
   horizonMonths: number;
-
   initialCash: number;
   sciInitialCash: number;
-
   projectStartDate: string; // format "YYYY-MM"
-  taxSchedules: any[];
-
+  taxSchedules: unknown[];
   taxRate: number;
   bufferMin: number;
   dscrMin?: number;
-
   phases: BackendCapacityPhase[];
   revenueParams: BackendRevenueParams;
   services: BackendService[];
-
   operatingCharges: BackendOperatingCharge[];
-
   debts: { debt: BackendDebt; state: BackendDebtState }[];
   sciDebts: { debt: BackendDebt; state: BackendDebtState }[];
-
   sciChargesCash: number;
   sciAmortization: number;
-
   ccaBalanceSas: number;
   ccaBalanceSci: number;
   distributableCashRate: number;
   ccaPriorityRatio: number;
   reserveStrategicRatio: number;
   reserveAfterCcaFullyRepaid: boolean;
-
   rentConstraints: BackendRentConstraints;
 }
 
@@ -101,17 +95,16 @@ export interface ProjectionInputs {
 // HELPERS
 // ============================================================
 
-/** Convertit un taux annuel en % (ex: 4.5) → décimal (0.045) */
+/** Taux en % (ex: 4.5) → décimal (0.045). Sécurisé. */
 function pctToDecimal(rate: number | undefined | null): number {
-  if (!rate || !Number.isFinite(rate)) return 0;
-  // Sécurité : si déjà en décimal (< 1), on ne redivise pas
-  if (rate < 1) return rate;
+  if (rate == null || !Number.isFinite(rate) || rate === 0) return 0;
+  if (rate < 1) return rate; // déjà en décimal
   return rate / 100;
 }
 
-/** Convertit une assurance mensuelle en € → taux annuel décimal */
+/** Assurance mensuelle en € → taux annuel décimal */
 function insuranceMonthlyToAnnualRate(insuranceMonthly: number | undefined | null, principal: number): number {
-  if (!insuranceMonthly || !principal || principal <= 0) return 0;
+  if (!insuranceMonthly || principal <= 0) return 0;
   return (insuranceMonthly * 12) / principal;
 }
 
@@ -119,7 +112,7 @@ function insuranceMonthlyToAnnualRate(insuranceMonthly: number | undefined | nul
 // MAPPER DETTES
 // ============================================================
 
-function mapDebt(d: any): { debt: BackendDebt; state: BackendDebtState } | null {
+function mapDebt(d: AnyProject): { debt: BackendDebt; state: BackendDebtState } | null {
   if (!d) return null;
 
   const principal = d.principalAmount ?? d.amount ?? 0;
@@ -127,10 +120,9 @@ function mapDebt(d: any): { debt: BackendDebt; state: BackendDebtState } | null 
 
   if (principal <= 0 || durationMonths <= 0) return null;
 
-  // Taux nominal : stocké en % → converti en décimal
   const nominalRateAnnual = pctToDecimal(d.nominalRateAnnual ?? d.annualRate ?? d.rate);
 
-  // Assurance : peut être en € mensuel ou en taux annuel décimal
+  // Assurance : taux annuel décimal, ou calculé depuis €/mois
   let insuranceRateAnnual = 0;
   if (d.insuranceRateAnnual != null) {
     insuranceRateAnnual = pctToDecimal(d.insuranceRateAnnual);
@@ -140,9 +132,8 @@ function mapDebt(d: any): { debt: BackendDebt; state: BackendDebtState } | null 
     insuranceRateAnnual = pctToDecimal(d.insuranceRate);
   }
 
-  // Différé
-  const defermentMonths = d.defermentMonths ?? d.deferralMonths ?? 0;
-  const rawDeferType = d.defermentType ?? d.deferralType ?? "NONE";
+  const defermentMonths: number = d.defermentMonths ?? d.deferralMonths ?? 0;
+  const rawDeferType: string = d.defermentType ?? d.deferralType ?? "NONE";
   const defermentType: "NONE" | "INTEREST_ONLY" | "TOTAL" =
     rawDeferType === "INTEREST_ONLY" || rawDeferType === "TOTAL" ? rawDeferType : "NONE";
 
@@ -175,15 +166,15 @@ function mapDebt(d: any): { debt: BackendDebt; state: BackendDebtState } | null 
 // MAPPER PHASES CAPACITÉ
 // ============================================================
 
-function mapPhase(phase: any, index: number): BackendCapacityPhase {
+function mapPhase(phase: AnyProject, index: number): BackendCapacityPhase {
+  const operationalStart: number = phase.operationalStartMonth ?? phase.startMonth ?? 0;
+
   return {
     phaseId: phase.id ?? phase.phaseId ?? `phase-${index}`,
     totalSurface: phase.totalSurface ?? phase.surface ?? 0,
-    operationalStartMonth: phase.operationalStartMonth ?? phase.startMonth ?? 0,
-    rampUpStartMonth: Math.max(
-      phase.rampUpStartMonth ?? phase.operationalStartMonth ?? phase.startMonth ?? 0,
-      phase.operationalStartMonth ?? phase.startMonth ?? 0,
-    ),
+    operationalStartMonth: operationalStart,
+    // rampUpStartMonth ne peut pas être avant l'ouverture physique
+    rampUpStartMonth: Math.max(phase.rampUpStartMonth ?? operationalStart, operationalStart),
     rampUpDurationMonths: phase.rampUpDurationMonths ?? phase.rampUpMonths ?? 12,
     rampCurve: phase.rampCurve ?? "LINEAR",
     isActive: phase.isActive !== false,
@@ -194,28 +185,21 @@ function mapPhase(phase: any, index: number): BackendCapacityPhase {
 // MAPPER CONTRAINTES DE LOYER
 // ============================================================
 
-function mapRentConstraints(project: Project): BackendRentConstraints {
-  // Chercher la stratégie de loyer dans le projet
-  // Priorité : fonciere.rentStrategy > exploitation.rentStrategy > default
-  const strategy =
-    (project as any).fonciere?.rentStrategy ??
-    (project as any).exploitation?.rentStrategy ??
-    (project as any).rentStrategy ??
-    null;
+function mapRentConstraints(project: AnyProject): BackendRentConstraints {
+  const strategy = project.fonciere?.rentStrategy ?? project.exploitation?.rentStrategy ?? project.rentStrategy ?? null;
 
   if (!strategy) {
     return { mode: "AUTONOMIE_SCI" };
   }
 
   const mode: BackendRentConstraints["mode"] = strategy.mode ?? "AUTONOMIE_SCI";
-
-  const params = strategy.parameters ?? strategy.params ?? {};
+  const params: AnyProject = strategy.parameters ?? strategy.params ?? {};
 
   switch (mode) {
     case "FIXE":
       return {
         mode: "FIXE",
-        // ✅ CORRECTION CRITIQUE : fixedRentAmount (pas monthlyRent)
+        // ✅ CORRECTION CRITIQUE : fixedRentAmount (jamais monthlyRent)
         fixedRentAmount: params.fixedRentAmount ?? params.fixed_rent_amount ?? params.monthlyRent ?? 0,
         marketMin: params.marketMin,
         marketMax: params.marketMax,
@@ -237,10 +221,11 @@ function mapRentConstraints(project: Project): BackendRentConstraints {
 }
 
 // ============================================================
-// CALCUL AMORTISSEMENT SCI depuis les actifs CAPEX
+// AMORTISSEMENT SCI depuis les actifs CAPEX
 // ============================================================
 
 const AMORTIZABLE_CATEGORIES = ["BATIMENTS", "VRD", "HONORAIRES", "CONSTRUCTION", "TRAVAUX"];
+
 const DEFAULT_AMORTIZATION_YEARS: Record<string, number> = {
   BATIMENTS: 30,
   VRD: 15,
@@ -249,11 +234,9 @@ const DEFAULT_AMORTIZATION_YEARS: Record<string, number> = {
   TRAVAUX: 10,
 };
 
-function computeSciAmortizationMonthly(project: Project): number {
-  const capexEvents: any[] =
-    (project as any).build?.capexEvents ?? (project as any).fonciere?.capexEvents ?? (project as any).capexItems ?? [];
-
-  if (!capexEvents || capexEvents.length === 0) return 0;
+function computeSciAmortizationMonthly(project: AnyProject): number {
+  const capexEvents: AnyProject[] =
+    project.build?.capexEvents ?? project.fonciere?.capexEvents ?? project.capexItems ?? [];
 
   let totalMonthly = 0;
 
@@ -261,10 +244,11 @@ function computeSciAmortizationMonthly(project: Project): number {
     const category: string = (asset.category ?? "").toUpperCase();
     if (!AMORTIZABLE_CATEGORIES.includes(category)) continue;
 
-    const amount = asset.amount ?? asset.cost ?? 0;
+    const amount: number = asset.amount ?? asset.cost ?? 0;
     if (amount <= 0) continue;
 
-    const durationYears = asset.amortizationYears ?? asset.durationYears ?? DEFAULT_AMORTIZATION_YEARS[category] ?? 20;
+    const durationYears: number =
+      asset.amortizationYears ?? asset.durationYears ?? DEFAULT_AMORTIZATION_YEARS[category] ?? 20;
 
     totalMonthly += amount / (durationYears * 12);
   }
@@ -273,38 +257,35 @@ function computeSciAmortizationMonthly(project: Project): number {
 }
 
 // ============================================================
-// CALCUL CHARGES SCI mensuelles
+// CHARGES SCI mensuelles
 // ============================================================
 
-function computeSciChargesCashMonthly(project: Project): number {
-  const charges: any[] =
-    (project as any).fonciere?.charges ??
-    (project as any).fonciere?.operatingCharges ??
-    (project as any).sciCharges ??
-    [];
-
-  if (!charges || charges.length === 0) return 0;
+function computeSciChargesCashMonthly(project: AnyProject): number {
+  const charges: AnyProject[] =
+    project.fonciere?.charges ?? project.fonciere?.operatingCharges ?? project.sciCharges ?? [];
 
   return charges
-    .filter((c: any) => c.isActive !== false)
-    .reduce((sum: number, c: any) => {
-      const monthly = c.monthlyAmount ?? (c.annualAmount != null ? c.annualAmount / 12 : 0) ?? 0;
+    .filter((c) => c.isActive !== false)
+    .reduce((sum, c) => {
+      // ✅ FIX 2 : pas de ?? 0 redondant sur une expression ternaire (toujours un nombre)
+      const monthly: number =
+        c.monthlyAmount != null ? c.monthlyAmount : c.annualAmount != null ? c.annualAmount / 12 : 0;
       return sum + monthly;
     }, 0);
 }
 
 // ============================================================
-// MAPPER SERVICES (revenus additionnels par m²)
+// SERVICES (revenus additionnels par m²)
 // ============================================================
 
-function mapServices(project: Project): BackendService[] {
-  const rawServices: any[] = (project as any).exploitation?.services ?? (project as any).services ?? [];
+function mapServices(project: AnyProject): BackendService[] {
+  const rawServices: AnyProject[] = project.exploitation?.services ?? project.services ?? [];
 
   return rawServices
-    .filter((s: any) => s && s.isActive !== false)
-    .filter((s: any) => s.pricingType === "PAR_M2" || s.monthlyAmountPerLeasedM2 != null)
+    .filter((s) => s?.isActive !== false)
+    .filter((s) => s.pricingType === "PAR_M2" || s.monthlyAmountPerLeasedM2 != null)
     .map(
-      (s: any): BackendService => ({
+      (s): BackendService => ({
         code: s.code ?? s.id ?? "SERVICE",
         monthlyAmountPerLeasedM2: s.monthlyAmountPerLeasedM2 ?? s.pricePerM2 ?? s.amount ?? 0,
         isActive: s.isActive !== false,
@@ -313,69 +294,66 @@ function mapServices(project: Project): BackendService[] {
 }
 
 // ============================================================
-// MAPPER CHARGES EXPLOITATION (SAS)
+// CHARGES EXPLOITATION (SAS)
 // ============================================================
 
-function mapOperatingCharges(project: Project): BackendOperatingCharge[] {
-  const rawCharges: any[] =
-    (project as any).exploitation?.operatingCharges ??
-    (project as any).exploitation?.charges ??
-    (project as any).operatingCharges ??
-    [];
+function mapOperatingCharges(project: AnyProject): BackendOperatingCharge[] {
+  const rawCharges: AnyProject[] =
+    project.exploitation?.operatingCharges ?? project.exploitation?.charges ?? project.operatingCharges ?? [];
 
   return rawCharges
-    .filter((c: any) => c && c.isActive !== false)
+    .filter((c) => c?.isActive !== false)
     .map(
-      (c: any): BackendOperatingCharge => ({
+      (c): BackendOperatingCharge => ({
         categoryCode: c.categoryCode ?? "SAS_OPEX",
-        monthlyAmount: c.monthlyAmount ?? (c.annualAmount != null ? c.annualAmount / 12 : 0) ?? 0,
+        // ✅ FIX 3 : pas de ?? 0 redondant sur une expression ternaire
+        monthlyAmount: c.monthlyAmount != null ? c.monthlyAmount : c.annualAmount != null ? c.annualAmount / 12 : 0,
         isActive: c.isActive !== false,
       }),
     );
 }
 
 // ============================================================
-// MAPPER PHASES + PARAMS REVENUS
+// PHASES + PARAMÈTRES REVENUS
 // ============================================================
 
-function mapPhasesAndRevenue(project: Project): {
+function mapPhasesAndRevenue(project: AnyProject): {
   phases: BackendCapacityPhase[];
   revenueParams: BackendRevenueParams;
 } {
-  const rawPhases: any[] =
-    (project as any).exploitation?.phases ?? (project as any).phases ?? (project as any).capacityPhases ?? [];
+  const rawPhases: AnyProject[] = project.exploitation?.phases ?? project.phases ?? project.capacityPhases ?? [];
 
-  const activePhases = rawPhases.filter((p: any) => p?.isActive !== false);
-  const phases = rawPhases.map((p: any, i: number) => mapPhase(p, i));
+  const activePhases = rawPhases.filter((p) => p?.isActive !== false);
+  const phases = rawPhases.map((p, i) => mapPhase(p, i));
 
   // Prix au m² : moyenne pondérée par surface des phases actives
   let totalSurface = 0;
   let weightedPrice = 0;
 
   for (const p of activePhases) {
-    const surface = p.totalSurface ?? p.surface ?? 0;
-    const price = p.pricePerM2 ?? p.prixM2 ?? 0;
+    const surface: number = p.totalSurface ?? p.surface ?? 0;
+    const price: number = p.pricePerM2 ?? p.prixM2 ?? 0;
     totalSurface += surface;
     weightedPrice += surface * price;
   }
 
   const pricePerM2 = totalSurface > 0 ? weightedPrice / totalSurface : 0;
 
-  // Taux d'occupation cible : priorité phase 1, sinon fallback projet
   const firstActivePhase = activePhases[0];
-  const targetOccupancy =
+  const rawOccupancy: number =
     firstActivePhase?.targetOccupancy ??
     firstActivePhase?.targetLeasedSurfacePercent ??
-    (project as any).exploitation?.targetOccupancy ??
+    project.exploitation?.targetOccupancy ??
     0.85;
+
+  // Normalise : si > 1, c'est un pourcentage (ex: 85 → 0.85)
+  const targetLeasedSurfacePercent = rawOccupancy > 1 ? rawOccupancy / 100 : rawOccupancy;
 
   const revenueParams: BackendRevenueParams = {
     pricePerM2,
-    targetLeasedSurfacePercent: targetOccupancy > 1 ? targetOccupancy / 100 : targetOccupancy,
-    annualIndexationRate: pctToDecimal(
-      (project as any).exploitation?.indexationRate ?? (project as any).indexationRate,
-    ),
-    indexationMonth: (project as any).exploitation?.indexationStartMonth ?? (project as any).indexationStartMonth ?? 12,
+    targetLeasedSurfacePercent,
+    annualIndexationRate: pctToDecimal(project.exploitation?.indexationRate ?? project.indexationRate),
+    indexationMonth: project.exploitation?.indexationStartMonth ?? project.indexationStartMonth ?? 12,
   };
 
   return { phases, revenueParams };
@@ -385,74 +363,47 @@ function mapPhasesAndRevenue(project: Project): {
 // FONCTION PRINCIPALE
 // ============================================================
 
-export function mapToProjectionInputs(project: Project, horizonMonths = 60): ProjectionInputs {
-  // — Trésorerie initiale
-  const initialCash = (project as any).exploitation?.initialCash ?? (project as any).initialCash ?? 0;
+export function mapToProjectionInputs(project: AnyProject, horizonMonths = 60): ProjectionInputs {
+  const initialCash: number = project.exploitation?.initialCash ?? project.initialCash ?? 0;
 
-  const sciInitialCash = (project as any).fonciere?.initialCash ?? (project as any).sciInitialCash ?? 0;
+  const sciInitialCash: number = project.fonciere?.initialCash ?? project.sciInitialCash ?? 0;
 
-  // — Date de démarrage (format YYYY-MM)
-  const projectStartDate = ((project as any).startDate ?? (project as any).projectStartDate ?? "2025-01").slice(0, 7);
+  const projectStartDate: string = (project.startDate ?? project.projectStartDate ?? "2025-01").slice(0, 7);
 
-  // — Taux IS
-  const taxRate = pctToDecimal((project as any).taxRate ?? (project as any).exploitation?.taxRate ?? 25);
+  const taxRate = pctToDecimal(project.taxRate ?? project.exploitation?.taxRate ?? 25);
 
-  // — Dettes SAS (exploitation)
-  const rawDebts: any[] = (project as any).exploitation?.debts ?? (project as any).debts ?? [];
-
+  // Dettes SAS
+  const rawDebts: AnyProject[] = project.exploitation?.debts ?? project.debts ?? [];
   const debts = rawDebts.map(mapDebt).filter((d): d is { debt: BackendDebt; state: BackendDebtState } => d !== null);
 
-  // — Dettes SCI (foncière)
-  const rawSciDebts: any[] = (project as any).fonciere?.debts ?? (project as any).sciDebts ?? [];
-
+  // Dettes SCI
+  const rawSciDebts: AnyProject[] = project.fonciere?.debts ?? project.sciDebts ?? [];
   const sciDebts = rawSciDebts
     .map(mapDebt)
     .filter((d): d is { debt: BackendDebt; state: BackendDebtState } => d !== null);
 
-  // — Phases et revenus
   const { phases, revenueParams } = mapPhasesAndRevenue(project);
-
-  // — Services
   const services = mapServices(project);
-
-  // — Charges exploitation
   const operatingCharges = mapOperatingCharges(project);
-
-  // — Charges SCI (cash)
   const sciChargesCash = computeSciChargesCashMonthly(project);
-
-  // — Amortissement SCI (depuis actifs CAPEX)
   const sciAmortization = computeSciAmortizationMonthly(project);
-
-  // — Contraintes de loyer
   const rentConstraints = mapRentConstraints(project);
 
-  // — CCA (comptes courants d'associés)
-  const ccaBalanceSas = (project as any).exploitation?.ccaBalance ?? (project as any).ccaBalanceSas ?? 0;
+  const ccaBalanceSas: number = project.exploitation?.ccaBalance ?? project.ccaBalanceSas ?? 0;
+  const ccaBalanceSci: number = project.fonciere?.ccaBalance ?? project.ccaBalanceSci ?? 0;
 
-  const ccaBalanceSci = (project as any).fonciere?.ccaBalance ?? (project as any).ccaBalanceSci ?? 0;
-
-  // — Distribution
   const distributableCashRate = pctToDecimal(
-    (project as any).distribution?.distributableCashRate ?? (project as any).distributableCashRate ?? 80,
+    project.distribution?.distributableCashRate ?? project.distributableCashRate ?? 80,
   );
-
-  const ccaPriorityRatio = pctToDecimal(
-    (project as any).distribution?.ccaPriorityRatio ?? (project as any).ccaPriorityRatio ?? 100,
-  );
-
+  const ccaPriorityRatio = pctToDecimal(project.distribution?.ccaPriorityRatio ?? project.ccaPriorityRatio ?? 100);
   const reserveStrategicRatio = pctToDecimal(
-    (project as any).distribution?.reserveStrategicRatio ?? (project as any).reserveStrategicRatio ?? 0,
+    project.distribution?.reserveStrategicRatio ?? project.reserveStrategicRatio ?? 0,
   );
+  const reserveAfterCcaFullyRepaid: boolean =
+    project.distribution?.reserveAfterCcaFullyRepaid ?? project.reserveAfterCcaFullyRepaid ?? false;
 
-  const reserveAfterCcaFullyRepaid =
-    (project as any).distribution?.reserveAfterCcaFullyRepaid ?? (project as any).reserveAfterCcaFullyRepaid ?? false;
-
-  // — Buffer trésorerie minimum
-  const bufferMin = (project as any).exploitation?.bufferMin ?? (project as any).bufferMin ?? 0;
-
-  // — Calendrier IS (tax schedules)
-  const taxSchedules = (project as any).taxSchedules ?? [];
+  const bufferMin: number = project.exploitation?.bufferMin ?? project.bufferMin ?? 0;
+  const taxSchedules: unknown[] = project.taxSchedules ?? [];
 
   return {
     horizonMonths,
@@ -479,3 +430,6 @@ export function mapToProjectionInputs(project: Project, horizonMonths = 60): Pro
     reserveAfterCcaFullyRepaid,
   };
 }
+
+// ✅ FIX 4 : alias pour compatibilité avec useEngine.ts (ancien nom)
+export const mapEngineInputsToProjectionInputs = mapToProjectionInputs;
