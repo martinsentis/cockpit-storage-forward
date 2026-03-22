@@ -235,9 +235,7 @@ function SciTable({ rows }: { rows: ReturnType<typeof buildSciRows> }) {
 
 // ── Export principal ─────────────────────────────────────────
 export default function EngineMonthlyPnL({ data }: Props) {
-  const engine = useEngine();
-  const prixM2 = engine?.exploitation?.prixM2Global ?? 0;
-  const totalSurface = engine?.exploitation?.totalSurface ?? 0;
+  if (!data || data.length === 0) {
 
   if (!data || data.length === 0) {
     return (
