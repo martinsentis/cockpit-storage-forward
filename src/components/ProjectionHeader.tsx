@@ -5,27 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
-import {
-  Settings2,
-  ChevronDown,
-  RotateCcw,
-  Save,
-  Check,
-} from "lucide-react";
-import { useState } from "react";
+import { Settings2, ChevronDown, RotateCcw, Save, Check } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useProject } from "@/contexts/ProjectContext";
 import { useScenario } from "@/contexts/ScenarioContext";
 import { toast } from "@/hooks/use-toast";
@@ -50,41 +34,65 @@ function formatPhaseDate(startMonth: number, projectStartDate: string): string {
   if (!projectStartDate) return `Mois ${startMonth}`;
   const [yearStr, monthStr] = projectStartDate.split("-");
   const baseYear = parseInt(yearStr, 10);
-  const baseMonth = parseInt(monthStr, 10) - 1; // 0-indexed
+  const baseMonth = parseInt(monthStr, 10) - 1;
   const totalMonths = baseMonth + startMonth;
   const year = baseYear + Math.floor(totalMonths / 12);
   const month = totalMonths % 12;
   const monthNames = [
-    "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
-    "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
+    "Janvier",
+    "Février",
+    "Mars",
+    "Avril",
+    "Mai",
+    "Juin",
+    "Juillet",
+    "Août",
+    "Septembre",
+    "Octobre",
+    "Novembre",
+    "Décembre",
   ];
   return `${monthNames[month]} ${year}`;
 }
 
 export function ProjectionHeader() {
   const { state } = useProject();
-  const {
-    scenarioState,
-    updateScenarioField,
-    updatePhaseOverride,
-    resetToDefaults,
-  } = useScenario();
+  const { scenarioState, updateScenarioField, updatePhaseOverride, resetToDefaults } = useScenario();
   const [open, setOpen] = useState(true);
 
   const phases = state.exploitation.capacityPhases;
   const projectStartDate = state.projet.projectStartDate;
 
+  // ── Pré-remplit le salaire depuis le vrai gestionnaire si le scénario est vide
+  useEffect(() => {
+    if (scenarioState.gestionnaireNetMensuel === 0) {
+      const firstSalarie = state.exploitation.gestionnaires.find((g) => g.actif && g.type === "SALARIE");
+      if (firstSalarie) {
+        updateScenarioField("gestionnaireNetMensuel", firstSalarie.salaireBrut);
+      }
+    }
+  }, []); // une seule fois au montage
+
   const handleApply = () => {
-    toast({ title: "Hypothèses appliquées", description: "Le scénario de travail a été mis à jour." });
+    toast({
+      title: "Hypothèses appliquées",
+      description: "Le scénario de travail a été mis à jour.",
+    });
   };
 
   const handleSave = () => {
-    toast({ title: "Sauvegarde", description: "Fonctionnalité de sauvegarde de scénario à venir." });
+    toast({
+      title: "Sauvegarde",
+      description: "Fonctionnalité de sauvegarde de scénario à venir.",
+    });
   };
 
   const handleReset = () => {
     resetToDefaults();
-    toast({ title: "Réinitialisé", description: "Les hypothèses ont été remises aux valeurs par défaut." });
+    toast({
+      title: "Réinitialisé",
+      description: "Les hypothèses ont été remises aux valeurs par défaut.",
+    });
   };
 
   return (
@@ -134,9 +142,11 @@ export function ProjectionHeader() {
 
           <CollapsibleContent>
             <CardContent className="space-y-6">
-              {/* 4.1 — Indexations */}
+              {/* Indexations */}
               <div>
-                <h4 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wide">Indexations</h4>
+                <h4 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wide">
+                  Indexations
+                </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="idx-ca">Indexation CA exploitation (%)</Label>
@@ -148,7 +158,6 @@ export function ProjectionHeader() {
                       onChange={(e) => updateScenarioField("indexationCA", (Number(e.target.value) || 0) / 100)}
                     />
                   </div>
-
                   <div className="space-y-1.5">
                     <Label htmlFor="idx-charges">Indexation charges (%)</Label>
                     <div className="flex gap-2">
@@ -177,7 +186,6 @@ export function ProjectionHeader() {
                       </Select>
                     </div>
                   </div>
-
                   <div className="space-y-1.5">
                     <Label htmlFor="idx-autres">Indexation autres revenus foncière (%)</Label>
                     <Input
@@ -195,9 +203,11 @@ export function ProjectionHeader() {
 
               <Separator />
 
-              {/* 4.1b — Mode de loyer */}
+              {/* Mode de loyer */}
               <div>
-                <h4 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wide">Mode de loyer</h4>
+                <h4 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wide">
+                  Mode de loyer
+                </h4>
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-sm text-muted-foreground">Mode actuel :</span>
                   <Badge variant="secondary">{RENT_PRESET_LABELS[scenarioState.rentPreset]}</Badge>
@@ -219,15 +229,14 @@ export function ProjectionHeader() {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
-                    Ce paramètre modifie uniquement le mode de calcul du loyer dans le scénario courant.
-                    Le calcul du loyer sera effectué par le moteur de projection.
+                    Ce paramètre modifie le mode de calcul du loyer dans le scénario courant.
                   </p>
                 </div>
               </div>
 
               <Separator />
 
-              {/* 4.2 — Remplissage */}
+              {/* Remplissage */}
               <div>
                 <h4 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wide">
                   Remplissage des box
@@ -251,7 +260,7 @@ export function ProjectionHeader() {
 
               <Separator />
 
-              {/* 4.3 — Ramp-up par phase */}
+              {/* Ramp-up par phase */}
               <div>
                 <h4 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wide">
                   Ramp-up par phase
@@ -261,12 +270,13 @@ export function ProjectionHeader() {
                     const override = scenarioState.phaseOverrides[phase.id];
                     const rampUpMonths = override?.rampUpMonths ?? phase.rampUpMonths;
                     const rampCurve = override?.rampCurve ?? phase.rampCurve;
-
                     return (
                       <Card key={phase.id} className="border-dashed">
                         <CardContent className="py-4">
                           <div className="mb-3">
-                            <p className="font-medium">Phase {idx + 1} — {phase.nom}</p>
+                            <p className="font-medium">
+                              Phase {idx + 1} — {phase.nom}
+                            </p>
                             <p className="text-sm text-muted-foreground">
                               Mise en exploitation : {formatPhaseDate(phase.startMonth, projectStartDate)}
                             </p>
@@ -282,7 +292,9 @@ export function ProjectionHeader() {
                                 min={0}
                                 value={rampUpMonths}
                                 onChange={(e) =>
-                                  updatePhaseOverride(phase.id, { rampUpMonths: Number(e.target.value) || 0 })
+                                  updatePhaseOverride(phase.id, {
+                                    rampUpMonths: Number(e.target.value) || 0,
+                                  })
                                 }
                               />
                             </div>
@@ -317,11 +329,15 @@ export function ProjectionHeader() {
 
               <Separator />
 
-              {/* 4.4 — Salaire gestionnaire */}
+              {/* Salaire gestionnaire */}
               <div>
                 <h4 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wide">
                   Salaire du gestionnaire
                 </h4>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Pré-rempli depuis le gestionnaire configuré dans l'exploitation. Modifiez ici pour simuler un impact
+                  sans changer la configuration de base.
+                </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="gest-net">Net mensuel cible (€)</Label>
@@ -333,19 +349,15 @@ export function ProjectionHeader() {
                       onChange={(e) => updateScenarioField("gestionnaireNetMensuel", Number(e.target.value) || 0)}
                     />
                   </div>
-
                   <div className="space-y-1.5">
                     <Label htmlFor="gest-start">Date de début</Label>
                     <Input
                       id="gest-start"
                       type="month"
                       value={scenarioState.gestionnaireStartDate ?? ""}
-                      onChange={(e) =>
-                        updateScenarioField("gestionnaireStartDate", e.target.value || null)
-                      }
+                      onChange={(e) => updateScenarioField("gestionnaireStartDate", e.target.value || null)}
                     />
                   </div>
-
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-2 mb-1">
                       <Checkbox
@@ -356,16 +368,16 @@ export function ProjectionHeader() {
                           if (!v) updateScenarioField("gestionnaireEndDate", null);
                         }}
                       />
-                      <Label htmlFor="gest-has-end" className="cursor-pointer">Date de fin</Label>
+                      <Label htmlFor="gest-has-end" className="cursor-pointer">
+                        Date de fin
+                      </Label>
                     </div>
                     <Input
                       id="gest-end"
                       type="month"
                       disabled={!scenarioState.gestionnaireHasEndDate}
                       value={scenarioState.gestionnaireEndDate ?? ""}
-                      onChange={(e) =>
-                        updateScenarioField("gestionnaireEndDate", e.target.value || null)
-                      }
+                      onChange={(e) => updateScenarioField("gestionnaireEndDate", e.target.value || null)}
                     />
                   </div>
                 </div>
