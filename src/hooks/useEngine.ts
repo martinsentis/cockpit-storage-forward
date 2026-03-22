@@ -14,6 +14,7 @@ import type { EngineOutputs, EngineInputs } from "@/engine/engineTypes";
 
 async function fetchEngine(inputs: EngineInputs): Promise<EngineOutputs> {
   console.log("FETCH ENGINE CALLED");
+  console.log("PAYLOAD", JSON.stringify(inputs, null, 2));
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20000);
   const payload = mapEngineInputsToProjectionInputs(inputs);
@@ -189,4 +190,3 @@ export function useMonthlyResults() {
     placeholderData: (prev) => prev,
   });
 }
-
