@@ -108,16 +108,16 @@ function SasTable({ rows }: { rows: ReturnType<typeof buildSasRows> }) {
                 <TableCell className="text-right">
                   <span
                     className={`font-medium ${
-                      row.occupancy === 0
+                      row.pctLoue == null
                         ? "text-muted-foreground"
-                        : row.occupancy >= 0.8
+                        : row.pctLoue >= 0.8
                           ? "text-green-600"
-                          : row.occupancy >= 0.5
+                          : row.pctLoue >= 0.5
                             ? "text-amber-600"
                             : "text-red-500"
                     }`}
                   >
-                    {fmtPct(row.occupancy)}
+                    {row.pctLoue != null ? Math.round(row.pctLoue * 100) + "%" : "—"}
                   </span>
                 </TableCell>
 
