@@ -133,19 +133,87 @@ async function fetchMonthlyResults(inputs: EngineInputs): Promise<BackendMonthly
 
 export function useMonthlyResults(): BackendMonthlyResult[] {
   const { state } = useProject();
-  const inputs = useMemo<EngineInputs>(
-    () => ({
-      projet: state.projet,
+  const { scenarioState } = useScenario();
+
+  const inputs = useMemo<EngineInputs>(() => {
+    // ── Override gestionnaire salary depuis le scénario ──
+    const gestionnaires = state.exploitation.gestionnaires.map((g) => {
+      if (g.type === "SALARIE" && g.actif && scenarioState.gestionnaireNetMensuel > 0) {
+        return { ...g, salaireBrut: scenarioState.gestionnaireNetMensuel };
+      }
+      return g;
+    });
+
+    // Si aucun gestionnaire salarié actif mais scénario en a un → l'ajouter
+    const hasActiveSalarie = gestionnaires.some((g) => g.type === "SALARIE" && g.actif);
+    const finalGestionnaires =
+      hasActiveSalarie || scenarioState.gestionnaireNetMensuel === 0
+        ? gestionnaires
+        : [
+            ...gestionnaires,
+            {
+              id: "scenario-gestionnaire",
+              nom: "Gestionnaire (scénario)",
+              type: "SALARIE" as const,
+              actif: true,
+              facturationMensuelle: 0,
+              prixType: "HT" as const,
+              vatRate: 0,
+              salaireBrut: scenarioState.gestionnaireNetMensuel,
+              tauxChargesPatronales: 0.42,
+              activeFromStart: true,
+              startMonth: 0,
+              hasEndMonth: false,
+              endMonth: null,
+            },
+          ];
+
+    // ── Override phases (taux d'occupation + ramp-up) ──
+    const capacityPhases = state.exploitation.capacityPhases.map((phase) => {
+      const override = scenarioState.phaseOverrides[phase.id];
+      return {
+        ...phase,
+        targetOccupancy: scenarioState.targetOccupancy,
+        ...(override?.rampUpMonths !== undefined ? { rampUpMonths: override.rampUpMonths } : {}),
+        ...(override?.rampCurve !== undefined ? { rampCurve: override.rampCurve } : {}),
+      };
+    });
+
+    // ── Override loyer dynamique depuis rentPreset du scénario ──
+    const loyerDynamique = {
+      ...state.loyerDynamique,
+      rentPlan: state.loyerDynamique.rentPlan.map((plan, i) =>
+        i === 0
+          ? {
+              ...plan,
+              strategy: {
+                ...plan.strategy,
+                mode: scenarioState.rentPreset,
+              },
+            }
+          : plan,
+      ),
+    };
+
+    return {
+      projet: {
+        ...state.projet,
+        horizonMonths: scenarioState.horizonMonths,
+      },
       build: state.build,
       financement: state.financement,
-      exploitation: state.exploitation,
+      exploitation: {
+        ...state.exploitation,
+        capacityPhases,
+        gestionnaires: finalGestionnaires,
+      },
       fonciere: state.fonciere,
-      loyerDynamique: state.loyerDynamique,
+      loyerDynamique,
       gouvernance: state.gouvernance,
       fiscalite: state.fiscalite,
-    }),
-    [state],
-  );
+    };
+  }, [state, scenarioState]);
+
   const { data } = useQuery({
     queryKey: ["engine-monthly", inputs],
     queryFn: () => fetchMonthlyResults(inputs),
