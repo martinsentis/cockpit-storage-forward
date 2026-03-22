@@ -12,7 +12,7 @@ interface Props {
 }
 
 // ── Lignes SAS ───────────────────────────────────────────────
-function buildSasRows(months: BackendMonthlyResult[], prixM2: number, totalSurface: number) {
+function buildSasRows(months: BackendMonthlyResult[]) {
   let prevCash = months[0]?.cashEnd ?? 0;
   return months.map((m, i) => {
     const cat = m.projectedByCategory ?? {};
@@ -28,14 +28,14 @@ function buildSasRows(months: BackendMonthlyResult[], prixM2: number, totalSurfa
     const resNet = ebe - interest - tax;
     const cfNet = m.cashEnd - (i === 0 ? 0 : prevCash);
 
-    // % surface louée dérivé du revenu
-    const leasedSurface = prixM2 > 0 ? revenue / prixM2 : 0;
-    const occupancy = totalSurface > 0 ? leasedSurface / totalSurface : 0;
+    const pctLoue = m.activeSurface > 0
+      ? m.leasedSurface / m.activeSurface
+      : null;
 
     prevCash = m.cashEnd;
     return {
       mois: m.monthIndex + 1,
-      occupancy,
+      pctLoue,
       revenue,
       opex,
       loyer,

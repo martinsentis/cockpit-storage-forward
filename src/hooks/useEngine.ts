@@ -124,6 +124,8 @@ export interface BackendMonthlyResult {
   cashEnd: number;
   sciCashEnd: number;
   dscr: number;
+  leasedSurface: number;
+  activeSurface: number;
   projectedByCategory?: Record<string, number>;
   warnings?: string[];
 }
