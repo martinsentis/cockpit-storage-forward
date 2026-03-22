@@ -107,7 +107,7 @@ function SasTable({ rows }: { rows: ReturnType<typeof buildSasRows> }) {
                 <TableCell className="text-right">
                   <span
                     className={`font-medium ${
-                      row.pctLoue == null
+                      row.pctLoue == null || row.pctLoue === 0
                         ? "text-muted-foreground"
                         : row.pctLoue >= 0.8
                           ? "text-green-600"
@@ -116,7 +116,7 @@ function SasTable({ rows }: { rows: ReturnType<typeof buildSasRows> }) {
                             : "text-red-500"
                     }`}
                   >
-                    {row.pctLoue != null ? Math.round(row.pctLoue * 100) + "%" : "—"}
+                    {row.pctLoue != null && row.pctLoue > 0 ? (row.pctLoue * 100).toFixed(1) + "%" : "—"}
                   </span>
                 </TableCell>
 
