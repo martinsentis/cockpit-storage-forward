@@ -15,7 +15,7 @@ import type { EngineOutputs, EngineInputs } from "@/engine/engineTypes";
 async function fetchEngine(inputs: EngineInputs): Promise<EngineOutputs> {
   console.log("FETCH ENGINE CALLED");
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
+  const timeout = setTimeout(() => controller.abort(), 20000);
   const payload = mapEngineInputsToProjectionInputs(inputs);
   const res = await fetch("https://pilotagebox-production.up.railway.app/run-projection", {
     method: "POST",
