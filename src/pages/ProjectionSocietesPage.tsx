@@ -70,7 +70,7 @@ function toYearlyData(months: BackendMonthlyResult[]) {
 export default function ProjectionSocietesPage() {
   const { scenarioState } = useScenario();
   const engine = useEngine();
-  const monthlyResults = useMonthlyResults();
+  const { data: monthlyResults = [] } = useMonthlyResults();
 
   const yearlyData = toYearlyData(monthlyResults);
   const lastYear = yearlyData[yearlyData.length - 1];

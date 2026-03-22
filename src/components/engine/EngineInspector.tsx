@@ -16,13 +16,13 @@ export default function EngineInspector() {
         <TabsTrigger value="ledger">Ledger des flux</TabsTrigger>
       </TabsList>
       <TabsContent value="pnl">
-        <EngineMonthlyPnL data={data} />
+        <EngineMonthlyPnL data={monthlyData} />
       </TabsContent>
       <TabsContent value="formulas">
-        <EngineFormulaInspector data={data} />
+        <EngineFormulaInspector data={monthlyData} />
       </TabsContent>
       <TabsContent value="ledger">
-        <EngineLedgerView data={data} />
+        <EngineLedgerView data={monthlyData} />
       </TabsContent>
     </Tabs>
   );
