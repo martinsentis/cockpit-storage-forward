@@ -27,9 +27,7 @@ function buildSasRows(months: BackendMonthlyResult[]) {
     const resNet = ebe - interest - tax;
     const cfNet = m.cashEnd - (i === 0 ? 0 : prevCash);
 
-    const pctLoue = m.activeSurface > 0
-      ? m.leasedSurface / m.activeSurface
-      : null;
+    const pctLoue = m.leasedSurfacePercent;
 
     prevCash = m.cashEnd;
     return {
@@ -61,12 +59,14 @@ function buildSciRows(months: BackendMonthlyResult[]) {
     const ebe = loyer - interest;
     const debtService = interest + principal + insurance;
     const resNet = ebe - tax;
+    const amortissement = m.sciAmortization ?? 0;
     const cfNet = m.sciCashEnd - (i === 0 ? 0 : prevCash);
     prevCash = m.sciCashEnd;
     return {
       mois: m.monthIndex + 1,
       loyer,
       interest,
+      amortissement,
       ebe,
       tax,
       resNet,
@@ -107,7 +107,7 @@ function SasTable({ rows }: { rows: ReturnType<typeof buildSasRows> }) {
                 <TableCell className="text-right">
                   <span
                     className={`font-medium ${
-                      row.pctLoue == null
+                      row.pctLoue == null || row.pctLoue === 0
                         ? "text-muted-foreground"
                         : row.pctLoue >= 0.8
                           ? "text-green-600"
@@ -116,7 +116,7 @@ function SasTable({ rows }: { rows: ReturnType<typeof buildSasRows> }) {
                             : "text-red-500"
                     }`}
                   >
-                    {row.pctLoue != null ? Math.round(row.pctLoue * 100) + "%" : "—"}
+                    {row.pctLoue != null && row.pctLoue > 0 ? (row.pctLoue * 100).toFixed(1) + "%" : "—"}
                   </span>
                 </TableCell>
 
@@ -178,6 +178,7 @@ function SciTable({ rows }: { rows: ReturnType<typeof buildSciRows> }) {
               <TableHead>Mois</TableHead>
               <TableHead className="text-right text-amber-600 font-semibold">Loyer reçu</TableHead>
               <TableHead className="text-right text-red-600">Intérêts dette</TableHead>
+              <TableHead className="text-right text-muted-foreground">Amortissement</TableHead>
               <TableHead className="text-right font-semibold">EBE</TableHead>
               <TableHead className="text-right">IS</TableHead>
               <TableHead className="text-right">Rés. net</TableHead>
@@ -197,6 +198,9 @@ function SciTable({ rows }: { rows: ReturnType<typeof buildSciRows> }) {
 
                 {/* Intérêts */}
                 <TableCell className="text-right text-red-600">{fmt(row.interest)}</TableCell>
+
+                {/* Amortissement */}
+                <TableCell className="text-right text-muted-foreground">{fmt(row.amortissement)}</TableCell>
 
                 {/* EBE */}
                 <TableCell className={`text-right font-semibold ${row.ebe < 0 ? "text-red-600" : ""}`}>
