@@ -27,9 +27,7 @@ function buildSasRows(months: BackendMonthlyResult[]) {
     const resNet = ebe - interest - tax;
     const cfNet = m.cashEnd - (i === 0 ? 0 : prevCash);
 
-    const pctLoue = m.activeSurface > 0
-      ? m.leasedSurface / m.activeSurface
-      : null;
+    const pctLoue = m.leasedSurfacePercent;
 
     prevCash = m.cashEnd;
     return {
