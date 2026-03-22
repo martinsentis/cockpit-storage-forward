@@ -254,7 +254,7 @@ export default function EngineMonthlyPnL({ data }: Props) {
           Le loyer SCI (<span className="text-amber-600 font-medium">en orange</span>) est la charge intra-groupe versée
           à la foncière. Le % surface louée est calculé par rapport au capacitaire total.
         </p>
-        <SasTable rows={buildSasRows(data, prixM2, totalSurface)} />
+        <SasTable rows={buildSasRows(data)} />
       </div>
 
       <div className="space-y-3">
