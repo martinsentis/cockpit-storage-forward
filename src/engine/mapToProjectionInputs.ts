@@ -248,7 +248,8 @@ function buildRentConstraints(inputs: EngineInputs): RentConstraints {
   const backendMode = RENT_MODE_MAP[phase.strategy.mode] ?? "AUTONOMIE_SCI";
   const constraints: RentConstraints = { mode: backendMode };
   if (backendMode === "FIXE" && phase.strategy.parameters?.fixed_rent_amount != null) {
-    constraints.monthlyRent = phase.strategy.parameters.fixed_rent_amount;
+    // ✅ CORRECT
+    constraints.fixedRentAmount = phase.strategy.parameters.fixed_rent_amount;
   }
   return constraints;
 }
