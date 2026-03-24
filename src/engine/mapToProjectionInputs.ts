@@ -457,6 +457,8 @@ export function mapToProjectionInputs(project: any, horizonMonths = 60): Project
   const reserveStrategicRatio: number = globalRule.reserveStrategicRatio ?? 0;
   const ccaPriorityRatio: number = 1; // CCA prioritaire par défaut
 
+  console.log('operatingCharges built:', operatingCharges);
+
   return {
     horizonMonths: horizon,
     initialCash,
