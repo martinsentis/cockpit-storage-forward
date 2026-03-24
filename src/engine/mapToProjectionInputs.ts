@@ -324,8 +324,6 @@ function computeSciChargesCash(project: any): number {
 //       ou project.build.capexEvents[].assets[] amortissables
 // ============================================================
 
-const SCI_AMORTIZABLE = ["BATIMENTS", "VRD", "HONORAIRES", "CONSTRUCTION", "TRAVAUX", "IMMOBILIER"];
-
 function computeSciAmortization(project: any): number {
   // Valeur pré-calculée dans financement
   const precomputed: number = project.financement?.sciAmortization ?? 0;
@@ -337,9 +335,7 @@ function computeSciAmortization(project: any): number {
 
   for (const event of capexEvents) {
     for (const asset of event.assets ?? []) {
-      if (!asset.amortissable) continue;
-      const cat = (asset.category ?? "").toUpperCase();
-      if (!SCI_AMORTIZABLE.includes(cat)) continue;
+      if (!asset.amortissable) continue; // seul critère : le flag amortissable
       const amount: number = asset.amount ?? 0;
       const years: number = asset.depreciationYears ?? 20;
       if (amount > 0 && years > 0) {

@@ -51,12 +51,15 @@ function buildSciRows(months: BackendMonthlyResult[]) {
   let prevCash = months[0]?.sciCashEnd ?? 0;
   return months.map((m, i) => {
     const cat = m.projectedByCategory ?? {};
-    const loyer = cat["SCI_RENT"] ?? 0; // = SAS_RENT en valeur absolue
+    const loyer = cat["SCI_RENT"] ?? 0;
+    const autresRevenus = cat["SCI_OTHER_REVENUE"] ?? 0;
+    const caTotal = loyer + autresRevenus;
+    const charges = Math.abs(cat["SCI_CHARGES"] ?? 0);
     const interest = Math.abs(cat["SCI_DEBT_INTEREST"] ?? 0);
     const principal = Math.abs(cat["SCI_DEBT_PRINCIPAL"] ?? 0);
     const insurance = Math.abs(cat["SCI_DEBT_INSURANCE"] ?? 0);
     const tax = Math.abs(cat["SCI_TAX"] ?? 0);
-    const ebe = loyer - interest;
+    const ebe = caTotal - charges - interest;
     const debtService = interest + principal + insurance;
     const resNet = ebe - tax;
     const amortissement = m.sciAmortization ?? 0;
@@ -65,6 +68,9 @@ function buildSciRows(months: BackendMonthlyResult[]) {
     return {
       mois: m.monthIndex + 1,
       loyer,
+      autresRevenus,
+      caTotal,
+      charges,
       interest,
       amortissement,
       ebe,
@@ -176,7 +182,10 @@ function SciTable({ rows }: { rows: ReturnType<typeof buildSciRows> }) {
           <TableHeader>
             <TableRow className="text-xs">
               <TableHead>Mois</TableHead>
-              <TableHead className="text-right text-amber-600 font-semibold">Loyer reçu</TableHead>
+              <TableHead className="text-right text-amber-600 font-semibold">Loyer reçu (SAS)</TableHead>
+              <TableHead className="text-right">Autres revenus</TableHead>
+              <TableHead className="text-right font-semibold">CA total</TableHead>
+              <TableHead className="text-right text-red-600">Charges</TableHead>
               <TableHead className="text-right text-red-600">Intérêts dette</TableHead>
               <TableHead className="text-right text-muted-foreground">Amortissement</TableHead>
               <TableHead className="text-right font-semibold">EBE</TableHead>
@@ -191,10 +200,19 @@ function SciTable({ rows }: { rows: ReturnType<typeof buildSciRows> }) {
               <TableRow key={row.mois} className={row.cfNet < 0 ? "bg-red-50" : ""}>
                 <TableCell className="font-medium">{row.mois}</TableCell>
 
-                {/* Loyer reçu — même valeur que SAS, visuellement isolé */}
+                {/* Loyer reçu */}
                 <TableCell className="bg-amber-50 text-right">
                   <span className="font-semibold text-amber-700">{fmt(row.loyer)}</span>
                 </TableCell>
+
+                {/* Autres revenus */}
+                <TableCell className="text-right">{fmt(row.autresRevenus)}</TableCell>
+
+                {/* CA total */}
+                <TableCell className="text-right font-semibold">{fmt(row.caTotal)}</TableCell>
+
+                {/* Charges */}
+                <TableCell className="text-right text-red-500">{fmt(row.charges)}</TableCell>
 
                 {/* Intérêts */}
                 <TableCell className="text-right text-red-600">{fmt(row.interest)}</TableCell>
