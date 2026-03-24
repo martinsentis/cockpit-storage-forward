@@ -1,25 +1,29 @@
 
 
-## Plan : Ajouter un console.log de debug dans mapOperatingCharges
+## Plan : Réécrire mapOperatingCharges + ajouter log de debug
 
-### Modification unique
+### Constat
 
-**Fichier** : `src/engine/mapToProjectionInputs.ts`, ligne 257
+La fonction `mapOperatingCharges` (ligne 256) et le champ `operatingCharges` dans le return (ligne 467) existent déjà et sont correctement branchés. Le problème potentiel est dans la conversion de fréquence : le code actuel utilise `"MENSUELLE"` / `"ANNUELLE"` comme valeurs de fréquence, mais le frontend stocke peut-être `"MONTHLY"` / `"ANNUAL"` / `"QUARTERLY"` / `"SEMI_ANNUAL"`.
 
-Ajouter un `console.log` après la déclaration de `charges` :
+### Modifications
 
-```typescript
-function mapOperatingCharges(project: any): BackendOperatingCharge[] {
-  const charges: any[] = project.exploitation?.charges ?? [];
-  console.log("CHARGES SAS:", charges.length, charges);
-  const gestionnaires: any[] = project.exploitation?.gestionnaires ?? [];
-```
+**Fichier** : `src/engine/mapToProjectionInputs.ts`
 
-### Étape suivante
+1. **Réécrire `mapOperatingCharges`** (lignes 256-299) avec la version fournie par l'utilisateur :
+   - Support des fréquences `QUARTERLY`, `ANNUAL`, `SEMI_ANNUAL`, `MONTHLY` (en plus de `MENSUELLE`/`ANNUELLE`)
+   - Utilise `Number()` pour sécuriser les conversions
+   - Supprime le filtrage `monthlyHT <= 0` (les charges à 0 seront envoyées, le backend filtre)
+   - Conserve la section gestionnaires après le mapping des charges
 
-Une fois le log en place, je lirai les console logs du preview pour voir ce que le mapper reçoit effectivement comme charges SAS.
+2. **Ajouter un `console.log`** juste avant le `return` final (ligne 455) :
+   ```typescript
+   console.log('operatingCharges built:', operatingCharges);
+   ```
+
+3. **Mettre à jour `toMonthlyAmount`** (ligne 109) pour supporter les nouvelles fréquences (`QUARTERLY`, `SEMI_ANNUAL`, `ANNUAL`) en plus de `ANNUELLE`.
 
 ### Fichier modifié
 
-1. `src/engine/mapToProjectionInputs.ts` — 1 ligne ajoutée (console.log)
+1. `src/engine/mapToProjectionInputs.ts` — réécriture mapOperatingCharges + log debug
 
