@@ -168,9 +168,11 @@ async function fetchMonthlyResults(inputs: EngineInputs): Promise<BackendMonthly
 // =============================================
 export function useMonthlyResults() {
   const inputs = useBuildScenarioInputs();
+  console.log("useMonthlyResults CALLED, inputs keys:", Object.keys(inputs));
+  console.log("useMonthlyResults exploitation.charges:", inputs.exploitation?.charges?.length);
 
   return useQuery<BackendMonthlyResult[]>({
-    queryKey: ["monthly-results", inputs],
+    queryKey: ["monthly-results", JSON.stringify(inputs)],
     queryFn: () => fetchMonthlyResults(inputs),
     staleTime: 30_000,
     placeholderData: (prev) => prev,
