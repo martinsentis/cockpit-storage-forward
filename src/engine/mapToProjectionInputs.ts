@@ -255,6 +255,7 @@ function mapPhasesAndRevenue(project: any): {
 
 function mapOperatingCharges(project: any): BackendOperatingCharge[] {
   const charges: any[] = project.exploitation?.charges ?? [];
+  console.log("CHARGES SAS:", charges.length, charges);
   const gestionnaires: any[] = project.exploitation?.gestionnaires ?? [];
   const result: BackendOperatingCharge[] = [];
 
