@@ -51,12 +51,15 @@ function buildSciRows(months: BackendMonthlyResult[]) {
   let prevCash = months[0]?.sciCashEnd ?? 0;
   return months.map((m, i) => {
     const cat = m.projectedByCategory ?? {};
-    const loyer = cat["SCI_RENT"] ?? 0; // = SAS_RENT en valeur absolue
+    const loyer = cat["SCI_RENT"] ?? 0;
+    const autresRevenus = cat["SCI_OTHER_REVENUE"] ?? 0;
+    const caTotal = loyer + autresRevenus;
+    const charges = Math.abs(cat["SCI_CHARGES"] ?? 0);
     const interest = Math.abs(cat["SCI_DEBT_INTEREST"] ?? 0);
     const principal = Math.abs(cat["SCI_DEBT_PRINCIPAL"] ?? 0);
     const insurance = Math.abs(cat["SCI_DEBT_INSURANCE"] ?? 0);
     const tax = Math.abs(cat["SCI_TAX"] ?? 0);
-    const ebe = loyer - interest;
+    const ebe = caTotal - charges - interest;
     const debtService = interest + principal + insurance;
     const resNet = ebe - tax;
     const amortissement = m.sciAmortization ?? 0;
@@ -65,6 +68,9 @@ function buildSciRows(months: BackendMonthlyResult[]) {
     return {
       mois: m.monthIndex + 1,
       loyer,
+      autresRevenus,
+      caTotal,
+      charges,
       interest,
       amortissement,
       ebe,
