@@ -1,45 +1,35 @@
 
 
-## Plan : Ajout des champs backend + sciOtherRevenuesMonthly
+## Plan : Amortissements simplifiés + nouvelles colonnes SCI
 
-### 1. BackendMonthlyResult — ajouter 2 champs
-
-**Fichier** : `src/hooks/useEngine.ts`, ligne 122-131
-
-Ajouter `leasedSurfacePercent` et `sciAmortization` à l'interface :
-
-```typescript
-export interface BackendMonthlyResult {
-  monthIndex: number;
-  cashEnd: number;
-  sciCashEnd: number;
-  dscr: number;
-  leasedSurface: number;
-  activeSurface: number;
-  leasedSurfacePercent: number;
-  sciAmortization: number;
-  projectedByCategory?: Record<string, number>;
-  warnings?: string[];
-}
-```
-
-### 2. EngineMonthlyPnL — utiliser leasedSurfacePercent
-
-**Fichier** : `src/components/engine/EngineMonthlyPnL.tsx`
-
-- **Table SAS** (buildSasRows) : remplacer le calcul `leasedSurface / activeSurface` par `m.leasedSurfacePercent`. Affichage : `(month.leasedSurfacePercent * 100).toFixed(1) + '%'`.
-- **Table SCI** (buildSciRows + SciTable) : ajouter une colonne "Amortissement" affichant `month.sciAmortization` via `fmt()`.
-
-### 3. ProjectionInputs — ajouter sciOtherRevenuesMonthly
+### 1. Simplifier computeSciAmortization
 
 **Fichier** : `src/engine/mapToProjectionInputs.ts`
 
-- Ajouter `sciOtherRevenuesMonthly: number` dans l'interface `ProjectionInputs`.
-- Dans l'objet retourné par `mapToProjectionInputs`, calculer la valeur depuis `project.fonciere.otherRevenues` (filtre actifs, conversion HT, mensualisation si annuel).
+- Supprimer la constante `SCI_AMORTIZABLE` (ligne 327)
+- Dans la boucle interne de `computeSciAmortization`, retirer les lignes `const cat = ...` et `if (!SCI_AMORTIZABLE.includes(cat)) continue;` — ne garder que le filtre `if (!asset.amortissable) continue;`
+
+### 2. Nouvelles colonnes dans le tableau SCI
+
+**Fichier** : `src/components/engine/EngineMonthlyPnL.tsx`
+
+**buildSciRows** — ajouter 3 champs au return :
+- `autresRevenus`: `cat["SCI_OTHER_REVENUE"] ?? 0`
+- `caTotal`: `loyer + autresRevenus`
+- `charges`: `Math.abs(cat["SCI_CHARGES"] ?? 0)`
+
+Recalculer EBE : `caTotal - charges - interest`
+
+**SciTable** — modifier les colonnes :
+1. "Loyer reçu (SAS)" — valeur existante `loyer`
+2. **Nouveau** "Autres revenus" — `autresRevenus`
+3. **Nouveau** "CA total" — `caTotal`
+4. **Nouveau** "Charges" — `charges`
+5. "Amortissement" — existant
+6. Colonnes existantes (EBE, IS, Rés. net, Service dette, CF net)
 
 ### Fichiers modifiés
 
-1. `src/hooks/useEngine.ts` — 2 lignes ajoutées dans l'interface
-2. `src/components/engine/EngineMonthlyPnL.tsx` — calcul % surface + colonne amortissement SCI
-3. `src/engine/mapToProjectionInputs.ts` — champ sciOtherRevenuesMonthly dans interface + return
+1. `src/engine/mapToProjectionInputs.ts` — suppression filtre catégorie amortissement
+2. `src/components/engine/EngineMonthlyPnL.tsx` — 3 nouvelles colonnes SCI + recalcul EBE
 
