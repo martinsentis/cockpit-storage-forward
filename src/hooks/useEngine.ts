@@ -107,7 +107,7 @@ export function useEngineWithScenario(): EngineOutputs {
   const inputs = useBuildScenarioInputs();
 
   const { data } = useQuery({
-    queryKey: ["engine", inputs],
+    queryKey: ["engine", JSON.stringify(inputs)],
     queryFn: () => fetchEngine(inputs),
     initialData: computeEngine(inputs),
     staleTime: 10_000,
