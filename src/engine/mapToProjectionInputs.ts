@@ -100,8 +100,13 @@ function pctToDecimal(rate: number | null | undefined): number {
 
 /** ChargeItem.amountInput + frequency → montant mensuel */
 function toMonthlyAmount(amount: number, frequency: string): number {
-  if (frequency === "ANNUELLE") return amount / 12;
-  return amount; // MENSUELLE par défaut
+  switch (frequency) {
+    case "ANNUELLE":
+    case "ANNUAL": return amount / 12;
+    case "SEMI_ANNUAL": return amount / 6;
+    case "QUARTERLY": return amount / 3;
+    default: return amount; // MENSUELLE / MONTHLY
+  }
 }
 
 /** Montant TTC → HT */
@@ -254,22 +259,24 @@ function mapPhasesAndRevenue(project: any): {
 // ============================================================
 
 function mapOperatingCharges(project: any): BackendOperatingCharge[] {
-  const charges: any[] = project.exploitation?.charges ?? [];
-  console.log("CHARGES SAS:", charges.length, charges);
-  const gestionnaires: any[] = project.exploitation?.gestionnaires ?? [];
+  const charges: any[] = project?.exploitation?.charges ?? [];
+  const gestionnaires: any[] = project?.exploitation?.gestionnaires ?? [];
   const result: BackendOperatingCharge[] = [];
 
   // Charges fixes (ChargeItem)
-  for (const c of charges) {
-    if (c.isActive === false) continue;
-    const amountHT = toHT(c.amountInput ?? 0, c.amountType ?? "HT", c.vatRate ?? 0);
-    const monthlyHT = toMonthlyAmount(amountHT, c.frequency ?? "MENSUELLE");
-    if (monthlyHT <= 0) continue;
+  for (const charge of charges) {
+    const amountInput = Number(charge.amountInput ?? 0);
+    const frequency = charge.frequency ?? "MONTHLY";
+    const amountType = charge.amountType ?? "HT";
+    const vatRate = Number(charge.vatRate ?? 0);
+
+    const htAmount = amountType === "TTC" ? amountInput / (1 + vatRate) : amountInput;
+    const monthlyAmount = toMonthlyAmount(htAmount, frequency);
 
     result.push({
-      categoryCode: c.category ?? "SAS_OPEX",
-      monthlyAmount: monthlyHT,
-      isActive: true,
+      categoryCode: charge.categoryCode ?? charge.category ?? "SAS_OPEX",
+      monthlyAmount,
+      isActive: charge.isActive !== false,
     });
   }
 
@@ -279,10 +286,8 @@ function mapOperatingCharges(project: any): BackendOperatingCharge[] {
 
     let monthlyHT = 0;
     if (g.type === "SALARIE") {
-      // Coût employeur = salaire brut × (1 + charges patronales)
       monthlyHT = (g.salaireBrut ?? 0) * (1 + (g.tauxChargesPatronales ?? 0.45));
     } else {
-      // PRESTATAIRE : facturation mensuelle
       monthlyHT = toHT(g.facturationMensuelle ?? 0, g.prixType ?? "HT", g.vatRate ?? 0);
     }
 
@@ -451,6 +456,8 @@ export function mapToProjectionInputs(project: any, horizonMonths = 60): Project
   const distributableCashRate: number = globalRule.distributableCashRate ?? 0.8;
   const reserveStrategicRatio: number = globalRule.reserveStrategicRatio ?? 0;
   const ccaPriorityRatio: number = 1; // CCA prioritaire par défaut
+
+  console.log('operatingCharges built:', operatingCharges);
 
   return {
     horizonMonths: horizon,
