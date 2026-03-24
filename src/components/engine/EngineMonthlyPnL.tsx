@@ -182,7 +182,10 @@ function SciTable({ rows }: { rows: ReturnType<typeof buildSciRows> }) {
           <TableHeader>
             <TableRow className="text-xs">
               <TableHead>Mois</TableHead>
-              <TableHead className="text-right text-amber-600 font-semibold">Loyer reçu</TableHead>
+              <TableHead className="text-right text-amber-600 font-semibold">Loyer reçu (SAS)</TableHead>
+              <TableHead className="text-right">Autres revenus</TableHead>
+              <TableHead className="text-right font-semibold">CA total</TableHead>
+              <TableHead className="text-right text-red-600">Charges</TableHead>
               <TableHead className="text-right text-red-600">Intérêts dette</TableHead>
               <TableHead className="text-right text-muted-foreground">Amortissement</TableHead>
               <TableHead className="text-right font-semibold">EBE</TableHead>
@@ -197,10 +200,19 @@ function SciTable({ rows }: { rows: ReturnType<typeof buildSciRows> }) {
               <TableRow key={row.mois} className={row.cfNet < 0 ? "bg-red-50" : ""}>
                 <TableCell className="font-medium">{row.mois}</TableCell>
 
-                {/* Loyer reçu — même valeur que SAS, visuellement isolé */}
+                {/* Loyer reçu */}
                 <TableCell className="bg-amber-50 text-right">
                   <span className="font-semibold text-amber-700">{fmt(row.loyer)}</span>
                 </TableCell>
+
+                {/* Autres revenus */}
+                <TableCell className="text-right">{fmt(row.autresRevenus)}</TableCell>
+
+                {/* CA total */}
+                <TableCell className="text-right font-semibold">{fmt(row.caTotal)}</TableCell>
+
+                {/* Charges */}
+                <TableCell className="text-right text-red-500">{fmt(row.charges)}</TableCell>
 
                 {/* Intérêts */}
                 <TableCell className="text-right text-red-600">{fmt(row.interest)}</TableCell>
