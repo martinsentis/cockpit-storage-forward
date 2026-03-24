@@ -100,8 +100,13 @@ function pctToDecimal(rate: number | null | undefined): number {
 
 /** ChargeItem.amountInput + frequency → montant mensuel */
 function toMonthlyAmount(amount: number, frequency: string): number {
-  if (frequency === "ANNUELLE") return amount / 12;
-  return amount; // MENSUELLE par défaut
+  switch (frequency) {
+    case "ANNUELLE":
+    case "ANNUAL": return amount / 12;
+    case "SEMI_ANNUAL": return amount / 6;
+    case "QUARTERLY": return amount / 3;
+    default: return amount; // MENSUELLE / MONTHLY
+  }
 }
 
 /** Montant TTC → HT */
