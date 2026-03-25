@@ -274,7 +274,7 @@ function mapOperatingCharges(project: any): BackendOperatingCharge[] {
     const monthlyAmount = toMonthlyAmount(htAmount, frequency);
 
     result.push({
-      categoryCode: charge.categoryCode ?? charge.category ?? "SAS_OPEX",
+      categoryCode: "SAS_OPEX",
       monthlyAmount,
       isActive: charge.isActive !== false,
     });
