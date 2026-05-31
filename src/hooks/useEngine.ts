@@ -11,14 +11,13 @@ import { computeEngine } from "@/engine/engine";
 import { mapEngineInputsToProjectionInputs } from "@/engine/mapToProjectionInputs";
 import { mapProjectionResultsToEngineOutputs } from "@/engine/mapFromProjectionResults";
 import type { EngineOutputs, EngineInputs } from "@/engine/engineTypes";
+import { API_URL } from "@/config";
 
 async function fetchEngine(inputs: EngineInputs): Promise<EngineOutputs> {
-  console.log("FETCH ENGINE CALLED");
-  console.log("PAYLOAD", JSON.stringify(inputs, null, 2));
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20000);
   const payload = mapEngineInputsToProjectionInputs(inputs);
-  const res = await fetch("https://pilotagebox-production.up.railway.app/run-projection", {
+  const res = await fetch(`${API_URL}/run-projection`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -29,7 +28,9 @@ async function fetchEngine(inputs: EngineInputs): Promise<EngineOutputs> {
     const errBody = await res.text();
     throw new Error(`Engine API ${res.status}: ${errBody}`);
   }
-  const results = await res.json();
+  const data = await res.json();
+  // Le backend retourne { results: MonthlyResult[], investorMetrics: {...} }
+  const results = Array.isArray(data) ? data : (data.results ?? []);
   return mapProjectionResultsToEngineOutputs(results);
 }
 
@@ -132,15 +133,13 @@ export interface BackendMonthlyResult {
   warnings?: string[];
 }
 
-const API_BASE_URL = "https://pilotagebox-production.up.railway.app";
-
 async function fetchMonthlyResults(inputs: EngineInputs): Promise<BackendMonthlyResult[]> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20_000);
 
   try {
     const payload = mapEngineInputsToProjectionInputs(inputs);
-    const res = await fetch(`${API_BASE_URL}/run-projection`, {
+    const res = await fetch(`${API_URL}/run-projection`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -155,7 +154,8 @@ async function fetchMonthlyResults(inputs: EngineInputs): Promise<BackendMonthly
     }
 
     const data = await res.json();
-    return Array.isArray(data) ? data : (data.months ?? []);
+    // Le backend retourne { results: MonthlyResult[], investorMetrics: {...} }
+    return Array.isArray(data) ? data : (data.results ?? data.months ?? []);
   } catch (err) {
     clearTimeout(timeout);
     throw err;
@@ -168,8 +168,6 @@ async function fetchMonthlyResults(inputs: EngineInputs): Promise<BackendMonthly
 // =============================================
 export function useMonthlyResults() {
   const inputs = useBuildScenarioInputs();
-  console.log("useMonthlyResults CALLED, inputs keys:", Object.keys(inputs));
-  console.log("useMonthlyResults exploitation.charges:", inputs.exploitation?.charges?.length);
 
   return useQuery<BackendMonthlyResult[]>({
     queryKey: ["monthly-results", JSON.stringify(inputs)],

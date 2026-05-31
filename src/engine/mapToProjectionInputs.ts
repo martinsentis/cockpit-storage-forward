@@ -457,14 +457,19 @@ export function mapToProjectionInputs(project: any, horizonMonths = 60): Project
   const reserveStrategicRatio: number = globalRule.reserveStrategicRatio ?? 0;
   const ccaPriorityRatio: number = 1; // CCA prioritaire par défaut
 
-  console.log('operatingCharges built:', operatingCharges);
+  // Construire les taxSchedules depuis le taux IS du projet.
+  // Si taux = 25 % (IS France standard PME), on applique la tranche réduite à 15 % jusqu'à 42 500 €.
+  // Sinon on envoie un barème plat avec le taux configuré.
+  const taxSchedules = taxRate === 0.25
+    ? [{ startDate: projectStartDate, brackets: [{ upTo: 42500, rate: 0.15 }, { upTo: null, rate: 0.25 }] }]
+    : [{ startDate: projectStartDate, brackets: [{ upTo: null, rate: taxRate }] }];
 
   return {
     horizonMonths: horizon,
     initialCash,
     sciInitialCash,
     projectStartDate,
-    taxSchedules: [],
+    taxSchedules,
     taxRate,
     bufferMin,
     dscrMin,
