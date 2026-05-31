@@ -8,15 +8,15 @@ import { useQuery } from "@tanstack/react-query";
 import { useProject } from "@/contexts/ProjectContext";
 import { useScenario } from "@/contexts/ScenarioContext";
 import { computeEngine } from "@/engine/engine";
-import { mapEngineInputsToProjectionInputs } from "@/engine/mapToProjectionInputs";
+import { mapEngineInputsToProjectionInputs, type ScenarioOverrides } from "@/engine/mapToProjectionInputs";
 import { mapProjectionResultsToEngineOutputs } from "@/engine/mapFromProjectionResults";
 import type { EngineOutputs, EngineInputs } from "@/engine/engineTypes";
 import { API_URL } from "@/config";
 
-async function fetchEngine(inputs: EngineInputs): Promise<EngineOutputs> {
+async function fetchEngine(inputs: EngineInputs, overrides: ScenarioOverrides = {}): Promise<EngineOutputs> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20000);
-  const payload = mapEngineInputsToProjectionInputs(inputs);
+  const payload = mapEngineInputsToProjectionInputs(inputs, undefined, overrides);
   const res = await fetch(`${API_URL}/run-projection`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -106,10 +106,12 @@ function useBuildScenarioInputs(): EngineInputs {
  */
 export function useEngineWithScenario(): EngineOutputs {
   const inputs = useBuildScenarioInputs();
+  const { scenarioState } = useScenario();
+  const overrides: ScenarioOverrides = { indexationCA: scenarioState.indexationCA };
 
   const { data } = useQuery({
-    queryKey: ["engine", JSON.stringify(inputs)],
-    queryFn: () => fetchEngine(inputs),
+    queryKey: ["engine", JSON.stringify(inputs), scenarioState.indexationCA],
+    queryFn: () => fetchEngine(inputs, overrides),
     initialData: computeEngine(inputs),
     staleTime: 10_000,
   });
@@ -133,12 +135,12 @@ export interface BackendMonthlyResult {
   warnings?: string[];
 }
 
-async function fetchMonthlyResults(inputs: EngineInputs): Promise<BackendMonthlyResult[]> {
+async function fetchMonthlyResults(inputs: EngineInputs, overrides: ScenarioOverrides = {}): Promise<BackendMonthlyResult[]> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20_000);
 
   try {
-    const payload = mapEngineInputsToProjectionInputs(inputs);
+    const payload = mapEngineInputsToProjectionInputs(inputs, undefined, overrides);
     const res = await fetch(`${API_URL}/run-projection`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -168,10 +170,12 @@ async function fetchMonthlyResults(inputs: EngineInputs): Promise<BackendMonthly
 // =============================================
 export function useMonthlyResults() {
   const inputs = useBuildScenarioInputs();
+  const { scenarioState } = useScenario();
+  const overrides: ScenarioOverrides = { indexationCA: scenarioState.indexationCA };
 
   return useQuery<BackendMonthlyResult[]>({
-    queryKey: ["monthly-results", JSON.stringify(inputs)],
-    queryFn: () => fetchMonthlyResults(inputs),
+    queryKey: ["monthly-results", JSON.stringify(inputs), scenarioState.indexationCA],
+    queryFn: () => fetchMonthlyResults(inputs, overrides),
     staleTime: 30_000,
     placeholderData: (prev) => prev,
   });

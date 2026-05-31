@@ -217,7 +217,7 @@ function mapPhase(phase: any, index: number): BackendCapacityPhase {
 // source : project.exploitation.capacityPhases
 // ============================================================
 
-function mapPhasesAndRevenue(project: any): {
+function mapPhasesAndRevenue(project: any, indexationCA = 0): {
   phases: BackendCapacityPhase[];
   revenueParams: BackendRevenueParams;
 } {
@@ -247,8 +247,8 @@ function mapPhasesAndRevenue(project: any): {
     revenueParams: {
       pricePerM2,
       targetLeasedSurfacePercent,
-      annualIndexationRate: 0,
-      indexationMonth: 12,
+      annualIndexationRate: indexationCA,
+      indexationMonth: 0, // indexation appliquée à partir du mois 0
     },
   };
 }
@@ -258,13 +258,23 @@ function mapPhasesAndRevenue(project: any): {
 // source : project.exploitation.charges + project.exploitation.gestionnaires
 // ============================================================
 
-function mapOperatingCharges(project: any): BackendOperatingCharge[] {
+// Convertit "YYYY-MM" + horizon en indice de mois relatif au projectStartDate
+function monthLabelToIndex(yearMonth: string | null | undefined, projectStartDate: string): number | null {
+  if (!yearMonth) return null;
+  const [py, pm] = projectStartDate.split("-").map(Number);
+  const [ey, em] = yearMonth.split("-").map(Number);
+  return (ey - py) * 12 + (em - pm);
+}
+
+function mapOperatingCharges(project: any, projectStartDate: string): BackendOperatingCharge[] {
   const charges: any[] = project?.exploitation?.charges ?? [];
   const gestionnaires: any[] = project?.exploitation?.gestionnaires ?? [];
   const result: BackendOperatingCharge[] = [];
 
   // Charges fixes (ChargeItem)
   for (const charge of charges) {
+    if (charge.isActive === false) continue;
+
     const amountInput = Number(charge.amountInput ?? 0);
     const frequency = charge.frequency ?? "MONTHLY";
     const amountType = charge.amountType ?? "HT";
@@ -273,10 +283,19 @@ function mapOperatingCharges(project: any): BackendOperatingCharge[] {
     const htAmount = amountType === "TTC" ? amountInput / (1 + vatRate) : amountInput;
     const monthlyAmount = toMonthlyAmount(htAmount, frequency);
 
+    // Respect de la temporalité : startMonth (index direct) ou startDate (YYYY-MM)
+    const startIdx: number = charge.startMonth ?? monthLabelToIndex(charge.startDate, projectStartDate) ?? 0;
+    const endIdx: number | null = charge.endMonth ?? monthLabelToIndex(charge.endDate, projectStartDate) ?? null;
+
+    // Le backend ne gère pas la temporalité par charge — on active la charge seulement
+    // si elle démarre au mois 0 ou avant. Les charges futures sont envoyées comme inactives.
+    // Limitation connue : une charge qui démarre à M6 sera ignorée par le moteur actuel.
+    const isActiveNow = startIdx <= 0 && (endIdx === null || endIdx > 0);
+
     result.push({
       categoryCode: "SAS_OPEX",
       monthlyAmount,
-      isActive: charge.isActive !== false,
+      isActive: isActiveNow,
     });
   }
 
@@ -293,10 +312,16 @@ function mapOperatingCharges(project: any): BackendOperatingCharge[] {
 
     if (monthlyHT <= 0) continue;
 
+    const startIdx: number = g.startMonth ?? monthLabelToIndex(g.startDate, projectStartDate) ?? 0;
+    const endIdx: number | null = g.endMonth ?? monthLabelToIndex(g.endDate, projectStartDate) ?? null;
+    const isActiveNow = g.activeFromStart !== false
+      ? (startIdx <= 0 && (endIdx === null || endIdx > 0))
+      : (startIdx <= 0 && (endIdx === null || endIdx > 0));
+
     result.push({
       categoryCode: "SAS_OPEX",
       monthlyAmount: monthlyHT,
-      isActive: true,
+      isActive: isActiveNow,
     });
   }
 
@@ -411,7 +436,12 @@ function mapRentConstraints(project: any): BackendRentConstraints {
 // FONCTION PRINCIPALE
 // ============================================================
 
-export function mapToProjectionInputs(project: any, horizonMonths = 60): ProjectionInputs {
+export interface ScenarioOverrides {
+  /** Taux d'indexation annuel du CA (décimal, ex: 0.02 pour 2%). Défaut: 0. */
+  indexationCA?: number;
+}
+
+export function mapToProjectionInputs(project: any, horizonMonths = 60, overrides: ScenarioOverrides = {}): ProjectionInputs {
   // ── Projet ─────────────────────────────────────────────
   const projectStartDate = (project.projet?.projectStartDate ?? "2025-01").slice(0, 7);
 
@@ -436,8 +466,9 @@ export function mapToProjectionInputs(project: any, horizonMonths = 60): Project
   }[];
 
   // ── Exploitation ───────────────────────────────────────
-  const { phases, revenueParams } = mapPhasesAndRevenue(project);
-  const operatingCharges = mapOperatingCharges(project);
+  const indexationCA = overrides.indexationCA ?? 0;
+  const { phases, revenueParams } = mapPhasesAndRevenue(project, indexationCA);
+  const operatingCharges = mapOperatingCharges(project, projectStartDate);
   const services = mapServices(project);
 
   // ── SCI ────────────────────────────────────────────────
@@ -452,10 +483,22 @@ export function mapToProjectionInputs(project: any, horizonMonths = 60): Project
   const globalRule = gouv.globalRule ?? {};
 
   const ccaBalanceSas: number = gouv.ccaBalance ?? 0;
-  const ccaBalanceSci: number = 0; // non exposé dans GouvernanceData
+  // ccaBalanceSci non exposé dans GouvernanceData — limitation connue, toujours 0
+  const ccaBalanceSci: number = 0;
   const distributableCashRate: number = globalRule.distributableCashRate ?? 0.8;
   const reserveStrategicRatio: number = globalRule.reserveStrategicRatio ?? 0;
-  const ccaPriorityRatio: number = 1; // CCA prioritaire par défaut
+
+  // ccaPriorityRatio : déduit de allocationOrder si CCA_REPAYMENT présent, sinon 1 (priorité totale)
+  const allocationOrder: any[] = globalRule.allocationOrder ?? [];
+  const ccaStep = allocationOrder.find((s: any) => s.type === "CCA_REPAYMENT");
+  const ccaPriorityRatio: number = ccaStep
+    ? (ccaStep.mode === "UNTIL_ZERO" ? 1 : (ccaStep.ratio ?? 100) / 100)
+    : 1;
+
+  // reserveAfterCcaFullyRepaid : vrai si la réserve est positionnée APRÈS le CCA dans l'ordre
+  const ccaIdx = allocationOrder.findIndex((s: any) => s.type === "CCA_REPAYMENT");
+  const reserveIdx = allocationOrder.findIndex((s: any) => s.type === "RESERVE");
+  const reserveAfterCcaFullyRepaid: boolean = reserveIdx > ccaIdx && ccaIdx >= 0;
 
   // Construire les taxSchedules depuis le taux IS du projet.
   // Si taux = 25 % (IS France standard PME), on applique la tranche réduite à 15 % jusqu'à 42 500 €.
@@ -493,7 +536,7 @@ export function mapToProjectionInputs(project: any, horizonMonths = 60): Project
     distributableCashRate,
     ccaPriorityRatio,
     reserveStrategicRatio,
-    reserveAfterCcaFullyRepaid: false,
+    reserveAfterCcaFullyRepaid,
   };
 }
 
