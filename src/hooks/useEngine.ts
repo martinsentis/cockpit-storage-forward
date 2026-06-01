@@ -1,17 +1,15 @@
 /**
  * useEngine — React hook that provides engine outputs, fetched from backend API.
- * Falls back to local computeEngine for initial rendering.
+ * Projection pages must only use Railway backend results.
  */
 
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useProject } from "@/contexts/ProjectContext";
 import { useScenario } from "@/contexts/ScenarioContext";
-import { computeEngine, phaseCAHT, phaseSurface } from "@/engine/engine";
 import { mapEngineInputsToProjectionInputs, type ScenarioOverrides } from "@/engine/mapToProjectionInputs";
 import { mapProjectionResultsToEngineOutputs } from "@/engine/mapFromProjectionResults";
 import type { EngineOutputs, EngineInputs } from "@/engine/engineTypes";
-import type { DebtItem } from "@/types/project";
 import { API_URL } from "@/config";
 
 async function fetchEngine(inputs: EngineInputs, overrides: ScenarioOverrides = {}): Promise<EngineOutputs> {
@@ -37,7 +35,7 @@ async function fetchEngine(inputs: EngineInputs, overrides: ScenarioOverrides = 
 
 export { fetchEngine };
 
-export function useEngine(): EngineOutputs {
+export function useEngine(): EngineOutputs | undefined {
   const { state } = useProject();
 
   const inputs = useMemo<EngineInputs>(
@@ -57,7 +55,6 @@ export function useEngine(): EngineOutputs {
   const { data } = useQuery({
     queryKey: ["engine", JSON.stringify(inputs)],
     queryFn: () => fetchEngine(inputs),
-    initialData: () => computeEngine(inputs),
     staleTime: 10_000,
     retry: 1,
   });
@@ -106,7 +103,7 @@ function useBuildScenarioInputs(): EngineInputs {
 /**
  * useEngineWithScenario — Merges ScenarioState overrides into EngineInputs.
  */
-export function useEngineWithScenario(): EngineOutputs {
+export function useEngineWithScenario(): EngineOutputs | undefined {
   const inputs = useBuildScenarioInputs();
   const { scenarioState } = useScenario();
   const overrides: ScenarioOverrides = { indexationCA: scenarioState.indexationCA };
@@ -114,7 +111,6 @@ export function useEngineWithScenario(): EngineOutputs {
   const { data } = useQuery({
     queryKey: ["engine", JSON.stringify(inputs), scenarioState.indexationCA],
     queryFn: () => fetchEngine(inputs, overrides),
-    initialData: computeEngine(inputs),
     staleTime: 10_000,
     retry: 1,
   });
