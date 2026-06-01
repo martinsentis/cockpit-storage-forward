@@ -7,15 +7,16 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useProject } from "@/contexts/ProjectContext";
 import { useScenario } from "@/contexts/ScenarioContext";
-import { computeEngine } from "@/engine/engine";
+import { computeEngine, phaseCAHT, phaseSurface } from "@/engine/engine";
 import { mapEngineInputsToProjectionInputs, type ScenarioOverrides } from "@/engine/mapToProjectionInputs";
 import { mapProjectionResultsToEngineOutputs } from "@/engine/mapFromProjectionResults";
 import type { EngineOutputs, EngineInputs } from "@/engine/engineTypes";
+import type { DebtItem } from "@/types/project";
 import { API_URL } from "@/config";
 
 async function fetchEngine(inputs: EngineInputs, overrides: ScenarioOverrides = {}): Promise<EngineOutputs> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20000);
+  const timeout = setTimeout(() => controller.abort(), 8_000);
   const payload = mapEngineInputsToProjectionInputs(inputs, undefined, overrides);
   const res = await fetch(`${API_URL}/run-projection`, {
     method: "POST",
@@ -56,8 +57,9 @@ export function useEngine(): EngineOutputs {
   const { data } = useQuery({
     queryKey: ["engine", JSON.stringify(inputs)],
     queryFn: () => fetchEngine(inputs),
-    placeholderData: computeEngine(inputs),
+    initialData: () => computeEngine(inputs),
     staleTime: 10_000,
+    retry: 1,
   });
 
   return data;
@@ -114,6 +116,7 @@ export function useEngineWithScenario(): EngineOutputs {
     queryFn: () => fetchEngine(inputs, overrides),
     initialData: computeEngine(inputs),
     staleTime: 10_000,
+    retry: 1,
   });
 
   return data;
