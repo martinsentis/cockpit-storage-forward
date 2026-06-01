@@ -56,6 +56,7 @@ function toYearlyWaterfall(
   months: BackendMonthlyResult[],
   gouvernance: GouvernanceData,
   bufferMin: number,
+  ccaBalances: { sas: number; sci: number },
 ): YearRow[] {
   const rule = gouvernance.globalRule;
   const order = rule.allocationOrder ?? [];
@@ -69,8 +70,8 @@ function toYearlyWaterfall(
       : (ccaStep.ratio ?? 0) / 100
     : 0;
 
-  // Solde CCA SAS uniquement (le type ne contient pas de ccaBalanceSci)
-  let ccaRemaining = Math.max(0, gouvernance.ccaBalance ?? 0);
+  let ccaRemainingSas = Math.max(0, ccaBalances.sas);
+  let ccaRemainingSci = Math.max(0, ccaBalances.sci);
 
   const years: YearRow[] = [];
   const totalYears = Math.ceil(months.length / 12);
@@ -98,24 +99,27 @@ function toYearlyWaterfall(
     const sciCashEnd = last?.sciCashEnd ?? 0;
 
     // ── Estimation locale des distributions ────────────────
-    // SAS : repartit cashDispo selon CCA -> RESERVE -> DIVIDENDS
     const sasCashDispo = Math.max(0, sasCashEnd - bufferMin);
     const sasDistrTotal = sasCashDispo * (rule.distributableCashRate ?? 0);
     let sasCca = 0;
-    if (ccaFirst && ccaRemaining > 0) {
-      sasCca = Math.min(sasDistrTotal * ccaPriorityRatio, ccaRemaining);
-      ccaRemaining -= sasCca;
+    if (ccaFirst && ccaRemainingSas > 0) {
+      sasCca = Math.min(sasDistrTotal * ccaPriorityRatio, ccaRemainingSas);
+      ccaRemainingSas -= sasCca;
     }
     const sasAfterCca = sasDistrTotal - sasCca;
     const sasReserve = sasAfterCca * (rule.reserveStrategicRatio ?? 0);
     const sasDividends = sasAfterCca - sasReserve;
 
-    // SCI : pas de CCA (ccaBalanceSci absent du modèle)
     const sciCashDispo = Math.max(0, sciCashEnd - bufferMin);
     const sciDistrTotal = sciCashDispo * (rule.distributableCashRate ?? 0);
-    const sciReserve = sciDistrTotal * (rule.reserveStrategicRatio ?? 0);
-    const sciDividends = sciDistrTotal - sciReserve;
-    const sciCca = 0;
+    let sciCca = 0;
+    if (ccaFirst && ccaRemainingSci > 0) {
+      sciCca = Math.min(sciDistrTotal * ccaPriorityRatio, ccaRemainingSci);
+      ccaRemainingSci -= sciCca;
+    }
+    const sciAfterCca = sciDistrTotal - sciCca;
+    const sciReserve = sciAfterCca * (rule.reserveStrategicRatio ?? 0);
+    const sciDividends = sciAfterCca - sciReserve;
 
     const dividends = sasDividends + sciDividends;
     const ccaRepayment = sasCca + sciCca;
@@ -153,9 +157,21 @@ export default function ProjectionAssociesPage() {
   );
   const physicalAssociates = state.associes.associes.filter((a) => a.type === "PHYSIQUE");
 
+  const ccaBalances = useMemo(() => {
+    const apports = state.apports?.apports ?? [];
+    return {
+      sas: apports
+        .filter((a) => a.type === "CCA" && a.beneficiaireId === "__exploitation__")
+        .reduce((s, a) => s + (a.montant ?? 0), 0),
+      sci: apports
+        .filter((a) => a.type === "CCA" && a.beneficiaireId === "__fonciere__")
+        .reduce((s, a) => s + (a.montant ?? 0), 0),
+    };
+  }, [state.apports]);
+
   const waterfall = useMemo(
-    () => toYearlyWaterfall(monthlyResults, state.gouvernance, state.financement.bufferMin ?? 0),
-    [monthlyResults, state.gouvernance, state.financement.bufferMin],
+    () => toYearlyWaterfall(monthlyResults, state.gouvernance, state.financement.bufferMin ?? 0, ccaBalances),
+    [monthlyResults, state.gouvernance, state.financement.bufferMin, ccaBalances],
   );
 
   // ── Valeur de sortie ─────────────────────────────────────────

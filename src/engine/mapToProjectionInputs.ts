@@ -482,9 +482,14 @@ export function mapToProjectionInputs(project: any, horizonMonths = 60, override
   const gouv = project.gouvernance ?? {};
   const globalRule = gouv.globalRule ?? {};
 
-  const ccaBalanceSas: number = gouv.ccaBalance ?? 0;
-  // ccaBalanceSci non exposé dans GouvernanceData — limitation connue, toujours 0
-  const ccaBalanceSci: number = 0;
+  // Soldes CCA dérivés des apports (source de vérité), pas du champ manuel gouv.ccaBalance
+  const apportsList: any[] = project.apports?.apports ?? [];
+  const ccaBalanceSas: number = apportsList
+    .filter((a: any) => a.type === "CCA" && a.beneficiaireId === "__exploitation__")
+    .reduce((s: number, a: any) => s + (a.montant ?? 0), 0);
+  const ccaBalanceSci: number = apportsList
+    .filter((a: any) => a.type === "CCA" && a.beneficiaireId === "__fonciere__")
+    .reduce((s: number, a: any) => s + (a.montant ?? 0), 0);
   const distributableCashRate: number = globalRule.distributableCashRate ?? 0.8;
   const reserveStrategicRatio: number = globalRule.reserveStrategicRatio ?? 0;
 
