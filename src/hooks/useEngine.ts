@@ -12,22 +12,47 @@ import { mapProjectionResultsToEngineOutputs } from "@/engine/mapFromProjectionR
 import type { EngineOutputs, EngineInputs } from "@/engine/engineTypes";
 import { API_URL } from "@/config";
 
-async function fetchEngine(inputs: EngineInputs, overrides: ScenarioOverrides = {}): Promise<EngineOutputs> {
+const ENGINE_TIMEOUT_MS = 45_000;
+
+async function postProjection(inputs: EngineInputs, overrides: ScenarioOverrides = {}) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8_000);
-  const payload = mapEngineInputsToProjectionInputs(inputs, undefined, overrides);
-  const res = await fetch(`${API_URL}/run-projection`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-    signal: controller.signal,
-  });
-  clearTimeout(timeout);
-  if (!res.ok) {
-    const errBody = await res.text();
-    throw new Error(`Engine API ${res.status}: ${errBody}`);
+  const timeout = setTimeout(() => controller.abort(), ENGINE_TIMEOUT_MS);
+
+  try {
+    const payload = mapEngineInputsToProjectionInputs(inputs, undefined, overrides);
+    const res = await fetch(`${API_URL}/run-projection`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new Error(`Engine API ${res.status}: ${errBody}`);
+    }
+
+    return res.json();
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error("Railway n'a pas répondu avant 45 secondes.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
   }
-  const data = await res.json();
+}
+
+const railwayQueryOptions = {
+  staleTime: 30_000,
+  retry: 3,
+  retryDelay: (attemptIndex: number) => Math.min(2_000 * 2 ** attemptIndex, 10_000),
+  refetchOnReconnect: true,
+  refetchOnWindowFocus: true,
+} as const;
+
+async function fetchEngine(inputs: EngineInputs, overrides: ScenarioOverrides = {}): Promise<EngineOutputs> {
+  const data = await postProjection(inputs, overrides);
   // Le backend retourne { results: MonthlyResult[], investorMetrics: {...} }
   const results = Array.isArray(data) ? data : (data.results ?? []);
   return mapProjectionResultsToEngineOutputs(results);
@@ -55,8 +80,7 @@ export function useEngine(): EngineOutputs | undefined {
   const { data } = useQuery({
     queryKey: ["engine", JSON.stringify(inputs)],
     queryFn: () => fetchEngine(inputs),
-    staleTime: 10_000,
-    retry: 1,
+    ...railwayQueryOptions,
   });
 
   return data;
@@ -111,8 +135,7 @@ export function useEngineWithScenario(): EngineOutputs | undefined {
   const { data } = useQuery({
     queryKey: ["engine", JSON.stringify(inputs), scenarioState.indexationCA],
     queryFn: () => fetchEngine(inputs, overrides),
-    staleTime: 10_000,
-    retry: 1,
+    ...railwayQueryOptions,
   });
 
   return data;
@@ -135,32 +158,9 @@ export interface BackendMonthlyResult {
 }
 
 async function fetchMonthlyResults(inputs: EngineInputs, overrides: ScenarioOverrides = {}): Promise<BackendMonthlyResult[]> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8_000);
-
-  try {
-    const payload = mapEngineInputsToProjectionInputs(inputs, undefined, overrides);
-    const res = await fetch(`${API_URL}/run-projection`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeout);
-
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Backend error ${res.status}: ${errText}`);
-    }
-
-    const data = await res.json();
-    // Le backend retourne { results: MonthlyResult[], investorMetrics: {...} }
-    return Array.isArray(data) ? data : (data.results ?? data.months ?? []);
-  } catch (err) {
-    clearTimeout(timeout);
-    throw err;
-  }
+  const data = await postProjection(inputs, overrides);
+  // Le backend retourne { results: MonthlyResult[], investorMetrics: {...} }
+  return Array.isArray(data) ? data : (data.results ?? data.months ?? []);
 }
 
 // =============================================
@@ -175,7 +175,6 @@ export function useMonthlyResults() {
   return useQuery<BackendMonthlyResult[]>({
     queryKey: ["monthly-results", JSON.stringify(inputs), scenarioState.indexationCA],
     queryFn: () => fetchMonthlyResults(inputs, overrides),
-    staleTime: 30_000,
-    retry: 1,
+    ...railwayQueryOptions,
   });
 }
