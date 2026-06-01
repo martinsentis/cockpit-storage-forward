@@ -1,6 +1,7 @@
 import { Outlet } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { RailwayStatusIndicator } from "@/components/RailwayStatusIndicator";
 
 export default function Layout() {
   return (
@@ -17,6 +18,7 @@ export default function Layout() {
           </main>
         </div>
       </div>
+      <RailwayStatusIndicator />
     </SidebarProvider>
   );
 }
