@@ -1,29 +1,55 @@
-# Sélection associé sur le graphique de flux distribués
+# Comptes courants non remboursés — corriger la source du solde CCA
 
-Ajouter un sélecteur au-dessus du graphique « Flux distribués aux associés » dans `src/pages/ProjectionAssociesPage.tsx`.
+## Diagnostic
 
-## Comportement
+Le solde CCA utilisé pour estimer le remboursement vient de `state.gouvernance.ccaBalance`. C'est un **champ manuel** sur la gouvernance, **jamais alimenté automatiquement** depuis les apports → il vaut 0 par défaut, donc :
+- la page Projection associés calcule `ccaRemaining = 0` → aucun remboursement, même avec « CCA en priorité jusqu'à épuisement ».
+- le mapper Railway envoie également `ccaBalanceSas: 0` au backend (et `ccaBalanceSci: 0` toujours).
 
-- Un `Select` shadcn affiché dans le `CardHeader` du graphique.
-- Options :
-  - **« Tous les associés (vue globale) »** (défaut) → affiche le waterfall consolidé actuel (dividendes / CCA / total distribué pour 100 % du capital).
-  - Une option par personne physique (`physicalAssociates`), libellée « Prénom Nom — Expl. X.X% / Fonc. Y.Y% ».
-- Quand un associé est sélectionné, les barres affichent **sa quote-part** année par année, calculée comme :
-  - `dividends = _sasDividends × pExp + _sciDividends × pFon`
-  - `ccaRepayment = _sasCca × pExp + _sciCca × pFon`
-  - `totalDistributed = dividends + ccaRepayment + (réserves × parts)` — réserves recalculées à partir du delta `_sasDividends`/`_sciDividends` vs `totalDistributed` global, ou plus simplement on n'affiche que `dividends` + `ccaRepayment` en mode individuel (la « réserve » n'est pas distribuée à l'associé). À choisir : je propose **dividendes + CCA uniquement** en vue individuelle (plus juste financièrement), et **ne pas montrer la barre `totalDistributed`** dans ce cas.
-- Le titre du graphique passe à « Flux distribués à {nom} » quand un associé est sélectionné.
+Or les **vrais** soldes CCA sont stockés dans `state.apports.apports` (items où `type === "CCA"`), avec :
+- `beneficiaireId === "__exploitation__"` → CCA SAS
+- `beneficiaireId === "__fonciere__"` → CCA Foncière
 
-## État
+## Correctif
 
-- `useState<string>("__all__")` pour l'associé sélectionné (id ou `"__all__"`).
-- `useMemo` qui dérive `chartData` à partir de `waterfall` + `economicOwnership` + sélection.
+### 1. Page `ProjectionAssociesPage.tsx`
 
-## Fichier touché
+Calculer les soldes CCA réels à partir des apports :
 
-- `src/pages/ProjectionAssociesPage.tsx` uniquement. Aucune modification du moteur, des types, ni des autres pages.
+```ts
+const ccaBalanceSas = state.apports.apports
+  .filter(a => a.type === "CCA" && a.beneficiaireId === "__exploitation__")
+  .reduce((s, a) => s + a.montant, 0);
+const ccaBalanceSci = state.apports.apports
+  .filter(a => a.type === "CCA" && a.beneficiaireId === "__fonciere__")
+  .reduce((s, a) => s + a.montant, 0);
+```
 
-## Points à confirmer
+Étendre `toYearlyWaterfall` pour accepter `{ ccaBalanceSas, ccaBalanceSci }` au lieu du seul `gouvernance.ccaBalance`, et appliquer l'algorithme par entité :
+- SAS : prélève sur `ccaRemainingSas` selon `ccaPriorityRatio` / `UNTIL_ZERO`, puis réserve, puis dividendes.
+- Foncière : même logique sur `ccaRemainingSci` (au lieu d'ignorer le CCA SCI comme aujourd'hui).
 
-1. En vue individuelle, faut-il afficher **uniquement dividendes + CCA** (montants réellement perçus par l'associé), ou **garder la barre « cash distribué total »** au prorata (qui inclut la réserve, non perçue) ?
-2. Veux-tu aussi voir les **dividendes nets après PFU** dans le graphique individuel (barre supplémentaire), ou rester sur les montants bruts comme la vue globale ?
+### 2. Mapper Railway (`src/engine/mapToProjectionInputs.ts`)
+
+Remplacer le calcul actuel de `ccaBalanceSas` / `ccaBalanceSci` par la même somme sur les apports :
+- `ccaBalanceSas = somme apports CCA → __exploitation__`
+- `ccaBalanceSci = somme apports CCA → __fonciere__`
+
+(Cela règle aussi la limitation #2 du `MAPPING_AUDIT.md` côté SCI.)
+
+### 3. `MAPPING_AUDIT.md`
+
+Mettre à jour la limitation #2 : `ccaBalanceSci` est désormais dérivé des apports (plus une limitation).
+
+## Fichiers touchés
+
+- `src/pages/ProjectionAssociesPage.tsx`
+- `src/engine/mapToProjectionInputs.ts`
+- `MAPPING_AUDIT.md`
+
+Aucun changement de types, de gouvernance, ni de backend.
+
+## Hors scope
+
+- Refondre l'UI Gouvernance pour supprimer/lier le champ `ccaBalance` manuel (à voir plus tard pour éviter la double saisie).
+- Émission backend des catégories `*_DISTRIBUTION_*` (limitation #6 inchangée).
