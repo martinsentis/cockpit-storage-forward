@@ -1,9 +1,11 @@
 import { useProject } from "@/contexts/ProjectContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle, CheckCircle } from "lucide-react";
 import type { SectionName } from "@/types/project";
 import ProjectTimeline from "@/components/ProjectTimeline";
+import { useMonthlyResults } from "@/hooks/useEngine";
+import type { BackendMonthlyResult } from "@/hooks/useEngine";
 
 const SECTION_LABELS: Record<SectionName, string> = {
   projet: "Projet",
@@ -20,9 +22,19 @@ const SECTION_LABELS: Record<SectionName, string> = {
 
 export default function DashboardPage() {
   const { validated, isProjectComplete } = useProject();
+  const { data: monthlyResults = [], isError } = useMonthlyResults();
 
   const complete = isProjectComplete();
   const missingSections = (Object.keys(validated) as SectionName[]).filter(k => !validated[k]);
+  const firstYear = monthlyResults.slice(0, 12);
+  const cat = (m: BackendMonthlyResult) => m.projectedByCategory ?? {};
+  const revenue = firstYear.reduce((s, m) => s + (cat(m)["SAS_REVENUE"] ?? 0), 0);
+  const opex = firstYear.reduce((s, m) => s + Math.abs(cat(m)["SAS_OPEX"] ?? 0), 0);
+  const rent = firstYear.reduce((s, m) => s + Math.abs(cat(m)["SAS_RENT"] ?? 0), 0);
+  const lastMonth = monthlyResults[monthlyResults.length - 1];
+  const avgDscrValues = firstYear.map((m) => m.dscr).filter((v) => v > 0);
+  const avgDscr = avgDscrValues.length ? avgDscrValues.reduce((a, b) => a + b, 0) / avgDscrValues.length : 0;
+  const fmt = (v: number) => v.toLocaleString("fr-FR", { maximumFractionDigits: 0 }) + " €";
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -51,13 +63,33 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* TODO: simulation remplacée par moteur engine.ts */}
-          <Button disabled className="w-full">
-            Simulation non connectée
-          </Button>
-          <p className="text-xs text-muted-foreground text-center">
-            La simulation sera alimentée par le moteur de projection.
-          </p>
+          {isError && (
+            <Alert className="border-primary/30 bg-primary/5">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                Moteur distant indisponible : affichage temporaire avec la projection locale.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="rounded-md border bg-card p-4">
+              <p className="text-sm text-muted-foreground">CA HT année 1</p>
+              <p className="text-xl font-semibold">{fmt(revenue)}</p>
+            </div>
+            <div className="rounded-md border bg-card p-4">
+              <p className="text-sm text-muted-foreground">EBE année 1</p>
+              <p className="text-xl font-semibold">{fmt(revenue - opex - rent)}</p>
+            </div>
+            <div className="rounded-md border bg-card p-4">
+              <p className="text-sm text-muted-foreground">Trésorerie fin projection</p>
+              <p className="text-xl font-semibold">{fmt(lastMonth?.cashEnd ?? 0)}</p>
+            </div>
+            <div className="rounded-md border bg-card p-4">
+              <p className="text-sm text-muted-foreground">DSCR moyen année 1</p>
+              <p className="text-xl font-semibold">{avgDscr.toFixed(2)} x</p>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>
