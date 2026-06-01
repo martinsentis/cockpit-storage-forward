@@ -194,7 +194,7 @@ function computeLocalMonthlyResults(inputs: EngineInputs, overrides: ScenarioOve
 
   return Array.from({ length: horizon }, (_, monthIndex) => {
     const indexFactor = Math.pow(1 + indexationCA, Math.floor(monthIndex / 12));
-    const activePhases = inputs.exploitation.capacityPhases.filter((p) => p.status !== "DRAFT" && p.status !== "INACTIVE");
+    const activePhases = inputs.exploitation.capacityPhases.filter((p) => p.status !== "DRAFT");
 
     let activeSurface = 0;
     let leasedSurface = 0;
