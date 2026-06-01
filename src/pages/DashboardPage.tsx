@@ -1,7 +1,7 @@
 import { useProject } from "@/contexts/ProjectContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle, CheckCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
 import type { SectionName } from "@/types/project";
 import ProjectTimeline from "@/components/ProjectTimeline";
 import { useMonthlyResults } from "@/hooks/useEngine";
@@ -22,7 +22,7 @@ const SECTION_LABELS: Record<SectionName, string> = {
 
 export default function DashboardPage() {
   const { validated, isProjectComplete } = useProject();
-  const { data: monthlyResults = [], isError } = useMonthlyResults();
+  const { data: monthlyResults = [], isLoading, isError, error } = useMonthlyResults();
 
   const complete = isProjectComplete();
   const missingSections = (Object.keys(validated) as SectionName[]).filter(k => !validated[k]);
@@ -64,32 +64,49 @@ export default function DashboardPage() {
           )}
 
           {isError && (
-            <Alert className="border-primary/30 bg-primary/5">
+            <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                Moteur distant indisponible : affichage temporaire avec la projection locale.
+                Railway n'a pas renvoyé de projection. Aucune valeur locale ou factice n'est affichée.
+                {error instanceof Error ? ` Détail : ${error.message}` : ""}
               </AlertDescription>
             </Alert>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="rounded-md border bg-card p-4">
-              <p className="text-sm text-muted-foreground">CA HT année 1</p>
-              <p className="text-xl font-semibold">{fmt(revenue)}</p>
+          {isLoading && (
+            <div className="flex items-center gap-3 rounded-md border bg-card p-4 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Calcul Railway en cours…
             </div>
-            <div className="rounded-md border bg-card p-4">
-              <p className="text-sm text-muted-foreground">EBE année 1</p>
-              <p className="text-xl font-semibold">{fmt(revenue - opex - rent)}</p>
+          )}
+
+          {!isLoading && !isError && monthlyResults.length === 0 && (
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>Railway a répondu, mais sans données de projection exploitables.</AlertDescription>
+            </Alert>
+          )}
+
+          {!isLoading && !isError && monthlyResults.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="rounded-md border bg-card p-4">
+                <p className="text-sm text-muted-foreground">CA HT année 1</p>
+                <p className="text-xl font-semibold">{fmt(revenue)}</p>
+              </div>
+              <div className="rounded-md border bg-card p-4">
+                <p className="text-sm text-muted-foreground">EBE année 1</p>
+                <p className="text-xl font-semibold">{fmt(revenue - opex - rent)}</p>
+              </div>
+              <div className="rounded-md border bg-card p-4">
+                <p className="text-sm text-muted-foreground">Trésorerie fin projection</p>
+                <p className="text-xl font-semibold">{fmt(lastMonth?.cashEnd ?? 0)}</p>
+              </div>
+              <div className="rounded-md border bg-card p-4">
+                <p className="text-sm text-muted-foreground">DSCR moyen année 1</p>
+                <p className="text-xl font-semibold">{avgDscr.toFixed(2)} x</p>
+              </div>
             </div>
-            <div className="rounded-md border bg-card p-4">
-              <p className="text-sm text-muted-foreground">Trésorerie fin projection</p>
-              <p className="text-xl font-semibold">{fmt(lastMonth?.cashEnd ?? 0)}</p>
-            </div>
-            <div className="rounded-md border bg-card p-4">
-              <p className="text-sm text-muted-foreground">DSCR moyen année 1</p>
-              <p className="text-xl font-semibold">{avgDscr.toFixed(2)} x</p>
-            </div>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>

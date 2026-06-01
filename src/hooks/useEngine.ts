@@ -1,17 +1,15 @@
 /**
  * useEngine — React hook that provides engine outputs, fetched from backend API.
- * Falls back to local computeEngine for initial rendering.
+ * Projection pages must only use Railway backend results.
  */
 
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useProject } from "@/contexts/ProjectContext";
 import { useScenario } from "@/contexts/ScenarioContext";
-import { computeEngine, phaseCAHT, phaseSurface } from "@/engine/engine";
 import { mapEngineInputsToProjectionInputs, type ScenarioOverrides } from "@/engine/mapToProjectionInputs";
 import { mapProjectionResultsToEngineOutputs } from "@/engine/mapFromProjectionResults";
 import type { EngineOutputs, EngineInputs } from "@/engine/engineTypes";
-import type { DebtItem } from "@/types/project";
 import { API_URL } from "@/config";
 
 async function fetchEngine(inputs: EngineInputs, overrides: ScenarioOverrides = {}): Promise<EngineOutputs> {
@@ -37,7 +35,7 @@ async function fetchEngine(inputs: EngineInputs, overrides: ScenarioOverrides = 
 
 export { fetchEngine };
 
-export function useEngine(): EngineOutputs {
+export function useEngine(): EngineOutputs | undefined {
   const { state } = useProject();
 
   const inputs = useMemo<EngineInputs>(
@@ -57,7 +55,6 @@ export function useEngine(): EngineOutputs {
   const { data } = useQuery({
     queryKey: ["engine", JSON.stringify(inputs)],
     queryFn: () => fetchEngine(inputs),
-    initialData: () => computeEngine(inputs),
     staleTime: 10_000,
     retry: 1,
   });
@@ -106,7 +103,7 @@ function useBuildScenarioInputs(): EngineInputs {
 /**
  * useEngineWithScenario — Merges ScenarioState overrides into EngineInputs.
  */
-export function useEngineWithScenario(): EngineOutputs {
+export function useEngineWithScenario(): EngineOutputs | undefined {
   const inputs = useBuildScenarioInputs();
   const { scenarioState } = useScenario();
   const overrides: ScenarioOverrides = { indexationCA: scenarioState.indexationCA };
@@ -114,7 +111,6 @@ export function useEngineWithScenario(): EngineOutputs {
   const { data } = useQuery({
     queryKey: ["engine", JSON.stringify(inputs), scenarioState.indexationCA],
     queryFn: () => fetchEngine(inputs, overrides),
-    initialData: computeEngine(inputs),
     staleTime: 10_000,
     retry: 1,
   });
@@ -167,98 +163,6 @@ async function fetchMonthlyResults(inputs: EngineInputs, overrides: ScenarioOver
   }
 }
 
-function toDecimalRate(rate: number | null | undefined): number {
-  if (!rate || !Number.isFinite(rate)) return 0;
-  return rate > 1 ? rate / 100 : rate;
-}
-
-function debtMonth(d: DebtItem, monthIndex: number) {
-  if (!d.amount || !d.durationMonths || monthIndex < (d.startMonth ?? 0)) return { interest: 0, principal: 0 };
-  const elapsed = monthIndex - (d.startMonth ?? 0);
-  if (elapsed >= d.durationMonths) return { interest: 0, principal: 0 };
-  if (d.type === "LEASE" && d.monthlyPayment > 0) return { interest: 0, principal: d.monthlyPayment };
-  const remainingPrincipal = Math.max(0, d.amount - (d.amount / d.durationMonths) * elapsed);
-  const interest = remainingPrincipal * toDecimalRate(d.annualRate) / 12 + (d.insuranceMonthly ?? 0);
-  const inDeferral = elapsed < (d.deferralMonths ?? 0);
-  const principal = inDeferral && d.deferralType !== "NONE" ? 0 : d.amount / d.durationMonths;
-  return { interest, principal };
-}
-
-function computeLocalMonthlyResults(inputs: EngineInputs, overrides: ScenarioOverrides = {}): BackendMonthlyResult[] {
-  const engine = computeEngine(inputs);
-  const horizon = Math.max(1, inputs.projet.horizonMonths || 120);
-  let cashEnd = inputs.financement.initialCash ?? 0;
-  let sciCashEnd = inputs.financement.sciInitialCash ?? 0;
-  const indexationCA = overrides.indexationCA ?? 0;
-  const taxRate = inputs.fiscalite.corporateTaxRate ?? 0.25;
-
-  return Array.from({ length: horizon }, (_, monthIndex) => {
-    const indexFactor = Math.pow(1 + indexationCA, Math.floor(monthIndex / 12));
-    const activePhases = inputs.exploitation.capacityPhases.filter((p) => p.status !== "DRAFT");
-
-    let activeSurface = 0;
-    let leasedSurface = 0;
-    let revenue = 0;
-
-    for (const phase of activePhases) {
-      const startMonth = phase.startMonth ?? 0;
-      if (monthIndex < startMonth) continue;
-      const rampMonths = Math.max(1, phase.rampUpMonths ?? 12);
-      const progress = Math.min(1, Math.max(0, (monthIndex - startMonth + 1) / rampMonths));
-      const targetOccupancy = phase.targetOccupancy > 1 ? phase.targetOccupancy / 100 : phase.targetOccupancy;
-      const surface = phaseSurface(phase);
-      activeSurface += surface;
-      leasedSurface += surface * targetOccupancy * progress;
-      revenue += phaseCAHT(phase) * targetOccupancy * progress * indexFactor;
-    }
-
-    const sasDebt = inputs.financement.debts
-      .filter((d) => d.entityId === "__exploitation__")
-      .reduce((acc, d) => {
-        const m = debtMonth(d, monthIndex);
-        return { interest: acc.interest + m.interest, principal: acc.principal + m.principal };
-      }, { interest: 0, principal: 0 });
-    const sciDebt = [...inputs.financement.sciDebts, ...inputs.financement.debts.filter((d) => d.entityId === "__fonciere__")]
-      .reduce((acc, d) => {
-        const m = debtMonth(d, monthIndex);
-        return { interest: acc.interest + m.interest, principal: acc.principal + m.principal };
-      }, { interest: 0, principal: 0 });
-
-    const opex = engine.exploitation.totalChargesHT + engine.exploitation.coutGestionnaires;
-    const rent = engine.loyerDynamique.loyerCalcule;
-    const sasTax = Math.max(0, revenue - opex - rent - sasDebt.interest) * taxRate;
-    const sciRent = rent;
-    const sciTax = Math.max(0, sciRent - engine.fonciere.totalChargesMensuellesHT - sciDebt.interest - engine.fonciere.amortissementAnnuel / 12) * taxRate;
-
-    cashEnd += revenue - opex - rent - sasDebt.interest - sasDebt.principal - sasTax;
-    sciCashEnd += sciRent + engine.fonciere.totalOtherRevenuesMensuellesHT - engine.fonciere.totalChargesMensuellesHT - sciDebt.interest - sciDebt.principal - sciTax;
-
-    return {
-      monthIndex,
-      cashEnd,
-      sciCashEnd,
-      dscr: sasDebt.interest + sasDebt.principal > 0 ? (revenue - opex - rent) / (sasDebt.interest + sasDebt.principal) : 0,
-      leasedSurface,
-      activeSurface,
-      leasedSurfacePercent: activeSurface > 0 ? leasedSurface / activeSurface : 0,
-      sciAmortization: engine.fonciere.amortissementAnnuel / 12,
-      projectedByCategory: {
-        SAS_REVENUE: revenue,
-        SAS_OPEX: -opex,
-        SAS_RENT: -rent,
-        SAS_EXP_DEBT_INTEREST: -sasDebt.interest,
-        SAS_EXP_DEBT_PRINCIPAL: -sasDebt.principal,
-        SAS_TAX: -sasTax,
-        SCI_RENT: sciRent,
-        SCI_DEBT_INTEREST: -sciDebt.interest,
-        SCI_DEBT_PRINCIPAL: -sciDebt.principal,
-        SCI_TAX: -sciTax,
-      },
-      warnings: ["Projection locale de secours — moteur distant indisponible ou en cours de chargement."],
-    };
-  });
-}
-
 // =============================================
 // HOOK CENTRAL — useMonthlyResults
 // Uses shared inputs from useBuildScenarioInputs
@@ -272,8 +176,6 @@ export function useMonthlyResults() {
     queryKey: ["monthly-results", JSON.stringify(inputs), scenarioState.indexationCA],
     queryFn: () => fetchMonthlyResults(inputs, overrides),
     staleTime: 30_000,
-    initialData: () => computeLocalMonthlyResults(inputs, overrides),
-    placeholderData: (prev) => prev,
     retry: 1,
   });
 }
