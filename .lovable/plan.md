@@ -1,38 +1,47 @@
-## Problème
+# Fix Projection associés
 
-Sur `/projection-societes`, le composant `ProjectionHorizonSlider` (colonne de gauche, sticky) affiche un curseur (thumb) qui paraît « flotter dans le vide » : la piste verticale du Slider shadcn n'est pas stylée pour l'orientation `vertical`, donc aucune ligne ne matérialise la course du curseur.
+Deux bugs identifiés sur `src/pages/ProjectionAssociesPage.tsx`.
 
-En plus, l'ensemble manque de présence visuelle pour qu'on comprenne que c'est interactif.
+## Bug 1 — Parts à 3900%
 
-## Fichier modifié
+`partExploitation` et `partFonciere` sont stockées en **pourcentage (0-100)** dans le projet (cf. `AssociesPage` qui affiche `${a.partExploitation}%` directement). La page projection les traite comme des **décimales (0-1)** :
 
-- `src/components/ProjectionHorizonSlider.tsx` uniquement (pas de logique métier touchée).
+- `(pExp * 100).toFixed(0)%` → 39 × 100 = **3900%**
+- `totalSasCca * pExp` → multiplié par 39 au lieu de 0.39 → montants × 100
 
-## Changements
+**De plus**, on n'utilise que les parts **directes**. Un associé qui détient via une holding morale est ignoré. Il faut utiliser `computeEconomicOwnership` (déjà disponible dans `src/lib/ownershipGraph.ts`) qui renvoie déjà les parts économiques **en pourcentage (0-100)**, direct + indirect.
 
-1. **Piste verticale visible** : passer une `trackClassName` / styles explicites au composant `Slider` pour forcer en mode vertical :
-   - Track : `w-1.5 h-full` (au lieu du défaut horizontal `h-2 w-full`), couleur `bg-border`, arrondie.
-   - Range (partie remplie) : `w-full` vertical, couleur `bg-primary`.
-   - Thumb : conserver taille actuelle, ajouter un léger `ring`/`shadow` pour mieux le distinguer.
+**Correctif** :
+- Remplacer `inv.partExploitation` / `inv.partFonciere` par `econ.exploitation / 100` et `econ.fonciere / 100` (via `computeEconomicOwnership(state.associes.associes)` mémoïsé).
+- Pour le badge : afficher `econ.exploitation.toFixed(0)%` directement (sans `*100`).
 
-2. **Graduations** : ajouter à droite de la piste de petits tirets pour 0, 5, 10, 15, 20, 25, 30 ans + label `5a`, `10a`, `15a`… discret en `text-[10px] text-muted-foreground`. Ça donne un repère visuel et confirme la nature interactive.
+## Bug 2 — Waterfall / graphique vides
 
-3. **Affordance** : 
-   - Cursor `cursor-pointer` sur la zone.
-   - Label « Horizon » en haut + valeur en gros chiffres en bas (déjà présent, on renforce le contraste : `text-foreground font-bold`).
-   - Légère bordure / background `bg-muted/30 rounded-lg` autour de la colonne pour la détacher du contenu et signifier qu'elle est une commande.
+Vérification de la réponse Railway : le backend ne renvoie **aucune** catégorie `SAS_DISTRIBUTION_DIVIDENDS`, `SCI_DISTRIBUTION_DIVIDENDS`, `SAS_DISTRIBUTION_CCA`, `SCI_DISTRIBUTION_CCA`, `SAS_DISTRIBUTION_RESERVE`, `SCI_DISTRIBUTION_RESERVE` dans `projectedByCategory`. Les seules catégories émises sont : `SAS_REVENUE`, `SAS_OPEX`, `SAS_RENT`, `SCI_RENT`, `SCI_DEBT_INTEREST`, `SCI_DEBT_INSURANCE`, `SCI_OTHER_REVENUE`, `SCI_CHARGES`.
 
-4. **Hauteur** : passer la piste de `h-48` à `h-64` pour avoir plus de place et rendre la course du curseur plus généreuse.
+Résultat : `dividends`, `ccaRepayment`, `totalDistributed` sont systématiquement à 0 → graphique sans barres et colonnes du tableau à 0 €.
 
-## Détails techniques
+**Correctif (front-only, sans toucher au backend)** : calculer les distributions côté front à partir des résultats nets annuels et des règles de gouvernance déjà saisies (`state.gouvernance.globalRule`) :
 
-Le composant `Slider` de shadcn (`src/components/ui/slider.tsx`) accepte `orientation="vertical"` mais ses classes Tailwind par défaut sont écrites pour l'horizontal. Plutôt que modifier le composant UI partagé (risque de casser d'autres usages), on surcharge via `className` sur le `<Slider>` et via les data-attributes `[&_[data-orientation=vertical]]:...` pour cibler la track et le range en mode vertical. Cela reste local au composant.
+```text
+Pour chaque année y :
+  cashDispo  = cashFinAnnée(SAS+SCI) - bufferMin     (clamp ≥ 0)
+  distrTotal = cashDispo × distributableCashRate
+  Si ccaBalance > 0 et allocationOrder priorise CCA :
+      cca       = min(distrTotal × ccaPriorityRatio, ccaBalance)
+      restant   = distrTotal − cca
+  Sinon cca = 0, restant = distrTotal
+  reserve   = restant × reserveStrategicRatio
+  dividends = restant − reserve
+```
 
-Aucun changement aux types, contextes, ou logique scenario.
+Cette approche reste une **estimation simplifiée** (pas d'IS différé, pas de propagation inter-annuelle du cash distribué). À documenter par un petit `Alert` au-dessus du tableau : « Estimation locale — le backend ne renvoie pas encore les flux de distribution ».
 
-## Validation
+Un correctif plus propre passera par une évolution Railway pour qu'il émette les catégories `*_DISTRIBUTION_*`. À noter dans `MAPPING_AUDIT.md` comme limitation #6.
 
-- Vérifier que le track vertical est visible (ligne grise verticale).
-- Vérifier que la partie sous le thumb se remplit en couleur primaire.
-- Vérifier que glisser le thumb met bien à jour `horizonMonths` (logique inchangée).
-- Vérifier l'aspect en sticky lors du scroll sur les pages `/projection-*`.
+## Fichiers touchés
+
+- `src/pages/ProjectionAssociesPage.tsx` : conversion parts %, intégration `computeEconomicOwnership`, estimation locale des distributions, `Alert` d'avertissement.
+- `MAPPING_AUDIT.md` : ajout limitation « 6. Catégories de distribution non émises par le backend ».
+
+Aucun changement sur le backend, le moteur, ou la gouvernance.
