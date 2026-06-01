@@ -176,7 +176,6 @@ export function useMonthlyResults() {
     queryKey: ["monthly-results", JSON.stringify(inputs), scenarioState.indexationCA],
     queryFn: () => fetchMonthlyResults(inputs, overrides),
     staleTime: 30_000,
-    placeholderData: (prev) => prev,
     retry: 1,
   });
 }
