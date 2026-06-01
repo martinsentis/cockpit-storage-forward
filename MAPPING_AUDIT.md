@@ -55,15 +55,13 @@ ni au bon moment ni en avance.
 **Fix complet nécessite** : que le backend accepte `startMonth` et `endMonth` par charge,
 ou que le mapper génère un payload différent par mois (architecture plus lourde).
 
-### 2. `ccaBalanceSci` toujours à 0
+### 2. ~~`ccaBalanceSci` toujours à 0~~ — résolu
 
-**Problème** : `GouvernanceData` ne contient pas de champ pour le solde CCA de la SCI
-(seulement `ccaBalance` pour la SAS).
-
-**Conséquence** : le remboursement du CCA SCI n'est jamais simulé.
-
-**Fix nécessite** : ajouter `ccaBalanceSci` dans `GouvernanceData` et un champ correspondant
-dans la page Gouvernance.
+`ccaBalanceSas` et `ccaBalanceSci` sont désormais calculés depuis
+`project.apports.apports` (somme des items `type === "CCA"` filtrés par
+`beneficiaireId === "__exploitation__"` ou `"__fonciere__"`). Le champ manuel
+`gouvernance.ccaBalance` n'est plus utilisé par le mapper ni par la page
+Projection associés.
 
 ### 3. Plans de loyer dynamique multi-périodes ignorés
 
