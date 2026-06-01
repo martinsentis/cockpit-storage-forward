@@ -91,6 +91,22 @@ n'accepte que `"NONE"`, `"INTEREST_ONLY"`, `"TOTAL"`.
 
 **Comportement actuel** : `"PARTIAL"` est silencieusement converti en `"NONE"`.
 
+### 6. Catégories de distribution non émises par le backend
+
+**Problème** : `projectedByCategory` ne contient aucune des catégories
+`SAS_DISTRIBUTION_DIVIDENDS`, `SCI_DISTRIBUTION_DIVIDENDS`,
+`SAS_DISTRIBUTION_CCA`, `SCI_DISTRIBUTION_CCA`,
+`SAS_DISTRIBUTION_RESERVE`, `SCI_DISTRIBUTION_RESERVE`.
+
+**Conséquence** : la page Projection associés ne peut pas lire les flux
+de distribution depuis Railway. Estimation locale calculée côté front
+à partir de `cashEnd`/`sciCashEnd`, `bufferMin` et des règles de
+`gouvernance.globalRule` (distributableCashRate, allocationOrder,
+reserveStrategicRatio, ccaBalance).
+
+**Fix nécessite** : que le backend applique l'`allocationOrder` et émette
+les catégories `*_DISTRIBUTION_*` mois par mois.
+
 ---
 
 ## Champs du ScenarioState transmis / ignorés

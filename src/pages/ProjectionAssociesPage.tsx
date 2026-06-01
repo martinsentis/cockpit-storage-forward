@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { ProjectionHeader } from "@/components/ProjectionHeader";
 import { ProjectionHorizonSlider } from "@/components/ProjectionHorizonSlider";
 import { useScenario } from "@/contexts/ScenarioContext";
@@ -15,56 +16,120 @@ import {
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
 } from "recharts";
-import { AlertTriangle, DoorOpen, TrendingUp, Users2, BarChart3, Loader2 } from "lucide-react";
+import { AlertTriangle, DoorOpen, TrendingUp, Users2, BarChart3, Info, Loader2 } from "lucide-react";
 import { useMonthlyResults } from "@/hooks/useEngine";
 import type { BackendMonthlyResult } from "@/hooks/useEngine";
+import { computeEconomicOwnership } from "@/lib/ownershipGraph";
+import type { GouvernanceData } from "@/types/project";
 
 const fmt = (v: number) =>
   v.toLocaleString("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 
-// ── Agrégation mensuelle → annuelle ──────────────────────────
-function toYearlyWaterfall(months: BackendMonthlyResult[]) {
-  const years = [];
-  for (let y = 0; y < Math.ceil(months.length / 12); y++) {
-    const slice  = months.slice(y * 12, y * 12 + 12);
-    const last   = slice[slice.length - 1];
-    const cat    = (m: BackendMonthlyResult) => m.projectedByCategory ?? {};
+interface YearRow {
+  year: number;
+  netResult: number;
+  cashAvailable: number;
+  dividends: number;
+  ccaRepayment: number;
+  totalDistributed: number;
+  remainingCash: number;
+  _sasDividends: number;
+  _sciDividends: number;
+  _sasCca: number;
+  _sciCca: number;
+}
 
-    const revenue    = slice.reduce((s, m) => s + (cat(m)["SAS_REVENUE"] ?? 0), 0);
-    const opex       = slice.reduce((s, m) => s + Math.abs(cat(m)["SAS_OPEX"] ?? 0), 0);
-    const rent       = slice.reduce((s, m) => s + Math.abs(cat(m)["SAS_RENT"] ?? 0), 0);
+/**
+ * Estime localement les distributions annuelles (le backend Railway n'émet pas
+ * encore les catégories *_DISTRIBUTION_*). Modèle simplifié :
+ *   cashDispo  = max(0, cashFinAnnée - bufferMin)
+ *   distrTotal = cashDispo × distributableCashRate
+ *   cca        = min(distrTotal × ccaPriorityRatio, ccaBalance restant)
+ *   restant    = distrTotal − cca
+ *   reserve    = restant × reserveStrategicRatio
+ *   dividends  = restant − reserve
+ */
+function toYearlyWaterfall(
+  months: BackendMonthlyResult[],
+  gouvernance: GouvernanceData,
+  bufferMin: number,
+): YearRow[] {
+  const rule = gouvernance.globalRule;
+  const order = rule.allocationOrder ?? [];
+  const ccaStepIdx = order.findIndex((s) => s.type === "CCA_REPAYMENT");
+  const reserveStepIdx = order.findIndex((s) => s.type === "RESERVE");
+  const ccaFirst = ccaStepIdx >= 0 && (reserveStepIdx < 0 || ccaStepIdx < reserveStepIdx);
+  const ccaStep = ccaStepIdx >= 0 ? order[ccaStepIdx] : undefined;
+  const ccaPriorityRatio = ccaStep
+    ? ccaStep.mode === "UNTIL_ZERO"
+      ? 1
+      : (ccaStep.ratio ?? 0) / 100
+    : 0;
+
+  // Solde CCA SAS uniquement (le type ne contient pas de ccaBalanceSci)
+  let ccaRemaining = Math.max(0, gouvernance.ccaBalance ?? 0);
+
+  const years: YearRow[] = [];
+  const totalYears = Math.ceil(months.length / 12);
+
+  for (let y = 0; y < totalYears; y++) {
+    const slice = months.slice(y * 12, y * 12 + 12);
+    const last = slice[slice.length - 1];
+    const cat = (m: BackendMonthlyResult) => m.projectedByCategory ?? {};
+
+    const revenue = slice.reduce((s, m) => s + (cat(m)["SAS_REVENUE"] ?? 0), 0);
+    const opex = slice.reduce((s, m) => s + Math.abs(cat(m)["SAS_OPEX"] ?? 0), 0);
+    const rent = slice.reduce((s, m) => s + Math.abs(cat(m)["SAS_RENT"] ?? 0), 0);
     const sasInterest = slice.reduce((s, m) => s + Math.abs(cat(m)["SAS_EXP_DEBT_INTEREST"] ?? 0), 0);
-    const sasTax     = slice.reduce((s, m) => s + Math.abs(cat(m)["SAS_TAX"] ?? 0), 0);
-    const sciRent    = slice.reduce((s, m) => s + (cat(m)["SCI_RENT"] ?? 0), 0);
+    const sasTax = slice.reduce((s, m) => s + Math.abs(cat(m)["SAS_TAX"] ?? 0), 0);
+    const sciRent = slice.reduce((s, m) => s + (cat(m)["SCI_RENT"] ?? 0), 0);
     const sciInterest = slice.reduce((s, m) => s + Math.abs(cat(m)["SCI_DEBT_INTEREST"] ?? 0), 0);
-    const sciTax     = slice.reduce((s, m) => s + Math.abs(cat(m)["SCI_TAX"] ?? 0), 0);
-
-    const sasDividends  = slice.reduce((s, m) => s + Math.abs(cat(m)["SAS_DISTRIBUTION_DIVIDENDS"] ?? 0), 0);
-    const sciDividends  = slice.reduce((s, m) => s + Math.abs(cat(m)["SCI_DISTRIBUTION_DIVIDENDS"] ?? 0), 0);
-    const sasCca        = slice.reduce((s, m) => s + Math.abs(cat(m)["SAS_DISTRIBUTION_CCA"] ?? 0), 0);
-    const sciCca        = slice.reduce((s, m) => s + Math.abs(cat(m)["SCI_DISTRIBUTION_CCA"] ?? 0), 0);
-    const sasReserve    = slice.reduce((s, m) => s + Math.abs(cat(m)["SAS_DISTRIBUTION_RESERVE"] ?? 0), 0);
-    const sciReserve    = slice.reduce((s, m) => s + Math.abs(cat(m)["SCI_DISTRIBUTION_RESERVE"] ?? 0), 0);
+    const sciTax = slice.reduce((s, m) => s + Math.abs(cat(m)["SCI_TAX"] ?? 0), 0);
+    const sciCharges = slice.reduce((s, m) => s + Math.abs(cat(m)["SCI_CHARGES"] ?? 0), 0);
+    const sciOther = slice.reduce((s, m) => s + (cat(m)["SCI_OTHER_REVENUE"] ?? 0), 0);
 
     const sasNetResult = (revenue - opex - rent) - sasInterest - sasTax;
-    const sciNetResult = sciRent - sciInterest - sciTax;
-    const dividends    = sasDividends + sciDividends;
+    const sciNetResult = sciRent + sciOther - sciCharges - sciInterest - sciTax;
+
+    const sasCashEnd = last?.cashEnd ?? 0;
+    const sciCashEnd = last?.sciCashEnd ?? 0;
+
+    // ── Estimation locale des distributions ────────────────
+    // SAS : repartit cashDispo selon CCA -> RESERVE -> DIVIDENDS
+    const sasCashDispo = Math.max(0, sasCashEnd - bufferMin);
+    const sasDistrTotal = sasCashDispo * (rule.distributableCashRate ?? 0);
+    let sasCca = 0;
+    if (ccaFirst && ccaRemaining > 0) {
+      sasCca = Math.min(sasDistrTotal * ccaPriorityRatio, ccaRemaining);
+      ccaRemaining -= sasCca;
+    }
+    const sasAfterCca = sasDistrTotal - sasCca;
+    const sasReserve = sasAfterCca * (rule.reserveStrategicRatio ?? 0);
+    const sasDividends = sasAfterCca - sasReserve;
+
+    // SCI : pas de CCA (ccaBalanceSci absent du modèle)
+    const sciCashDispo = Math.max(0, sciCashEnd - bufferMin);
+    const sciDistrTotal = sciCashDispo * (rule.distributableCashRate ?? 0);
+    const sciReserve = sciDistrTotal * (rule.reserveStrategicRatio ?? 0);
+    const sciDividends = sciDistrTotal - sciReserve;
+    const sciCca = 0;
+
+    const dividends = sasDividends + sciDividends;
     const ccaRepayment = sasCca + sciCca;
     const totalDistributed = dividends + ccaRepayment + sasReserve + sciReserve;
 
     years.push({
       year: y + 1,
-      netResult:       Math.round(sasNetResult + sciNetResult),
-      cashAvailable:   Math.round((last?.cashEnd ?? 0) + (last?.sciCashEnd ?? 0) + totalDistributed),
-      dividends:       Math.round(dividends),
-      ccaRepayment:    Math.round(ccaRepayment),
+      netResult: Math.round(sasNetResult + sciNetResult),
+      cashAvailable: Math.round(sasCashEnd + sciCashEnd),
+      dividends: Math.round(dividends),
+      ccaRepayment: Math.round(ccaRepayment),
       totalDistributed: Math.round(totalDistributed),
-      remainingCash:   Math.round((last?.cashEnd ?? 0) + (last?.sciCashEnd ?? 0)),
-      // pour les fiches associés
-      _sasDividends:   sasDividends,
-      _sciDividends:   sciDividends,
-      _sasCca:         sasCca,
-      _sciCca:         sciCca,
+      remainingCash: Math.round(sasCashEnd + sciCashEnd - totalDistributed),
+      _sasDividends: sasDividends,
+      _sciDividends: sciDividends,
+      _sasCca: sasCca,
+      _sciCca: sciCca,
     });
   }
   return years;
@@ -78,35 +143,42 @@ export default function ProjectionAssociesPage() {
   const projectionYears = Math.max(1, Math.ceil(scenarioState.horizonMonths / 12));
   const { fonciereValuation, exploitationEBEMultiple, repayCcaFirst } = scenarioState.exitHypotheses;
 
+  // Parts économiques (direct + indirect via holdings), retournées en % (0-100)
+  const economicOwnership = useMemo(
+    () => computeEconomicOwnership(state.associes.associes),
+    [state.associes.associes],
+  );
   const physicalAssociates = state.associes.associes.filter((a) => a.type === "PHYSIQUE");
-  const waterfall = toYearlyWaterfall(monthlyResults);
+
+  const waterfall = useMemo(
+    () => toYearlyWaterfall(monthlyResults, state.gouvernance, state.financement.bufferMin ?? 0),
+    [monthlyResults, state.gouvernance, state.financement.bufferMin],
+  );
 
   // ── Valeur de sortie ─────────────────────────────────────────
   const lastMonth = monthlyResults[monthlyResults.length - 1];
-  const lastYear  = waterfall[waterfall.length - 1];
 
-  // EBE dernière année pour valorisation exploitation
   const lastYearMonths = monthlyResults.slice(-12);
   const cat = (m: BackendMonthlyResult) => m.projectedByCategory ?? {};
   const lastEbe = lastYearMonths.reduce((s, m) => {
-    const rev  = cat(m)["SAS_REVENUE"] ?? 0;
+    const rev = cat(m)["SAS_REVENUE"] ?? 0;
     const opex = Math.abs(cat(m)["SAS_OPEX"] ?? 0);
     const rent = Math.abs(cat(m)["SAS_RENT"] ?? 0);
     return s + (rev - opex - rent);
   }, 0);
 
   const valorisationExploitation = lastEbe * exploitationEBEMultiple;
-  const tresorerieExploitation   = lastMonth?.cashEnd ?? 0;
-  const valorisationFonciere     = fonciereValuation;
-  const tresorerieFonciere       = lastMonth?.sciCashEnd ?? 0;
+  const tresorerieExploitation = lastMonth?.cashEnd ?? 0;
+  const valorisationFonciere = fonciereValuation;
+  const tresorerieFonciere = lastMonth?.sciCashEnd ?? 0;
   const totalEquity = valorisationExploitation + tresorerieExploitation + valorisationFonciere + tresorerieFonciere;
 
   // ── Totaux pour fiches associés ──────────────────────────────
   const totalSasDividends = waterfall.reduce((s, r) => s + r._sasDividends, 0);
   const totalSciDividends = waterfall.reduce((s, r) => s + r._sciDividends, 0);
-  const totalSasCca       = waterfall.reduce((s, r) => s + r._sasCca, 0);
-  const totalSciCca       = waterfall.reduce((s, r) => s + r._sciCca, 0);
-  const dividendFlatTax   = state.fiscalite.dividendFlatTaxRate ?? 0.30;
+  const totalSasCca = waterfall.reduce((s, r) => s + r._sasCca, 0);
+  const totalSciCca = waterfall.reduce((s, r) => s + r._sciCca, 0);
+  const dividendFlatTax = state.fiscalite.dividendFlatTaxRate ?? 0.30;
 
   return (
     <div className="flex gap-6">
@@ -192,6 +264,16 @@ export default function ProjectionAssociesPage() {
           </CardContent>
         </Card>
 
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            Estimation locale des distributions : le moteur Railway ne renvoie pas
+            encore les catégories <code>*_DISTRIBUTION_*</code>. Les montants ci-dessous
+            sont calculés côté front à partir de la trésorerie de fin d'année et des
+            règles de gouvernance (taux distribuable, ordre d'allocation, ratio réserve).
+          </AlertDescription>
+        </Alert>
+
         {/* Section 2 — Waterfall annuel */}
         <Card>
           <CardHeader className="pb-2">
@@ -250,8 +332,8 @@ export default function ProjectionAssociesPage() {
                 <XAxis dataKey="year" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip formatter={(v: number) => fmt(v)} />
-                <Bar dataKey="dividends"      name="Dividendes"          fill="hsl(217, 91%, 60%)" />
-                <Bar dataKey="ccaRepayment"   name="CCA remboursés"      fill="hsl(142, 71%, 45%)" />
+                <Bar dataKey="dividends" name="Dividendes" fill="hsl(217, 91%, 60%)" />
+                <Bar dataKey="ccaRepayment" name="CCA remboursés" fill="hsl(142, 71%, 45%)" />
                 <Bar dataKey="totalDistributed" name="Cash distribué total" fill="hsl(271, 91%, 65%)" />
               </BarChart>
             </ResponsiveContainer>
@@ -315,18 +397,22 @@ export default function ProjectionAssociesPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {physicalAssociates.map((inv) => {
-                const pExp = inv.partExploitation;  // part dans SAS
-                const pFon = inv.partFonciere;       // part dans SCI
+                const econ = economicOwnership.find((e) => e.personId === inv.id);
+                // economicOwnership renvoie des pourcentages (0-100)
+                const pctExp = econ?.exploitation ?? 0;
+                const pctFon = econ?.fonciere ?? 0;
+                const pExp = pctExp / 100;
+                const pFon = pctFon / 100;
 
-                const ccaBrut     = totalSasCca * pExp + totalSciCca * pFon;
-                const divBruts    = totalSasDividends * pExp + totalSciDividends * pFon;
-                const divNets     = divBruts * (1 - dividendFlatTax);
+                const ccaBrut = totalSasCca * pExp + totalSciCca * pFon;
+                const divBruts = totalSasDividends * pExp + totalSciDividends * pFon;
+                const divNets = divBruts * (1 - dividendFlatTax);
                 const exitExplVal = valorisationExploitation * pExp;
                 const exitExplTre = tresorerieExploitation * pExp;
-                const exitFonVal  = valorisationFonciere * pFon;
-                const exitFonTre  = tresorerieFonciere * pFon;
+                const exitFonVal = valorisationFonciere * pFon;
+                const exitFonTre = tresorerieFonciere * pFon;
                 const cashTotalBrut = ccaBrut + divBruts + exitExplVal + exitExplTre + exitFonVal + exitFonTre;
-                const cashTotalNet  = ccaBrut + divNets + exitExplVal + exitExplTre + exitFonVal + exitFonTre;
+                const cashTotalNet = ccaBrut + divNets + exitExplVal + exitExplTre + exitFonVal + exitFonTre;
 
                 return (
                   <Card key={inv.id}>
@@ -334,7 +420,7 @@ export default function ProjectionAssociesPage() {
                       <CardTitle className="flex items-center justify-between text-base">
                         {inv.prenom ? `${inv.prenom} ${inv.nom}` : inv.nom}
                         <Badge variant="outline">
-                          SAS {(pExp * 100).toFixed(0)}% / SCI {(pFon * 100).toFixed(0)}%
+                          Expl. {pctExp.toFixed(1)}% / Fonc. {pctFon.toFixed(1)}%
                         </Badge>
                       </CardTitle>
                     </CardHeader>
