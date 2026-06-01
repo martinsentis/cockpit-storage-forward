@@ -4,6 +4,7 @@ import { useScenario } from "@/contexts/ScenarioContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +15,7 @@ import {
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
 } from "recharts";
-import { DoorOpen, TrendingUp, Users2, BarChart3 } from "lucide-react";
+import { AlertTriangle, DoorOpen, TrendingUp, Users2, BarChart3, Loader2 } from "lucide-react";
 import { useMonthlyResults } from "@/hooks/useEngine";
 import type { BackendMonthlyResult } from "@/hooks/useEngine";
 
@@ -72,7 +73,7 @@ function toYearlyWaterfall(months: BackendMonthlyResult[]) {
 export default function ProjectionAssociesPage() {
   const { scenarioState, updateExitHypotheses } = useScenario();
   const { state } = useProject();
-  const { data: monthlyResults = [] } = useMonthlyResults();
+  const { data: monthlyResults = [], isLoading, isError, error } = useMonthlyResults();
 
   const projectionYears = Math.max(1, Math.ceil(scenarioState.horizonMonths / 12));
   const { fonciereValuation, exploitationEBEMultiple, repayCcaFirst } = scenarioState.exitHypotheses;
@@ -113,6 +114,35 @@ export default function ProjectionAssociesPage() {
       <div className="flex-1 space-y-6">
         <h1 className="text-2xl font-bold">Projection associés</h1>
         <ProjectionHeader />
+
+        {isLoading && (
+          <Card>
+            <CardContent className="flex items-center gap-3 py-8 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Calcul Railway en cours…
+            </CardContent>
+          </Card>
+        )}
+
+        {isError && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              Railway n'a pas renvoyé de projection. Aucune valeur locale ou factice n'est affichée.
+              {error instanceof Error ? ` Détail : ${error.message}` : ""}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {!isLoading && !isError && monthlyResults.length === 0 && (
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>Railway a répondu, mais sans données de projection exploitables.</AlertDescription>
+          </Alert>
+        )}
+
+        {!isLoading && !isError && monthlyResults.length > 0 && (
+          <>
 
         {/* Section 1 — Hypothèses de sortie */}
         <Card>
@@ -351,6 +381,8 @@ export default function ProjectionAssociesPage() {
             </div>
           )}
         </div>
+          </>
+        )}
       </div>
     </div>
   );
