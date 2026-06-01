@@ -140,7 +140,7 @@ export interface BackendMonthlyResult {
 
 async function fetchMonthlyResults(inputs: EngineInputs, overrides: ScenarioOverrides = {}): Promise<BackendMonthlyResult[]> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20_000);
+  const timeout = setTimeout(() => controller.abort(), 8_000);
 
   try {
     const payload = mapEngineInputsToProjectionInputs(inputs, undefined, overrides);
@@ -180,6 +180,8 @@ export function useMonthlyResults() {
     queryKey: ["monthly-results", JSON.stringify(inputs), scenarioState.indexationCA],
     queryFn: () => fetchMonthlyResults(inputs, overrides),
     staleTime: 30_000,
+    initialData: () => computeLocalMonthlyResults(inputs, overrides),
     placeholderData: (prev) => prev,
+    retry: 1,
   });
 }
