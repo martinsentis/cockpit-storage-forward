@@ -183,6 +183,36 @@ export default function ProjectionAssociesPage() {
   const totalSciCca = waterfall.reduce((s, r) => s + r._sciCca, 0);
   const dividendFlatTax = state.fiscalite.dividendFlatTaxRate ?? 0.30;
 
+  // ── Sélecteur associé sur le graphique ────────────────────────
+  const [selectedAssocieId, setSelectedAssocieId] = useState<string>("__all__");
+  const selectedAssocie = physicalAssociates.find((a) => a.id === selectedAssocieId);
+  const selectedEcon = selectedAssocie
+    ? economicOwnership.find((e) => e.personId === selectedAssocie.id)
+    : undefined;
+  const selectedName = selectedAssocie
+    ? selectedAssocie.prenom
+      ? `${selectedAssocie.prenom} ${selectedAssocie.nom}`
+      : selectedAssocie.nom
+    : null;
+
+  const chartData = useMemo(() => {
+    if (!selectedEcon) return waterfall;
+    const pExp = (selectedEcon.exploitation ?? 0) / 100;
+    const pFon = (selectedEcon.fonciere ?? 0) / 100;
+    return waterfall.map((row) => {
+      const dividends = row._sasDividends * pExp + row._sciDividends * pFon;
+      const ccaRepayment = row._sasCca * pExp + row._sciCca * pFon;
+      const dividendsNets = dividends * (1 - dividendFlatTax);
+      return {
+        ...row,
+        dividends: Math.round(dividends),
+        ccaRepayment: Math.round(ccaRepayment),
+        dividendsNets: Math.round(dividendsNets),
+        totalDistributed: Math.round(dividends + ccaRepayment),
+      };
+    });
+  }, [waterfall, selectedEcon, dividendFlatTax]);
+
   return (
     <div className="flex gap-6">
       <ProjectionHorizonSlider />
