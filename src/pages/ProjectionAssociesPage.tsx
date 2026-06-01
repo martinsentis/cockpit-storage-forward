@@ -353,21 +353,53 @@ export default function ProjectionAssociesPage() {
         {/* Section 3 — Graphique */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <BarChart3 className="h-5 w-5" />
-              Flux distribués aux associés
-            </CardTitle>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <BarChart3 className="h-5 w-5" />
+                {selectedName
+                  ? `Flux distribués à ${selectedName}`
+                  : "Flux distribués aux associés"}
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="associe-select" className="text-sm text-muted-foreground">
+                  Vue
+                </Label>
+                <Select value={selectedAssocieId} onValueChange={setSelectedAssocieId}>
+                  <SelectTrigger id="associe-select" className="w-[280px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">Tous les associés (vue globale)</SelectItem>
+                    {physicalAssociates.map((a) => {
+                      const econ = economicOwnership.find((e) => e.personId === a.id);
+                      const label = a.prenom ? `${a.prenom} ${a.nom}` : a.nom;
+                      const expl = (econ?.exploitation ?? 0).toFixed(1);
+                      const fon = (econ?.fonciere ?? 0).toFixed(1);
+                      return (
+                        <SelectItem key={a.id} value={a.id}>
+                          {label} — Expl. {expl}% / Fonc. {fon}%
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={waterfall}>
+              <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="year" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip formatter={(v: number) => fmt(v)} />
-                <Bar dataKey="dividends" name="Dividendes" fill="hsl(217, 91%, 60%)" />
+                <Bar dataKey="dividends" name={selectedName ? "Dividendes bruts" : "Dividendes"} fill="hsl(217, 91%, 60%)" />
                 <Bar dataKey="ccaRepayment" name="CCA remboursés" fill="hsl(142, 71%, 45%)" />
-                <Bar dataKey="totalDistributed" name="Cash distribué total" fill="hsl(271, 91%, 65%)" />
+                {selectedName ? (
+                  <Bar dataKey="dividendsNets" name={`Dividendes nets (PFU ${(dividendFlatTax * 100).toFixed(0)}%)`} fill="hsl(38, 92%, 50%)" />
+                ) : (
+                  <Bar dataKey="totalDistributed" name="Cash distribué total" fill="hsl(271, 91%, 65%)" />
+                )}
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
