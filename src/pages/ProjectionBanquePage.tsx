@@ -5,6 +5,7 @@ import { ProjectionHorizonSlider } from "@/components/ProjectionHorizonSlider";
 import type { DebtType, FinancingEntity } from "@/types/project";
 import { DEBT_TYPE_LABELS, FINANCING_ENTITY_LABELS } from "@/types/project";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +23,7 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import { useMonthlyResults } from "@/hooks/useEngine";
 import type { BackendMonthlyResult } from "@/hooks/useEngine";
 
@@ -72,7 +74,7 @@ function toYearlyData(months: BackendMonthlyResult[]) {
 
 export default function ProjectionBanquePage() {
   const { scenarioState } = useScenario();
-  const { data: monthlyResults = [] } = useMonthlyResults();
+  const { data: monthlyResults = [], isLoading, isError, error } = useMonthlyResults();
   const [bankMode, setBankMode] = useState<"financing" | "monitoring">("financing");
   const [entity, setEntity] = useState<FinancingEntity>("FONCIERE");
   const [financingType, setFinancingType] = useState<DebtType>("BANK_LOAN");
@@ -95,6 +97,35 @@ export default function ProjectionBanquePage() {
       <ProjectionHorizonSlider />
       <div className="flex-1 space-y-6 p-6">
         <ProjectionHeader />
+
+        {isLoading && (
+          <Card>
+            <CardContent className="flex items-center gap-3 py-8 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Calcul Railway en cours…
+            </CardContent>
+          </Card>
+        )}
+
+        {isError && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              Railway n'a pas renvoyé de projection. Aucune valeur locale ou factice n'est affichée.
+              {error instanceof Error ? ` Détail : ${error.message}` : ""}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {!isLoading && !isError && monthlyResults.length === 0 && (
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>Railway a répondu, mais sans données de projection exploitables.</AlertDescription>
+          </Alert>
+        )}
+
+        {!isLoading && !isError && monthlyResults.length > 0 && (
+          <>
         <div className="flex items-center gap-3">
           <Label className="text-sm font-medium">Simulation financement</Label>
           <Switch
@@ -296,6 +327,8 @@ export default function ProjectionBanquePage() {
             </Table>
           </CardContent>
         </Card>
+          </>
+        )}
       </div>
     </div>
   );
