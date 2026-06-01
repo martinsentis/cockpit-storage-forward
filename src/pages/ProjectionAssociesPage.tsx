@@ -157,9 +157,21 @@ export default function ProjectionAssociesPage() {
   );
   const physicalAssociates = state.associes.associes.filter((a) => a.type === "PHYSIQUE");
 
+  const ccaBalances = useMemo(() => {
+    const apports = state.apports?.apports ?? [];
+    return {
+      sas: apports
+        .filter((a) => a.type === "CCA" && a.beneficiaireId === "__exploitation__")
+        .reduce((s, a) => s + (a.montant ?? 0), 0),
+      sci: apports
+        .filter((a) => a.type === "CCA" && a.beneficiaireId === "__fonciere__")
+        .reduce((s, a) => s + (a.montant ?? 0), 0),
+    };
+  }, [state.apports]);
+
   const waterfall = useMemo(
-    () => toYearlyWaterfall(monthlyResults, state.gouvernance, state.financement.bufferMin ?? 0),
-    [monthlyResults, state.gouvernance, state.financement.bufferMin],
+    () => toYearlyWaterfall(monthlyResults, state.gouvernance, state.financement.bufferMin ?? 0, ccaBalances),
+    [monthlyResults, state.gouvernance, state.financement.bufferMin, ccaBalances],
   );
 
   // ── Valeur de sortie ─────────────────────────────────────────
